@@ -118,6 +118,71 @@ func TestGitHubPackagesForbiddenFallsBackToCommits(t *testing.T) {
 	}
 }
 
+func TestGitHubLookupCommit(t *testing.T) {
+	t.Parallel()
+	var hits int
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/ianunruh/kmc/commits/b8e5098", func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		writeJSON(t, w, map[string]any{
+			"sha":      "b8e509806517abcdef",
+			"html_url": "https://github.com/ianunruh/kmc/commit/b8e509806517abcdef",
+			"commit": map[string]any{
+				"message": "Fix the thing\n\nMore detail.",
+				"author":  map[string]any{"name": "Ian Unruh", "date": "2026-08-20T05:15:00Z"},
+			},
+			"author": map[string]any{"login": "ianunruh"},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	g := &GitHub{Token: "t", APIBase: srv.URL, HTTPClient: srv.Client()}
+	got, err := g.LookupCommit(t.Context(), "https://github.com/ianunruh/kmc", "b8e5098")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SHA != "b8e509806517abcdef" || got.Message != "Fix the thing" || got.Author != "Ian Unruh" {
+		t.Fatalf("%+v", got)
+	}
+	if got.URL != "https://github.com/ianunruh/kmc/commit/b8e509806517abcdef" {
+		t.Fatalf("url %s", got.URL)
+	}
+	again, err := g.LookupCommit(t.Context(), "https://github.com/ianunruh/kmc", "b8e5098")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again != got {
+		t.Fatalf("cache %+v", again)
+	}
+	if hits != 1 {
+		t.Fatalf("hits %d", hits)
+	}
+	if _, err := g.LookupCommit(t.Context(), "https://gitlab.com/ianunruh/kmc", "b8e5098"); err == nil {
+		t.Fatal("expected gitlab error")
+	}
+}
+
+func TestGitHubLookupCommitNotFoundCached(t *testing.T) {
+	t.Parallel()
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		http.Error(w, `{"message":"Not Found"}`, http.StatusNotFound)
+	}))
+	t.Cleanup(srv.Close)
+	g := &GitHub{APIBase: srv.URL, HTTPClient: srv.Client()}
+	if _, err := g.LookupCommit(t.Context(), "https://github.com/ianunruh/kmc", "deadbee"); err == nil {
+		t.Fatal("expected error")
+	}
+	if _, err := g.LookupCommit(t.Context(), "https://github.com/ianunruh/kmc", "deadbee"); err == nil {
+		t.Fatal("expected cached error")
+	}
+	if hits != 1 {
+		t.Fatalf("hits %d", hits)
+	}
+}
+
 func TestGitHubListRejectsNonGHCR(t *testing.T) {
 	t.Parallel()
 	g := &GitHub{Token: "t"}

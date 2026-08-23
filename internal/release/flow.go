@@ -20,10 +20,11 @@ const (
 )
 
 type Flow struct {
-	Image  string `json:"image,omitempty"`
-	Digest string `json:"digest,omitempty"`
-	Tag    string `json:"tag,omitempty"`
-	Hops   []Hop  `json:"hops"`
+	Image  string       `json:"image,omitempty"`
+	Digest string       `json:"digest,omitempty"`
+	Tag    string       `json:"tag,omitempty"`
+	Source SourceCommit `json:"source,omitempty"`
+	Hops   []Hop        `json:"hops"`
 }
 
 type Hop struct {

@@ -4,6 +4,7 @@ import type { Release, ReleaseStageHit } from "~/lib/api.server";
 import { CompactImage } from "~/ui/compact-image";
 import { RelativeTime } from "~/ui/relative-time";
 import { ResourceTable, Table } from "~/ui/resource-table";
+import { SourceCommitMeta } from "~/ui/source-commit";
 
 export function ReleaseHistory({
   stages,
@@ -28,19 +29,22 @@ export function ReleaseHistory({
           headers={["Image", ...stages]}
           isEmpty={releases.length === 0}
           emptyMessage="No pin or promote commits yet."
-          minWidth={Math.max(480, 180 + stages.length * 160)}
+          minWidth={Math.max(560, 260 + stages.length * 160)}
         >
           {releases.map((rel) => (
             <Table.Tr key={rel.digest || rel.image}>
               <Table.Td className="db-cell-clip">
-                <Group gap="xs" wrap="nowrap">
-                  <CompactImage value={rel.image} />
-                  {rel.current ? (
-                    <Badge size="xs" variant="light" color="accent" tt="none">
-                      current
-                    </Badge>
-                  ) : null}
-                </Group>
+                <Stack gap={4}>
+                  <Group gap="xs" wrap="nowrap">
+                    <CompactImage value={rel.image} />
+                    {rel.current ? (
+                      <Badge size="xs" variant="light" color="accent" tt="none">
+                        current
+                      </Badge>
+                    ) : null}
+                  </Group>
+                  <SourceCommitMeta source={rel.source} />
+                </Stack>
               </Table.Td>
               {stages.map((stage) => (
                 <Table.Td key={stage} className="db-cell-fit">

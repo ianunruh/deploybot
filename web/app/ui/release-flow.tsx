@@ -5,6 +5,7 @@ import { IconArrowRight } from "@tabler/icons-react";
 import type { Flow, FlowHop, StageStatus } from "~/lib/api.server";
 import { CompactImage } from "~/ui/compact-image";
 import { ConsolePaper } from "~/ui/console-paper";
+import { SourceCommitMeta } from "~/ui/source-commit";
 import { StatusBadge } from "~/ui/status-badge";
 
 const HOP_LABEL: Record<string, string> = {
@@ -45,6 +46,7 @@ export function ReleaseFlow({ stages, flow }: { stages: StageStatus[]; flow?: Fl
           <CompactImage value={flow.tag || flow.image} />
         ) : null}
       </Group>
+      <SourceCommitMeta source={flow?.source} />
       <ConsolePaper>
         <div className="db-flow">
           {stages.map((st, i) => {

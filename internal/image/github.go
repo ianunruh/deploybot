@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -21,11 +22,20 @@ const (
 	maxPackagePages  = 2
 )
 
-// GitHub lists GHCR images through the GitHub Packages API.
+// GitHub lists GHCR images through the GitHub Packages API and looks up
+// source commits on github.com.
 type GitHub struct {
 	Token      string
 	APIBase    string
 	HTTPClient *http.Client
+
+	mu      sync.Mutex
+	commits map[string]cachedCommit
+}
+
+type cachedCommit struct {
+	commit Commit
+	found  bool
 }
 
 func NewGitHub() *GitHub {
@@ -163,6 +173,76 @@ func (g *GitHub) commitVersions(ctx context.Context, owner, pkg, repository, def
 	return out, nil
 }
 
+// LookupCommit fetches a commit from a github.com repoURL. Results are cached
+// for the process lifetime; 404s are cached, other errors are not.
+func (g *GitHub) LookupCommit(ctx context.Context, repoURL, sha string) (Commit, error) {
+	owner, repo, ok := ParseGitHubRepo(repoURL)
+	if !ok {
+		return Commit{}, fmt.Errorf("not a github.com repo URL")
+	}
+	sha = strings.TrimSpace(sha)
+	if sha == "" {
+		return Commit{}, fmt.Errorf("empty commit sha")
+	}
+	key := commitCacheKey(owner, repo, sha)
+	if cached, hit := g.cachedCommit(key); hit {
+		if !cached.found {
+			return Commit{}, fmt.Errorf("github commit not found")
+		}
+		return cached.commit, nil
+	}
+	path := fmt.Sprintf("/repos/%s/%s/commits/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(sha))
+	var raw gitCommit
+	if _, err := g.getJSON(ctx, path, &raw); err != nil {
+		var apiErr *apiError
+		if errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound {
+			g.storeCommit(key, cachedCommit{})
+		}
+		return Commit{}, err
+	}
+	got := commitFromAPI(raw, repoURL, sha)
+	g.storeCommit(key, cachedCommit{commit: got, found: true})
+	if raw.SHA != "" && !strings.EqualFold(raw.SHA, sha) {
+		g.storeCommit(commitCacheKey(owner, repo, raw.SHA), cachedCommit{commit: got, found: true})
+	}
+	return got, nil
+}
+
+func commitFromAPI(raw gitCommit, repoURL, sha string) Commit {
+	out := Commit{SHA: cmp.Or(raw.SHA, sha)}
+	msg := strings.TrimSpace(raw.Commit.Message)
+	if i := strings.IndexByte(msg, '\n'); i >= 0 {
+		msg = strings.TrimSpace(msg[:i])
+	}
+	out.Message = msg
+	out.Author = cmp.Or(raw.Commit.Author.Name, raw.Author.Login)
+	out.URL = cmp.Or(raw.HTMLURL, GitHubCommitURL(repoURL, out.SHA))
+	return out
+}
+
+func commitCacheKey(owner, repo, sha string) string {
+	return strings.ToLower(owner + "/" + repo + "@" + sha)
+}
+
+func (g *GitHub) cachedCommit(key string) (cachedCommit, bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.commits == nil {
+		return cachedCommit{}, false
+	}
+	c, ok := g.commits[key]
+	return c, ok
+}
+
+func (g *GitHub) storeCommit(key string, c cachedCommit) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.commits == nil {
+		g.commits = map[string]cachedCommit{}
+	}
+	g.commits[key] = c
+}
+
 func sortVersions(out []Version) {
 	slices.SortStableFunc(out, func(a, b Version) int {
 		if c := b.CreatedAt.Compare(a.CreatedAt); c != 0 {
@@ -183,15 +263,21 @@ type packageVersion struct {
 }
 
 type gitCommit struct {
-	SHA    string `json:"sha"`
-	Commit struct {
-		Author struct {
+	SHA     string `json:"sha"`
+	HTMLURL string `json:"html_url"`
+	Commit  struct {
+		Message string `json:"message"`
+		Author  struct {
+			Name string    `json:"name"`
 			Date time.Time `json:"date"`
 		} `json:"author"`
 		Committer struct {
 			Date time.Time `json:"date"`
 		} `json:"committer"`
 	} `json:"commit"`
+	Author struct {
+		Login string `json:"login"`
+	} `json:"author"`
 }
 
 func versionFromPackage(repository string, v packageVersion) (Version, bool) {

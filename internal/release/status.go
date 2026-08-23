@@ -116,6 +116,11 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 		}
 	}
 	out.Flow = buildFlow(snaps, time.Now().UTC())
+	if out.Flow.Tag != "" {
+		sctx, cancel := context.WithTimeout(ctx, sourceCommitTimeout)
+		out.Flow.Source = s.resolveSource(sctx, d.Spec.Links.RepoURL, out.Flow.Tag)
+		cancel()
+	}
 	return out, nil
 }
 

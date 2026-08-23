@@ -42,11 +42,19 @@ type ReleaseStage struct {
 	CommitURL string    `json:"commitURL,omitempty"`
 }
 
+type SourceCommit struct {
+	SHA     string `json:"sha,omitempty"`
+	Message string `json:"message,omitempty"`
+	Author  string `json:"author,omitempty"`
+	URL     string `json:"url,omitempty"`
+}
+
 type Release struct {
 	Image   string                  `json:"image"`
 	Digest  string                  `json:"digest,omitempty"`
 	Tag     string                  `json:"tag,omitempty"`
 	Current bool                    `json:"current,omitempty"`
+	Source  SourceCommit            `json:"source,omitempty"`
 	Stages  map[string]ReleaseStage `json:"stages"`
 }
 
@@ -79,7 +87,9 @@ func (s *Service) History(ctx context.Context, name string, limit int) (History,
 			current = img
 		}
 	}
-	return History{Events: events, Releases: groupReleases(events, current)}, nil
+	releases := groupReleases(events, current)
+	s.attachSources(ctx, d.Spec.Links.RepoURL, releases)
+	return History{Events: events, Releases: releases}, nil
 }
 
 func (s *Service) overlayChanges(ctx context.Context, d *spec.Deployable, limit int) ([]Event, error) {

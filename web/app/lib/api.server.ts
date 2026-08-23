@@ -75,10 +75,18 @@ export type FlowHop = {
   destImage?: string;
 };
 
+export type SourceCommit = {
+  sha?: string;
+  message?: string;
+  author?: string;
+  url?: string;
+};
+
 export type Flow = {
   image?: string;
   digest?: string;
   tag?: string;
+  source?: SourceCommit;
   hops: FlowHop[];
 };
 
@@ -107,6 +115,7 @@ export type Release = {
   digest?: string;
   tag?: string;
   current?: boolean;
+  source?: SourceCommit;
   stages: Record<string, ReleaseStageHit>;
 };
 

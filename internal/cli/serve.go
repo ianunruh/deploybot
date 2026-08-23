@@ -67,6 +67,7 @@ func runServe(ctx context.Context, args []string) error {
 		return err
 	}
 	token, tokenSrc := image.ResolveToken()
+	gh := &image.GitHub{Token: token, HTTPClient: &http.Client{Timeout: 20 * time.Second}}
 	svc := &release.Service{
 		Catalog: cat,
 		OpsRepo: s.repo,
@@ -76,7 +77,8 @@ func runServe(ctx context.Context, args []string) error {
 		Author:  gitwrite.DefaultAuthor(),
 		Argo:    eps,
 		Wait:    5 * time.Minute,
-		Images:  &image.GitHub{Token: token, HTTPClient: &http.Client{Timeout: 20 * time.Second}},
+		Images:  gh,
+		Commits: gh,
 	}
 	h := (&api.Server{Release: svc, Catalog: cat}).Handler()
 	srv := &http.Server{Addr: s.addr, Handler: h}

@@ -21,6 +21,7 @@ type Service struct {
 	Wait      time.Duration
 	FlowEvery time.Duration
 	Images    image.Lister
+	Commits   image.CommitLookup
 
 	overlays *overlayCache
 }
