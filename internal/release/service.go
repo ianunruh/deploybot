@@ -187,7 +187,7 @@ func (s *Service) Promote(ctx context.Context, name, from, to string) (Mutation,
 	}, []string{to})
 }
 
-type syncPlan struct {
+type reconcilePlan struct {
 	d      *spec.Deployable
 	stages []string
 	before render.Tree
@@ -195,43 +195,43 @@ type syncPlan struct {
 	msg    string
 }
 
-func (s *Service) planSync(name string, stages []string) (syncPlan, error) {
+func (s *Service) planReconcile(name string, stages []string) (reconcilePlan, error) {
 	d, err := s.Catalog.Get(name)
 	if err != nil {
-		return syncPlan{}, err
+		return reconcilePlan{}, err
 	}
 	stages, err = resolveStages(d, stages)
 	if err != nil {
-		return syncPlan{}, err
+		return reconcilePlan{}, err
 	}
 	generated, err := render.Render(d)
 	if err != nil {
-		return syncPlan{}, err
+		return reconcilePlan{}, err
 	}
 	generated, err = render.FilterStages(generated, d, stages)
 	if err != nil {
-		return syncPlan{}, err
+		return reconcilePlan{}, err
 	}
 	before := render.Tree{}
 	if s.OpsRepo != "" {
 		before, err = gitwrite.ReadPaths(s.OpsRepo, render.SortedPaths(generated))
 		if err != nil {
-			return syncPlan{}, err
+			return reconcilePlan{}, err
 		}
 	}
 	after, err := render.MergeTrees(before, generated)
 	if err != nil {
-		return syncPlan{}, err
+		return reconcilePlan{}, err
 	}
-	msg := fmt.Sprintf("sync %s", name)
+	msg := fmt.Sprintf("reconcile %s", name)
 	if len(stages) != len(d.Spec.Stages) {
-		msg = fmt.Sprintf("sync %s (%s)", name, strings.Join(stages, ", "))
+		msg = fmt.Sprintf("reconcile %s (%s)", name, strings.Join(stages, ", "))
 	}
-	return syncPlan{d: d, stages: stages, before: before, after: after, msg: msg}, nil
+	return reconcilePlan{d: d, stages: stages, before: before, after: after, msg: msg}, nil
 }
 
-func (s *Service) DiffSync(name string, stages []string) (Mutation, error) {
-	plan, err := s.planSync(name, stages)
+func (s *Service) DiffReconcile(name string, stages []string) (Mutation, error) {
+	plan, err := s.planReconcile(name, stages)
 	if err != nil {
 		return Mutation{}, err
 	}
@@ -242,8 +242,8 @@ func (s *Service) DiffSync(name string, stages []string) (Mutation, error) {
 	}, nil
 }
 
-func (s *Service) SyncManifests(ctx context.Context, name string, stages []string) (Mutation, error) {
-	plan, err := s.planSync(name, stages)
+func (s *Service) Reconcile(ctx context.Context, name string, stages []string) (Mutation, error) {
+	plan, err := s.planReconcile(name, stages)
 	if err != nil {
 		return Mutation{}, err
 	}
@@ -388,6 +388,17 @@ func (s *Service) overlayTree(d *spec.Deployable) (render.Tree, error) {
 		out[p] = generated[p]
 	}
 	return out, nil
+}
+
+// WithSync returns a shallow copy with Argo sync forced on or off for one
+// mutation. Sync cannot be turned on if the service has it disabled.
+func (s *Service) WithSync(enabled bool) *Service {
+	if s == nil || !s.Sync || enabled {
+		return s
+	}
+	cp := *s
+	cp.Sync = false
+	return &cp
 }
 
 func (s *Service) author() gitwrite.Author {

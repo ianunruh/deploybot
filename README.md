@@ -37,7 +37,7 @@ just build
   --image ghcr.io/ianunruh/kmc@sha256:… --repo /path/to/kcloud-ops --apply --push
 ./build/deploybot promote --spec examples/kmc.yaml --from homelab --to prod \
   --repo /path/to/kcloud-ops --apply --push
-./build/deploybot sync --spec examples/kmc.yaml --stage homelab \
+./build/deploybot reconcile --spec examples/kmc.yaml --stage homelab \
   --repo /path/to/kcloud-ops --apply --push
 ```
 

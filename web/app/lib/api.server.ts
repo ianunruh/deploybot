@@ -109,36 +109,61 @@ export function diffPin(name: string, stage: string, image: string) {
   );
 }
 
-export function pinDeployable(name: string, stage: string, image: string) {
+export function pinDeployable(
+  name: string,
+  stage: string,
+  image: string,
+  opts?: { sync?: boolean },
+) {
   return apiFetch<MutationResult>(`/api/v1/deployables/${encodeURIComponent(name)}/pin`, {
     method: "POST",
-    body: JSON.stringify({ stage, image }),
+    body: JSON.stringify({
+      stage,
+      image,
+      ...(opts?.sync != null ? { sync: opts.sync } : {}),
+    }),
   });
 }
 
-export function promoteDeployable(name: string, from: string, to: string) {
+export function promoteDeployable(
+  name: string,
+  from: string,
+  to: string,
+  opts?: { sync?: boolean },
+) {
   return apiFetch<MutationResult>(
     `/api/v1/deployables/${encodeURIComponent(name)}/promote`,
     {
       method: "POST",
-      body: JSON.stringify({ from, to }),
+      body: JSON.stringify({
+        from,
+        to,
+        ...(opts?.sync != null ? { sync: opts.sync } : {}),
+      }),
     },
   );
 }
 
-export function previewSync(name: string, stage: string) {
+export function previewReconcile(name: string, stage: string) {
   const q = new URLSearchParams({ stage });
   return apiFetch<MutationResult>(
-    `/api/v1/deployables/${encodeURIComponent(name)}/sync?${q}`,
+    `/api/v1/deployables/${encodeURIComponent(name)}/reconcile?${q}`,
   );
 }
 
-export function syncDeployable(name: string, stage: string) {
+export function reconcileDeployable(
+  name: string,
+  stage: string,
+  opts?: { sync?: boolean },
+) {
   return apiFetch<MutationResult>(
-    `/api/v1/deployables/${encodeURIComponent(name)}/sync`,
+    `/api/v1/deployables/${encodeURIComponent(name)}/reconcile`,
     {
       method: "POST",
-      body: JSON.stringify({ stage }),
+      body: JSON.stringify({
+        stage,
+        ...(opts?.sync != null ? { sync: opts.sync } : {}),
+      }),
     },
   );
 }

@@ -29,7 +29,7 @@ Usage:
   deploybot render [--out dir] <spec>
   deploybot pin --spec <file> --stage <name> --image <ref> [--config file] [--repo dir] [--apply] [--push] [--sync]
   deploybot promote --spec <file> --from <stage> --to <stage> [--config file] [--repo dir] [--apply] [--push] [--sync]
-  deploybot sync --spec <file> [--stage name]... [--config file] [--repo dir] [--apply] [--push] [--sync]
+  deploybot reconcile --spec <file> [--stage name]... [--config file] [--repo dir] [--apply] [--push] [--sync]
   deploybot serve [--config file] [--addr host:port] [--specs dir] [--repo dir] [--apply] [--push] [--sync]
   deploybot version
 `
@@ -52,8 +52,8 @@ func Run(ctx context.Context, args []string) error {
 		return runPin(ctx, args[1:])
 	case "promote":
 		return runPromote(ctx, args[1:])
-	case "sync":
-		return runSync(ctx, args[1:])
+	case "reconcile":
+		return runReconcile(ctx, args[1:])
 	case "serve":
 		return runServe(ctx, args[1:])
 	default:
@@ -144,8 +144,8 @@ func runPromote(ctx context.Context, args []string) error {
 	return nil
 }
 
-func runSync(ctx context.Context, args []string) error {
-	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
+func runReconcile(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("reconcile", flag.ContinueOnError)
 	flags := mutationFlags(fs)
 	var stages stringList
 	fs.Var(&stages, "stage", "stage to write (repeatable or comma-separated; default: all)")
@@ -153,13 +153,13 @@ func runSync(ctx context.Context, args []string) error {
 		return err
 	}
 	if *flags.spec == "" {
-		return fmt.Errorf("sync requires --spec")
+		return fmt.Errorf("reconcile requires --spec")
 	}
 	svc, name, err := serviceFromFlags(fs, flags)
 	if err != nil {
 		return err
 	}
-	mut, err := svc.SyncManifests(ctx, name, []string(stages))
+	mut, err := svc.Reconcile(ctx, name, []string(stages))
 	if err != nil {
 		return err
 	}

@@ -38,7 +38,7 @@ API, not a replacement for them.
 - **Do not grow the spec into a Deployment schema.** Generate the skeleton
   (Deployment, optional Service/HTTPRoute, overlay `images:`, Argo app).
   App-specific fields (env, volumes, args, securityContext, extra ports,
-  CRDs, RBAC, PVCs) stay as extra files and overlay patches. Sync rewrites
+  CRDs, RBAC, PVCs) stay as extra files and overlay patches. Reconcile rewrites
   generated paths and merges kustomizations so those extras survive.
 
 ## Stack
@@ -69,13 +69,13 @@ Kaniko or rewrite `docker-build.yml` for this.
 
 Spec + renderer + goldens for both customers, image pin (GHCR picker, newest
 first), local git write, opt-in git push (no force), Argo sync/health/promote,
-RR console (catalog, stage matrix, pin, promote, per-stage sync).
+RR console (catalog, stage matrix, pin, promote, per-stage reconcile).
 
 Pin/promote **only** upsert `images:` on the stage overlay. They must not
 rewrite workload YAML or shared Argo project `kustomization.yaml` files
 (sandbox app list).
 
-`deploybot sync` renders generated manifests into the ops repo (merge
+`deploybot reconcile` renders generated manifests into the ops repo (merge
 kustomizations, keep pins and human generators/patches) and can limit stages.
 Argo Applications are full docs per overlay, not a shared base + path patch.
 

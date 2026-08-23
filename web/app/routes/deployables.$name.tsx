@@ -17,6 +17,13 @@ import { useFetcherResult } from "~/lib/use-fetcher-result";
 import { ConfirmActionModal } from "~/ui/confirm-action-modal";
 import { DiffPanel } from "~/ui/diff-panel";
 import { DeployableLinkLabels, HostnameLink } from "~/ui/external-links";
+import {
+  ArgoSyncCheckbox,
+  formFlag,
+  MutationGitHint,
+  mutationCommitLabel,
+  mutationNote,
+} from "~/ui/mutation-controls";
 import { PageHeader } from "~/ui/page-header";
 import { ResourceTable, Table } from "~/ui/resource-table";
 import { StatusBadge } from "~/ui/status-badge";
@@ -60,6 +67,7 @@ export async function action({ request, params }: Route.ActionArgs) {
             name,
             String(form.get("stage") ?? ""),
             String(form.get("image") ?? ""),
+            { sync: formFlag(form, "sync") },
           ),
         } satisfies ActionData;
       case "promote":
@@ -70,6 +78,7 @@ export async function action({ request, params }: Route.ActionArgs) {
             name,
             String(form.get("from") ?? ""),
             String(form.get("to") ?? ""),
+            { sync: formFlag(form, "sync") },
           ),
         } satisfies ActionData;
       default:
@@ -94,6 +103,8 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
   const [pinOpen, pinHandlers] = useDisclosure(false);
   const [promoteOpen, promoteHandlers] = useDisclosure(false);
   const [image, setImage] = useState("");
+  const [pinSync, setPinSync] = useState(true);
+  const [promoteSync, setPromoteSync] = useState(true);
 
   const stages = status?.stages ?? [];
   const defaultStage = stages[0]?.name ?? "";
@@ -128,7 +139,10 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       notifyActionError("Pin failed", data.error);
       return;
     }
-    notifyActionSuccess("Pin", `Wrote overlay${mutationNote(data.result)}`);
+    notifyActionSuccess(
+      "Pin",
+      `Wrote overlay${mutationNote(data.result, { argoAvailable: status?.sync })}`,
+    );
     pinHandlers.close();
     setImage("");
     void revalidator.revalidate();
@@ -139,7 +153,10 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       notifyActionError("Promote failed", data.error);
       return;
     }
-    notifyActionSuccess("Promote", `Copied pin${mutationNote(data.result)}`);
+    notifyActionSuccess(
+      "Promote",
+      `Copied pin${mutationNote(data.result, { argoAvailable: status?.sync })}`,
+    );
     promoteHandlers.close();
     void revalidator.revalidate();
   });
@@ -181,13 +198,19 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
           <Group gap="sm">
             <Button
               variant="default"
-              onClick={() => pinHandlers.open()}
+              onClick={() => {
+                setPinSync(true);
+                pinHandlers.open();
+              }}
               disabled={stages.length === 0}
             >
               Pin image
             </Button>
             <Button
-              onClick={() => promoteHandlers.open()}
+              onClick={() => {
+                setPromoteSync(true);
+                promoteHandlers.open();
+              }}
               disabled={fromStage == null || toStage == null}
             >
               Promote
@@ -228,11 +251,11 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
             <Table.Td className="db-cell-fit">
               <Button
                 component={Link}
-                to={`/deployables/${status.name}/sync/${st.name}`}
+                to={`/deployables/${status.name}/reconcile/${st.name}`}
                 variant="default"
                 size="compact-sm"
               >
-                Sync
+                Reconcile
               </Button>
             </Table.Td>
           </Table.Tr>
@@ -249,7 +272,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         }}
         loading={pinFetcher.state !== "idle"}
         title={`Pin ${status.name}`}
-        confirmLabel={commitLabel(status, "pin")}
+        confirmLabel={mutationCommitLabel(status, "pin", status.sync && pinSync)}
         confirmDisabled={!selectedImage.trim() || imagesLoading}
         size="lg"
         message={
@@ -315,17 +338,29 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
                 Newest GHCR versions first.
               </Text>
             )}
+            <ArgoSyncCheckbox
+              show={status.apply && status.sync}
+              checked={pinSync}
+              onChange={setPinSync}
+              stage={stageValue}
+              argoURL={stages.find((s) => s.name === stageValue)?.argoURL}
+            />
             <MutationGitHint
               apply={status.apply}
               push={status.push}
-              sync={status.sync}
+              sync={status.sync && pinSync}
               syncStage={stageValue}
             />
           </Stack>
         }
         onConfirm={() => {
           void pinFetcher.submit(
-            { intent: "pin", stage: stageValue, image: selectedImage },
+            {
+              intent: "pin",
+              stage: stageValue,
+              image: selectedImage,
+              ...(status.sync ? { sync: pinSync ? "true" : "false" } : {}),
+            },
             { method: "post" },
           );
         }}
@@ -336,7 +371,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         onClose={promoteHandlers.close}
         loading={promoteFetcher.state !== "idle"}
         title={`Promote ${status.name}`}
-        confirmLabel={commitLabel(status, "promote")}
+        confirmLabel={mutationCommitLabel(status, "promote", status.sync && promoteSync)}
         message={
           fromStage && toStage ? (
             <Stack gap="sm">
@@ -346,10 +381,17 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
                 <strong>{toStage.name}</strong>. Homelab must be healthy when Argo is
                 configured.
               </Text>
+              <ArgoSyncCheckbox
+                show={status.apply && status.sync}
+                checked={promoteSync}
+                onChange={setPromoteSync}
+                stage={toStage.name}
+                argoURL={toStage.argoURL}
+              />
               <MutationGitHint
                 apply={status.apply}
                 push={status.push}
-                sync={status.sync}
+                sync={status.sync && promoteSync}
                 syncStage={toStage.name}
               />
             </Stack>
@@ -360,58 +402,17 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         onConfirm={() => {
           if (!fromStage || !toStage) return;
           void promoteFetcher.submit(
-            { intent: "promote", from: fromStage.name, to: toStage.name },
+            {
+              intent: "promote",
+              from: fromStage.name,
+              to: toStage.name,
+              ...(status.sync ? { sync: promoteSync ? "true" : "false" } : {}),
+            },
             { method: "post" },
           );
         }}
       />
     </Stack>
-  );
-}
-
-function commitLabel(status: { apply: boolean; push: boolean }, action: string): string {
-  if (!status.apply) return `Preview ${action}`;
-  if (status.push) return `Commit and push ${action}`;
-  return `Commit ${action}`;
-}
-
-function mutationNote(result?: MutationResult): string {
-  if (result?.dryRun) return " (dry-run)";
-  if (result?.pushed) return " and pushed";
-  return "";
-}
-
-function MutationGitHint({
-  apply,
-  push,
-  sync,
-  syncStage,
-}: {
-  apply: boolean;
-  push: boolean;
-  sync: boolean;
-  syncStage?: string;
-}) {
-  let text: string;
-  if (!apply) {
-    text = "Previews a git diff and does not commit.";
-  } else if (!push) {
-    text = "Commits locally and does not push.";
-  } else {
-    text = "Commits and pushes the current branch. Never force-pushes.";
-  }
-  if (apply) {
-    if (sync) {
-      const where = syncStage ? ` on ${syncStage}` : "";
-      text += ` Then syncs Argo CD${where} and waits until healthy.`;
-    } else {
-      text += " Does not sync Argo CD.";
-    }
-  }
-  return (
-    <Text size="sm" c="dimmed">
-      {text}
-    </Text>
   );
 }
 

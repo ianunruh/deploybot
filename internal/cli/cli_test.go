@@ -33,18 +33,18 @@ func TestRunUnknown(t *testing.T) {
 	}
 }
 
-func TestRunSync(t *testing.T) {
+func TestRunReconcile(t *testing.T) {
 	isolateEnv(t)
 	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
-	if err := Run(t.Context(), []string{"sync", "--spec", spec, "--stage", "homelab"}); err != nil {
+	if err := Run(t.Context(), []string{"reconcile", "--spec", spec, "--stage", "homelab"}); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestRunSyncUnknownStage(t *testing.T) {
+func TestRunReconcileUnknownStage(t *testing.T) {
 	isolateEnv(t)
 	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
-	if err := Run(t.Context(), []string{"sync", "--spec", spec, "--stage", "nope"}); err == nil {
+	if err := Run(t.Context(), []string{"reconcile", "--spec", spec, "--stage", "nope"}); err == nil {
 		t.Fatal("expected error")
 	}
 }
@@ -65,7 +65,7 @@ func TestRunMissingConfig(t *testing.T) {
 	isolateEnv(t)
 	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
 	err := Run(t.Context(), []string{
-		"sync", "--spec", spec, "--stage", "homelab",
+		"reconcile", "--spec", spec, "--stage", "homelab",
 		"--config", filepath.Join(t.TempDir(), "nope.yaml"),
 	})
 	if err == nil {
@@ -83,7 +83,7 @@ func TestRunConfigArgoYAML(t *testing.T) {
 	}
 	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
 	if err := Run(t.Context(), []string{
-		"sync", "--spec", spec, "--stage", "homelab", "--config", cfg,
+		"reconcile", "--spec", spec, "--stage", "homelab", "--config", cfg,
 	}); err != nil {
 		t.Fatal(err)
 	}

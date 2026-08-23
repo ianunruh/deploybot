@@ -1,20 +1,28 @@
 import { Alert, Button, Group, Stack, Text } from "@mantine/core";
+import { useState } from "react";
 import { Link, useFetcher, useRevalidator } from "react-router";
 
-import type { Route } from "./+types/deployables.$name.sync.$stage";
+import type { Route } from "./+types/deployables.$name.reconcile.$stage";
 import {
   getDeployable,
-  previewSync,
-  syncDeployable,
+  previewReconcile,
+  reconcileDeployable,
   type MutationResult,
 } from "~/lib/api.server";
 import { notifyActionError, notifyActionSuccess } from "~/lib/action-feedback";
 import { useFetcherResult } from "~/lib/use-fetcher-result";
 import { DiffPanel } from "~/ui/diff-panel";
+import {
+  ArgoSyncCheckbox,
+  formFlag,
+  MutationGitHint,
+  mutationCommitLabel,
+  mutationNote,
+} from "~/ui/mutation-controls";
 import { PageHeader } from "~/ui/page-header";
 
 export function meta({ params }: Route.MetaArgs) {
-  return [{ title: `Sync ${params.stage} · ${params.name} · deploybot` }];
+  return [{ title: `Reconcile ${params.stage} · ${params.name} · deploybot` }];
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -26,7 +34,7 @@ export async function loader({ params }: Route.LoaderArgs) {
   try {
     const [status, preview] = await Promise.all([
       getDeployable(name),
-      previewSync(name, stage),
+      previewReconcile(name, stage),
     ]);
     return { status, preview, error: null as string | null };
   } catch (err) {
@@ -47,11 +55,14 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { ok: false, error: "missing name or stage" } satisfies ActionData;
   }
   const form = await request.formData();
-  if (String(form.get("intent") ?? "") !== "sync") {
+  if (String(form.get("intent") ?? "") !== "reconcile") {
     return { ok: false, error: "unknown intent" } satisfies ActionData;
   }
   try {
-    return { ok: true, result: await syncDeployable(name, stage) } satisfies ActionData;
+    return {
+      ok: true,
+      result: await reconcileDeployable(name, stage, { sync: formFlag(form, "sync") }),
+    } satisfies ActionData;
   } catch (err) {
     return {
       ok: false,
@@ -60,7 +71,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 }
 
-function syncCrumbs(name?: string) {
+function reconcileCrumbs(name?: string) {
   const crumbs = [{ label: "Deployables", to: "/" }];
   if (name) {
     crumbs.push({ label: name, to: `/deployables/${name}` });
@@ -68,24 +79,28 @@ function syncCrumbs(name?: string) {
   return crumbs;
 }
 
-export default function SyncStage({ loaderData, params }: Route.ComponentProps) {
+export default function ReconcileStage({ loaderData, params }: Route.ComponentProps) {
   const { status, preview, error } = loaderData;
   const revalidator = useRevalidator();
   const fetcher = useFetcher<ActionData>();
+  const [syncArgo, setSyncArgo] = useState(true);
 
   useFetcherResult(fetcher, (data) => {
     if (!data.ok) {
-      notifyActionError("Sync failed", data.error);
+      notifyActionError("Reconcile failed", data.error);
       return;
     }
-    notifyActionSuccess("Sync", `Wrote manifests${mutationNote(data.result)}`);
+    notifyActionSuccess(
+      "Reconcile",
+      `Wrote manifests${mutationNote(data.result, { argoAvailable: status?.sync })}`,
+    );
     void revalidator.revalidate();
   });
 
   if (error != null || status == null || preview == null) {
     return (
       <Stack gap="lg">
-        <PageHeader title="Sync" crumbs={syncCrumbs(params.name)} />
+        <PageHeader title="Reconcile" crumbs={reconcileCrumbs(params.name)} />
         <Alert color="red" title="Could not load">
           {error ?? "unknown error"}
         </Alert>
@@ -104,12 +119,14 @@ export default function SyncStage({ loaderData, params }: Route.ComponentProps) 
   const hasChanges = files.length > 0 && Boolean(preview.diff);
   const committing = fetcher.state !== "idle";
   const canCommit = status.apply && hasChanges && !committing;
+  const willSync = status.apply && status.sync && syncArgo;
+  const stageArgoURL = status.stages.find((s) => s.name === params.stage)?.argoURL;
 
   return (
     <Stack gap="lg">
       <PageHeader
-        title={`Sync ${params.stage}`}
-        crumbs={syncCrumbs(status.name)}
+        title={`Reconcile ${params.stage}`}
+        crumbs={reconcileCrumbs(status.name)}
         description={`${status.name} · write generated manifests for this stage`}
         actions={
           <Group gap="sm">
@@ -120,10 +137,16 @@ export default function SyncStage({ loaderData, params }: Route.ComponentProps) 
               disabled={!canCommit}
               loading={committing}
               onClick={() => {
-                void fetcher.submit({ intent: "sync" }, { method: "post" });
+                void fetcher.submit(
+                  {
+                    intent: "reconcile",
+                    ...(status.sync ? { sync: syncArgo ? "true" : "false" } : {}),
+                  },
+                  { method: "post" },
+                );
               }}
             >
-              {commitLabel(status)}
+              {mutationCommitLabel(status, "reconcile", willSync)}
             </Button>
           </Group>
         }
@@ -131,8 +154,26 @@ export default function SyncStage({ loaderData, params }: Route.ComponentProps) 
 
       <MutationModeAlert apply={status.apply} push={status.push} />
 
+      {hasChanges ? (
+        <Stack gap="sm">
+          <ArgoSyncCheckbox
+            show={status.apply && status.sync}
+            checked={syncArgo}
+            onChange={setSyncArgo}
+            stage={params.stage}
+            argoURL={stageArgoURL}
+          />
+          <MutationGitHint
+            apply={status.apply}
+            push={status.push}
+            sync={willSync}
+            syncStage={params.stage}
+          />
+        </Stack>
+      ) : null}
+
       {!hasChanges ? (
-        <Alert color="gray" title="Already in sync">
+        <Alert color="gray" title="Already reconciled">
           Generated manifests for <strong>{params.stage}</strong> match the ops repo.
         </Alert>
       ) : (
@@ -152,21 +193,9 @@ export default function SyncStage({ loaderData, params }: Route.ComponentProps) 
         </Stack>
       ) : null}
 
-      <DiffPanel diff={preview.diff ?? ""} title="Sync preview" maxHeight="60vh" />
+      <DiffPanel diff={preview.diff ?? ""} title="Reconcile preview" maxHeight="60vh" />
     </Stack>
   );
-}
-
-function commitLabel(status: { apply: boolean; push: boolean }): string {
-  if (!status.apply) return "API is dry-run";
-  if (status.push) return "Commit and push sync";
-  return "Commit sync";
-}
-
-function mutationNote(result: MutationResult): string {
-  if (result.dryRun) return " (dry-run)";
-  if (result.pushed) return " and pushed";
-  return "";
 }
 
 function MutationModeAlert({ apply, push }: { apply: boolean; push: boolean }) {
@@ -192,7 +221,7 @@ function MutationModeAlert({ apply, push }: { apply: boolean; push: boolean }) {
   if (!push) {
     return (
       <Alert color="yellow" title="Local commits only">
-        Sync commits locally and does not push. Start the API with{" "}
+        Reconcile commits locally and does not push. Start the API with{" "}
         <Text span ff="monospace">
           --push
         </Text>{" "}

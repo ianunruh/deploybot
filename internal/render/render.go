@@ -143,14 +143,14 @@ func FilterStages(tree Tree, d *spec.Deployable, stages []string) (Tree, error) 
 	}
 	out := Tree{}
 	for p, b := range tree {
-		if keepSyncPath(d, p, want) {
+		if keepStagePath(d, p, want) {
 			out[p] = b
 		}
 	}
 	return out, nil
 }
 
-func keepSyncPath(d *spec.Deployable, p string, stages map[string]struct{}) bool {
+func keepStagePath(d *spec.Deployable, p string, stages map[string]struct{}) bool {
 	p = path.Clean(p)
 	workload := path.Clean(d.Spec.Git.WorkloadPath)
 	if inDir(p, path.Join(workload, "base")) {

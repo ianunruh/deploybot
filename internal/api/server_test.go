@@ -82,7 +82,27 @@ func TestListAndGet(t *testing.T) {
 	}
 }
 
-func TestSyncDiffAndPost(t *testing.T) {
+func TestMutatorSkipSync(t *testing.T) {
+	t.Parallel()
+	s := &Server{Release: &release.Service{Sync: true}}
+	if !s.mutator(nil).Sync {
+		t.Fatal("omitted sync should keep the process default")
+	}
+	on := true
+	if !s.mutator(&on).Sync {
+		t.Fatal("sync true should keep Argo enabled")
+	}
+	off := false
+	got := s.mutator(&off)
+	if got.Sync {
+		t.Fatal("sync false should skip Argo")
+	}
+	if got == s.Release {
+		t.Fatal("opt-out should not mutate the process default")
+	}
+}
+
+func TestReconcileDiffAndPost(t *testing.T) {
 	t.Parallel()
 	_, file, _, _ := runtime.Caller(0)
 	specs := filepath.Join(filepath.Dir(file), "..", "..", "examples")
@@ -97,7 +117,7 @@ func TestSyncDiffAndPost(t *testing.T) {
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
 
-	res, err := http.Get(srv.URL + "/api/v1/deployables/kmc/sync?stage=homelab")
+	res, err := http.Get(srv.URL + "/api/v1/deployables/kmc/reconcile?stage=homelab")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +137,7 @@ func TestSyncDiffAndPost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res2, err := http.Post(srv.URL+"/api/v1/deployables/kmc/sync", "application/json", bytes.NewReader(body))
+	res2, err := http.Post(srv.URL+"/api/v1/deployables/kmc/reconcile", "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +153,20 @@ func TestSyncDiffAndPost(t *testing.T) {
 		t.Fatalf("expected dry-run post, got %+v", mut)
 	}
 
-	bad, err := http.Get(srv.URL + "/api/v1/deployables/kmc/sync?stage=nope")
+	skip, err := json.Marshal(map[string]any{"stage": "homelab", "sync": false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res3, err := http.Post(srv.URL+"/api/v1/deployables/kmc/reconcile", "application/json", bytes.NewReader(skip))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res3.Body.Close() }()
+	if res3.StatusCode != http.StatusOK {
+		t.Fatal(res3.Status)
+	}
+
+	bad, err := http.Get(srv.URL + "/api/v1/deployables/kmc/reconcile?stage=nope")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +175,7 @@ func TestSyncDiffAndPost(t *testing.T) {
 		t.Fatalf("unknown stage status %s", bad.Status)
 	}
 
-	missing, err := http.Get(srv.URL + "/api/v1/deployables/kmc/sync")
+	missing, err := http.Get(srv.URL + "/api/v1/deployables/kmc/reconcile")
 	if err != nil {
 		t.Fatal(err)
 	}

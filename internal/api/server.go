@@ -22,10 +22,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/deployables/{name}", s.get)
 	mux.HandleFunc("GET /api/v1/deployables/{name}/images", s.images)
 	mux.HandleFunc("GET /api/v1/deployables/{name}/diff", s.diff)
-	mux.HandleFunc("GET /api/v1/deployables/{name}/sync", s.syncDiff)
+	mux.HandleFunc("GET /api/v1/deployables/{name}/reconcile", s.reconcileDiff)
 	mux.HandleFunc("POST /api/v1/deployables/{name}/pin", s.pin)
 	mux.HandleFunc("POST /api/v1/deployables/{name}/promote", s.promote)
-	mux.HandleFunc("POST /api/v1/deployables/{name}/sync", s.syncManifests)
+	mux.HandleFunc("POST /api/v1/deployables/{name}/reconcile", s.reconcile)
 	return withJSON(mux)
 }
 
@@ -90,6 +90,7 @@ func (s *Server) diff(w http.ResponseWriter, r *http.Request) {
 type pinRequest struct {
 	Stage string `json:"stage"`
 	Image string `json:"image"`
+	Sync  *bool  `json:"sync"`
 }
 
 func (s *Server) pin(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +99,7 @@ func (s *Server) pin(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	mut, err := s.Release.Pin(r.Context(), r.PathValue("name"), req.Stage, req.Image)
+	mut, err := s.mutator(req.Sync).Pin(r.Context(), r.PathValue("name"), req.Stage, req.Image)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -109,6 +110,7 @@ func (s *Server) pin(w http.ResponseWriter, r *http.Request) {
 type promoteRequest struct {
 	From string `json:"from"`
 	To   string `json:"to"`
+	Sync *bool  `json:"sync"`
 }
 
 func (s *Server) promote(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +119,7 @@ func (s *Server) promote(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	mut, err := s.Release.Promote(r.Context(), r.PathValue("name"), req.From, req.To)
+	mut, err := s.mutator(req.Sync).Promote(r.Context(), r.PathValue("name"), req.From, req.To)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -125,13 +127,13 @@ func (s *Server) promote(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, mut)
 }
 
-func (s *Server) syncDiff(w http.ResponseWriter, r *http.Request) {
+func (s *Server) reconcileDiff(w http.ResponseWriter, r *http.Request) {
 	stage := r.URL.Query().Get("stage")
 	if stage == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "stage is required"})
 		return
 	}
-	mut, err := s.Release.DiffSync(r.PathValue("name"), []string{stage})
+	mut, err := s.Release.DiffReconcile(r.PathValue("name"), []string{stage})
 	if err != nil {
 		writeError(w, err)
 		return
@@ -139,12 +141,13 @@ func (s *Server) syncDiff(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, mut)
 }
 
-type syncRequest struct {
+type reconcileRequest struct {
 	Stage string `json:"stage"`
+	Sync  *bool  `json:"sync"`
 }
 
-func (s *Server) syncManifests(w http.ResponseWriter, r *http.Request) {
-	var req syncRequest
+func (s *Server) reconcile(w http.ResponseWriter, r *http.Request) {
+	var req reconcileRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
@@ -153,12 +156,19 @@ func (s *Server) syncManifests(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "stage is required"})
 		return
 	}
-	mut, err := s.Release.SyncManifests(r.Context(), r.PathValue("name"), []string{req.Stage})
+	mut, err := s.mutator(req.Sync).Reconcile(r.Context(), r.PathValue("name"), []string{req.Stage})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, mut)
+}
+
+func (s *Server) mutator(sync *bool) *release.Service {
+	if sync == nil {
+		return s.Release
+	}
+	return s.Release.WithSync(*sync)
 }
 
 func withJSON(next http.Handler) http.Handler {
