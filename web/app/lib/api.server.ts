@@ -44,6 +44,7 @@ export type DeployableSummary = {
   stages: string[];
   repoURL?: string;
   projectURL?: string;
+  deployedAt?: string;
   stageLinks?: StageLinks[];
 };
 
@@ -55,6 +56,7 @@ export type StageStatus = {
   health: string;
   revision?: string;
   message?: string;
+  deployedAt?: string;
   argoURL?: string;
   headlampURL?: string;
   grafanaURL?: string;

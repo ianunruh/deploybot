@@ -32,13 +32,7 @@ func (c *KubeClient) Get(ctx context.Context, app string) (Status, error) {
 	if err := c.REST.Get(ctx, c.appPath(app), &raw); err != nil {
 		return Status{}, fmt.Errorf("argo kube get %s: %w", app, err)
 	}
-	return Status{
-		Name:     raw.Metadata.Name,
-		Health:   raw.Status.Health.Status,
-		Sync:     raw.Status.Sync.Status,
-		Revision: raw.Status.Sync.Revision,
-		Message:  raw.Status.Health.Message,
-	}, nil
+	return statusFrom(raw), nil
 }
 
 func (c *KubeClient) Sync(ctx context.Context, app string, prune bool) error {

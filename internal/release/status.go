@@ -12,17 +12,18 @@ import (
 const statusArgoTimeout = 4 * time.Second
 
 type StageStatus struct {
-	Name        string `json:"name"`
-	Hostname    string `json:"hostname"`
-	Image       string `json:"image,omitempty"`
-	Sync        string `json:"sync"`
-	Health      string `json:"health"`
-	Revision    string `json:"revision,omitempty"`
-	Message     string `json:"message,omitempty"`
-	ArgoURL     string `json:"argoURL,omitempty"`
-	HeadlampURL string `json:"headlampURL,omitempty"`
-	GrafanaURL  string `json:"grafanaURL,omitempty"`
-	LogsURL     string `json:"logsURL,omitempty"`
+	Name        string     `json:"name"`
+	Hostname    string     `json:"hostname"`
+	Image       string     `json:"image,omitempty"`
+	Sync        string     `json:"sync"`
+	Health      string     `json:"health"`
+	Revision    string     `json:"revision,omitempty"`
+	Message     string     `json:"message,omitempty"`
+	DeployedAt  *time.Time `json:"deployedAt,omitempty"`
+	ArgoURL     string     `json:"argoURL,omitempty"`
+	HeadlampURL string     `json:"headlampURL,omitempty"`
+	GrafanaURL  string     `json:"grafanaURL,omitempty"`
+	LogsURL     string     `json:"logsURL,omitempty"`
 }
 
 type Status struct {
@@ -87,6 +88,7 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 					out.Stages[i].Sync = got.Sync
 					out.Stages[i].Revision = got.Revision
 					out.Stages[i].Message = got.Message
+					out.Stages[i].DeployedAt = got.DeployedAt
 				}(i, c)
 				continue
 			}
@@ -95,4 +97,42 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 	}
 	wg.Wait()
 	return out, nil
+}
+
+// LatestDeployedAt returns the newest Argo history deployedAt across stages
+// for each catalog deployable. Missing Argo clients and Get errors are skipped.
+func (s *Service) LatestDeployedAt(ctx context.Context) map[string]*time.Time {
+	out := map[string]*time.Time{}
+	if s == nil || s.Argo == nil || s.Catalog == nil {
+		return out
+	}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, d := range s.Catalog.List() {
+		name := d.Metadata.Name
+		app := d.Spec.Argo.Name
+		for _, stage := range d.StageNames() {
+			c := s.Argo.ForStage(stage)
+			if c == nil {
+				continue
+			}
+			wg.Add(1)
+			go func(name, app string, c argo.Client) {
+				defer wg.Done()
+				gctx, cancel := context.WithTimeout(ctx, statusArgoTimeout)
+				defer cancel()
+				got, err := c.Get(gctx, app)
+				if err != nil || got.DeployedAt == nil {
+					return
+				}
+				mu.Lock()
+				defer mu.Unlock()
+				if prev := out[name]; prev == nil || got.DeployedAt.After(*prev) {
+					out[name] = got.DeployedAt
+				}
+			}(name, app, c)
+		}
+	}
+	wg.Wait()
+	return out
 }

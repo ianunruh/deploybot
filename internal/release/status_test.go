@@ -3,6 +3,7 @@ package release
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/ianunruh/deploybot/internal/argo"
 	"github.com/ianunruh/deploybot/internal/image"
@@ -12,10 +13,12 @@ func TestStatusLinksAndArgoURL(t *testing.T) {
 	t.Parallel()
 	homelab := argo.NewFake()
 	homelab.UIBase = "https://argocd.k8s.kcloud.zone"
-	homelab.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
+	homelabAt := time.Date(2026, 8, 20, 12, 0, 0, 0, time.UTC)
+	prodAt := time.Date(2026, 8, 23, 15, 4, 0, 0, time.UTC)
+	homelab.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced", DeployedAt: &homelabAt})
 	prod := argo.NewFake()
 	prod.UIBase = "https://argocd.k8s.kcloud.io"
-	prod.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
+	prod.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced", DeployedAt: &prodAt})
 	svc := &Service{
 		Catalog: loadExamples(t),
 		Argo:    stageRouter{"homelab": homelab, "prod": prod},
@@ -51,6 +54,17 @@ func TestStatusLinksAndArgoURL(t *testing.T) {
 	}
 	assertURL(t, "status headlamp", st.Stages[0].HeadlampURL, "https://headlamp.k8s.kcloud.zone/c/main/deployments?namespace=kmc-system")
 	assertURL(t, "status grafana", st.Stages[1].GrafanaURL, "https://grafana.k8s.kcloud.io/d/a87fb0d919ec0ea5f6543124e16c42a5/kubernetes-compute-resources-namespace-workloads?from=now-1h&to=now&var-namespace=kmc-system")
+	if st.Stages[0].DeployedAt == nil || !st.Stages[0].DeployedAt.Equal(homelabAt) {
+		t.Fatalf("homelab deployedAt %+v", st.Stages[0].DeployedAt)
+	}
+	if st.Stages[1].DeployedAt == nil || !st.Stages[1].DeployedAt.Equal(prodAt) {
+		t.Fatalf("prod deployedAt %+v", st.Stages[1].DeployedAt)
+	}
+
+	latest := svc.LatestDeployedAt(t.Context())
+	if latest["kmc"] == nil || !latest["kmc"].Equal(prodAt) {
+		t.Fatalf("latest kmc %+v", latest["kmc"])
+	}
 }
 
 func TestListImages(t *testing.T) {

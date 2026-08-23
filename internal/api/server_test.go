@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
+	"github.com/ianunruh/deploybot/internal/argo"
 	"github.com/ianunruh/deploybot/internal/catalog"
 	"github.com/ianunruh/deploybot/internal/image"
 	"github.com/ianunruh/deploybot/internal/release"
@@ -105,6 +107,78 @@ func TestListAndGet(t *testing.T) {
 		t.Fatalf("status observability %+v", st.Stages)
 	}
 }
+
+func TestListAndGetDeployedAt(t *testing.T) {
+	t.Parallel()
+	_, file, _, _ := runtime.Caller(0)
+	specs := filepath.Join(filepath.Dir(file), "..", "..", "examples")
+	cat, err := catalog.Load(specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	homelabAt := time.Date(2026, 8, 20, 12, 0, 0, 0, time.UTC)
+	prodAt := time.Date(2026, 8, 23, 15, 4, 0, 0, time.UTC)
+	homelab := argo.NewFake()
+	homelab.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced", DeployedAt: &homelabAt})
+	prod := argo.NewFake()
+	prod.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced", DeployedAt: &prodAt})
+	s := &Server{
+		Catalog: cat,
+		Release: &release.Service{
+			Catalog: cat,
+			Argo:    listRouter{"homelab": homelab, "prod": prod},
+		},
+	}
+	srv := httptest.NewServer(s.Handler())
+	t.Cleanup(srv.Close)
+
+	res, err := http.Get(srv.URL + "/api/v1/deployables")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	var list struct {
+		Deployables []struct {
+			Name       string     `json:"name"`
+			DeployedAt *time.Time `json:"deployedAt"`
+		} `json:"deployables"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	var kmc *time.Time
+	for _, d := range list.Deployables {
+		if d.Name == "kmc" {
+			kmc = d.DeployedAt
+		}
+	}
+	if kmc == nil || !kmc.Equal(prodAt) {
+		t.Fatalf("list kmc deployedAt %+v", kmc)
+	}
+
+	res2, err := http.Get(srv.URL + "/api/v1/deployables/kmc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res2.Body.Close() }()
+	var st release.Status
+	if err := json.NewDecoder(res2.Body).Decode(&st); err != nil {
+		t.Fatal(err)
+	}
+	if len(st.Stages) != 2 {
+		t.Fatalf("stages %+v", st.Stages)
+	}
+	if st.Stages[0].DeployedAt == nil || !st.Stages[0].DeployedAt.Equal(homelabAt) {
+		t.Fatalf("homelab %+v", st.Stages[0].DeployedAt)
+	}
+	if st.Stages[1].DeployedAt == nil || !st.Stages[1].DeployedAt.Equal(prodAt) {
+		t.Fatalf("prod %+v", st.Stages[1].DeployedAt)
+	}
+}
+
+type listRouter map[string]argo.Client
+
+func (r listRouter) ForStage(stage string) argo.Client { return r[stage] }
 
 func TestListImages(t *testing.T) {
 	t.Parallel()

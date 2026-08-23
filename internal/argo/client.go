@@ -12,11 +12,12 @@ import (
 )
 
 type Status struct {
-	Name     string
-	Health   string
-	Sync     string
-	Revision string
-	Message  string
+	Name       string
+	Health     string
+	Sync       string
+	Revision   string
+	Message    string
+	DeployedAt *time.Time
 }
 
 func (s Status) Healthy() bool {
@@ -72,7 +73,43 @@ type argoApp struct {
 			Status   string `json:"status"`
 			Revision string `json:"revision"`
 		} `json:"sync"`
+		History []struct {
+			DeployedAt time.Time `json:"deployedAt"`
+		} `json:"history"`
+		OperationState struct {
+			FinishedAt *time.Time `json:"finishedAt"`
+		} `json:"operationState"`
 	} `json:"status"`
+}
+
+func statusFrom(raw argoApp) Status {
+	return Status{
+		Name:       raw.Metadata.Name,
+		Health:     raw.Status.Health.Status,
+		Sync:       raw.Status.Sync.Status,
+		Revision:   raw.Status.Sync.Revision,
+		Message:    raw.Status.Health.Message,
+		DeployedAt: raw.deployedAt(),
+	}
+}
+
+// deployedAt is the last recorded Application sync. History is preferred
+// (Argo's History/Rollback clock); finishedAt is only used when history is
+// empty so a failed or in-flight operation does not hide the last success.
+func (a argoApp) deployedAt() *time.Time {
+	hist := a.Status.History
+	for i := len(hist) - 1; i >= 0; i-- {
+		if hist[i].DeployedAt.IsZero() {
+			continue
+		}
+		t := hist[i].DeployedAt.UTC()
+		return &t
+	}
+	if t := a.Status.OperationState.FinishedAt; t != nil && !t.IsZero() {
+		u := t.UTC()
+		return &u
+	}
+	return nil
 }
 
 func WaitHealthy(ctx context.Context, c Client, app string, poll time.Duration) error {

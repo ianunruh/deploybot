@@ -13,6 +13,7 @@ import {
   type MutationResult,
 } from "~/lib/api.server";
 import { notifyActionError, notifyActionSuccess } from "~/lib/action-feedback";
+import { formatAbsolute } from "~/lib/time";
 import { useFetcherResult } from "~/lib/use-fetcher-result";
 import { ConfirmActionModal } from "~/ui/confirm-action-modal";
 import { DiffPanel } from "~/ui/diff-panel";
@@ -29,6 +30,7 @@ import {
   mutationNote,
 } from "~/ui/mutation-controls";
 import { PageHeader } from "~/ui/page-header";
+import { RelativeTime } from "~/ui/relative-time";
 import { ResourceTable, Table } from "~/ui/resource-table";
 import { StatusBadge } from "~/ui/status-badge";
 
@@ -226,7 +228,16 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       <MutationModeAlert apply={status.apply} push={status.push} />
 
       <ResourceTable
-        headers={["Stage", "Hostname", "Image", "Sync", "Health", "Links", ""]}
+        headers={[
+          "Stage",
+          "Hostname",
+          "Image",
+          "Sync",
+          "Health",
+          "Deployed",
+          "Links",
+          "",
+        ]}
         isEmpty={stages.length === 0}
         minWidth={800}
       >
@@ -251,6 +262,9 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
                   {st.message}
                 </Text>
               ) : null}
+            </Table.Td>
+            <Table.Td className="db-cell-fit">
+              <RelativeTime value={st.deployedAt} />
             </Table.Td>
             <Table.Td className="db-cell-fit">
               <StageObservabilityIcons
@@ -490,7 +504,7 @@ function ImageOption({ img, label }: { img?: ImageVersion; label: string }) {
       </Stack>
       {img?.createdAt ? (
         <Text size="xs" c="dimmed">
-          {formatWhen(img.createdAt)}
+          {formatAbsolute(img.createdAt)}
         </Text>
       ) : null}
     </Group>
@@ -501,16 +515,4 @@ function shortDigest(digest?: string): string {
   if (!digest) return "";
   const hex = digest.replace(/^sha256:/, "");
   return hex ? `sha256:${hex.slice(0, 12)}` : digest;
-}
-
-function formatWhen(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
 }

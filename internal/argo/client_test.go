@@ -55,6 +55,10 @@ func TestKubeClientGetAndSync(t *testing.T) {
 			"status": map[string]any{
 				"health": map[string]any{"status": "Healthy", "message": "ok"},
 				"sync":   map[string]any{"status": "Synced", "revision": "abc"},
+				"history": []map[string]any{
+					{"revision": "old", "deployedAt": "2026-08-01T00:00:00Z"},
+					{"revision": "abc", "deployedAt": "2026-08-23T15:04:00Z"},
+				},
 			},
 		})
 	})
@@ -83,6 +87,10 @@ func TestKubeClientGetAndSync(t *testing.T) {
 	}
 	if !st.Healthy() || st.Sync != "Synced" || st.Revision != "abc" {
 		t.Fatalf("%+v", st)
+	}
+	want := time.Date(2026, 8, 23, 15, 4, 0, 0, time.UTC)
+	if st.DeployedAt == nil || !st.DeployedAt.Equal(want) {
+		t.Fatalf("deployedAt %+v", st.DeployedAt)
 	}
 	if err := c.Sync(t.Context(), "kmc", true); err != nil {
 		t.Fatal(err)
@@ -170,6 +178,49 @@ func TestAppURL(t *testing.T) {
 	if got := AppURL(NewFake(), "kmc"); got != "" {
 		t.Fatalf("fake without UI %q", got)
 	}
+}
+
+func TestDeployedAt(t *testing.T) {
+	t.Parallel()
+	parse := func(body string) *time.Time {
+		t.Helper()
+		var raw argoApp
+		if err := json.Unmarshal([]byte(body), &raw); err != nil {
+			t.Fatal(err)
+		}
+		return raw.deployedAt()
+	}
+	eq := func(got *time.Time, want string) {
+		t.Helper()
+		if want == "" {
+			if got != nil {
+				t.Fatalf("got %v want nil", got)
+			}
+			return
+		}
+		tm, err := time.Parse(time.RFC3339, want)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got == nil || !got.Equal(tm) {
+			t.Fatalf("got %v want %s", got, want)
+		}
+	}
+
+	eq(parse(`{"status":{"history":[
+		{"revision":"old","deployedAt":"2026-08-01T00:00:00Z"},
+		{"revision":"abc","deployedAt":"2026-08-23T15:04:00Z"}
+	]}}`), "2026-08-23T15:04:00Z")
+	eq(parse(`{"status":{"history":[
+		{"revision":"old","deployedAt":"2026-08-01T00:00:00Z"},
+		{"revision":"abc"}
+	]}}`), "2026-08-01T00:00:00Z")
+	eq(parse(`{"status":{"operationState":{"finishedAt":"2026-08-20T12:00:00Z"}}}`), "2026-08-20T12:00:00Z")
+	eq(parse(`{"status":{
+		"history":[{"deployedAt":"2026-08-01T00:00:00Z"}],
+		"operationState":{"finishedAt":"2026-08-23T15:04:00Z"}
+	}}`), "2026-08-01T00:00:00Z")
+	eq(parse(`{"status":{}}`), "")
 }
 
 func TestWaitHealthy(t *testing.T) {

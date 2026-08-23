@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/ianunruh/deploybot/internal/release"
 )
@@ -20,7 +21,12 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 		Stages     []string    `json:"stages"`
 		RepoURL    string      `json:"repoURL,omitempty"`
 		ProjectURL string      `json:"projectURL,omitempty"`
+		DeployedAt *time.Time  `json:"deployedAt,omitempty"`
 		StageLinks []itemStage `json:"stageLinks,omitempty"`
+	}
+	var times map[string]*time.Time
+	if s.Release != nil {
+		times = s.Release.LatestDeployedAt(r.Context())
 	}
 	var items []item
 	for _, d := range s.Catalog.List() {
@@ -37,6 +43,7 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 			Stages:     d.StageNames(),
 			RepoURL:    d.Spec.Links.RepoURL,
 			ProjectURL: d.Spec.Links.ProjectURL,
+			DeployedAt: times[d.Metadata.Name],
 			StageLinks: links,
 		})
 	}
