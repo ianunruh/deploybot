@@ -6,10 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
@@ -372,6 +374,51 @@ func TestSyncUnknownStage(t *testing.T) {
 	}
 }
 
+func TestPinPush(t *testing.T) {
+	t.Parallel()
+	cat := loadExamples(t)
+	dir := initOpsRepo(t)
+	remote := addBareRemote(t, dir)
+	branch, before := repoHead(t, dir)
+	author := gitwrite.Author{Name: "t", Email: "t@t"}
+
+	localOnly := &Service{Catalog: cat, OpsRepo: dir, Apply: true, Author: author}
+	pin, err := localOnly.Pin(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc@sha256:aaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pin.Pushed || pin.Ref != "" {
+		t.Fatalf("apply without push should stay local: %+v", pin)
+	}
+	if branchHash(t, remote, branch) != before {
+		t.Fatal("remote updated without push")
+	}
+
+	withPush := &Service{Catalog: cat, OpsRepo: dir, Apply: true, Push: true, Author: author}
+	pin2, err := withPush.Pin(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc@sha256:bbb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pin2.Pushed || pin2.Commit == "" {
+		t.Fatalf("expected push, got %+v", pin2)
+	}
+	if pin2.Ref != git.DefaultRemoteName+"/"+branch {
+		t.Fatalf("ref %q", pin2.Ref)
+	}
+	if branchHash(t, remote, branch) != pin2.Commit {
+		t.Fatalf("remote %s want %s", branchHash(t, remote, branch), pin2.Commit)
+	}
+}
+
+func TestPushRequiresApply(t *testing.T) {
+	t.Parallel()
+	svc := &Service{Catalog: loadExamples(t), Push: true}
+	_, err := svc.Pin(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc@sha256:abc")
+	if err == nil || !strings.Contains(err.Error(), "push requires apply") {
+		t.Fatalf("got %v", err)
+	}
+}
+
 type stageRouter map[string]argo.Client
 
 func (r stageRouter) ForStage(stage string) argo.Client { return r[stage] }
@@ -451,6 +498,54 @@ patches:
 		t.Fatal(err)
 	}
 	return dir
+}
+
+func addBareRemote(t *testing.T, local string) string {
+	t.Helper()
+	remote := filepath.Join(t.TempDir(), "origin.git")
+	if _, err := git.PlainInit(remote, true); err != nil {
+		t.Fatal(err)
+	}
+	repo, err := git.PlainOpen(local)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.CreateRemote(&config.RemoteConfig{
+		Name: git.DefaultRemoteName,
+		URLs: []string{remote},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Push(&git.PushOptions{RemoteName: git.DefaultRemoteName}); err != nil {
+		t.Fatal(err)
+	}
+	return remote
+}
+
+func repoHead(t *testing.T, dir string) (branch, hash string) {
+	t.Helper()
+	repo, err := git.PlainOpen(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	head, err := repo.Head()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return head.Name().Short(), head.Hash().String()
+}
+
+func branchHash(t *testing.T, repoDir, branch string) string {
+	t.Helper()
+	repo, err := git.PlainOpen(repoDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref, err := repo.Reference(plumbing.NewBranchReferenceName(branch), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ref.Hash().String()
 }
 
 func initControllerOpsRepo(t *testing.T) string {

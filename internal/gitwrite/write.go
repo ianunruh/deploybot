@@ -36,7 +36,8 @@ type Result struct {
 	Files  []string
 }
 
-// Write materializes tree into repoDir and creates a local commit. It never pushes.
+// Write materializes tree into repoDir and creates a local commit. It never
+// pushes; call Push when the caller wants the remote updated.
 func Write(repoDir string, tree render.Tree, message string, author Author) (Result, error) {
 	repo, err := git.PlainOpen(repoDir)
 	if err != nil {

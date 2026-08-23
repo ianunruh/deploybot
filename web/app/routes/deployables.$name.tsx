@@ -127,8 +127,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       notifyActionError("Pin failed", data.error);
       return;
     }
-    const extra = data.result?.dryRun ? " (dry-run)" : "";
-    notifyActionSuccess("Pin", `Wrote overlay${extra}`);
+    notifyActionSuccess("Pin", `Wrote overlay${mutationNote(data.result)}`);
     pinHandlers.close();
     setImage("");
     void revalidator.revalidate();
@@ -139,8 +138,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       notifyActionError("Promote failed", data.error);
       return;
     }
-    const extra = data.result?.dryRun ? " (dry-run)" : "";
-    notifyActionSuccess("Promote", `Copied pin${extra}`);
+    notifyActionSuccess("Promote", `Copied pin${mutationNote(data.result)}`);
     promoteHandlers.close();
     void revalidator.revalidate();
   });
@@ -187,19 +185,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         }
       />
 
-      {!status.apply && (
-        <Alert color="yellow" title="Dry-run">
-          Mutations preview a git diff and do not commit. Start the API with{" "}
-          <Text span ff="monospace">
-            --apply
-          </Text>{" "}
-          and{" "}
-          <Text span ff="monospace">
-            DEPLOYBOT_OPS_REPO
-          </Text>{" "}
-          to write local commits.
-        </Alert>
-      )}
+      <MutationModeAlert apply={status.apply} push={status.push} />
 
       <ResourceTable
         headers={["Stage", "Hostname", "Image", "Sync", "Health", ""]}
@@ -252,7 +238,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         }}
         loading={pinFetcher.state !== "idle"}
         title={`Pin ${status.name}`}
-        confirmLabel={status.apply ? "Commit pin" : "Preview pin"}
+        confirmLabel={commitLabel(status, "pin")}
         confirmDisabled={!selectedImage.trim() || imagesLoading}
         size="lg"
         message={
@@ -318,6 +304,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
                 Newest GHCR versions first.
               </Text>
             )}
+            <MutationGitHint apply={status.apply} push={status.push} />
           </Stack>
         }
         onConfirm={() => {
@@ -333,15 +320,18 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         onClose={promoteHandlers.close}
         loading={promoteFetcher.state !== "idle"}
         title={`Promote ${status.name}`}
-        confirmLabel={status.apply ? "Commit promote" : "Preview promote"}
+        confirmLabel={commitLabel(status, "promote")}
         message={
           fromStage && toStage ? (
-            <Text size="sm">
-              Copy the pinned image from <strong>{fromStage.name}</strong> (
-              <CompactImage value={fromStage.image} empty="unpinned" />) to{" "}
-              <strong>{toStage.name}</strong>. Homelab must be healthy when Argo is
-              configured.
-            </Text>
+            <Stack gap="sm">
+              <Text size="sm">
+                Copy the pinned image from <strong>{fromStage.name}</strong> (
+                <CompactImage value={fromStage.image} empty="unpinned" />) to{" "}
+                <strong>{toStage.name}</strong>. Homelab must be healthy when Argo is
+                configured.
+              </Text>
+              <MutationGitHint apply={status.apply} push={status.push} />
+            </Stack>
           ) : (
             <Text size="sm">Need at least two stages to promote.</Text>
           )
@@ -356,6 +346,68 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       />
     </Stack>
   );
+}
+
+function commitLabel(status: { apply: boolean; push: boolean }, action: string): string {
+  if (!status.apply) return `Preview ${action}`;
+  if (status.push) return `Commit and push ${action}`;
+  return `Commit ${action}`;
+}
+
+function mutationNote(result?: MutationResult): string {
+  if (result?.dryRun) return " (dry-run)";
+  if (result?.pushed) return " and pushed";
+  return "";
+}
+
+function MutationGitHint({ apply, push }: { apply: boolean; push: boolean }) {
+  let text: string;
+  if (!apply) {
+    text = "Previews a git diff and does not commit.";
+  } else if (!push) {
+    text = "Commits locally and does not push.";
+  } else {
+    text = "Commits and pushes the current branch. Never force-pushes.";
+  }
+  return (
+    <Text size="sm" c="dimmed">
+      {text}
+    </Text>
+  );
+}
+
+function MutationModeAlert({ apply, push }: { apply: boolean; push: boolean }) {
+  if (!apply) {
+    return (
+      <Alert color="yellow" title="Dry-run">
+        Mutations preview a git diff and do not commit. Start the API with{" "}
+        <Text span ff="monospace">
+          --apply
+        </Text>{" "}
+        and{" "}
+        <Text span ff="monospace">
+          DEPLOYBOT_OPS_REPO
+        </Text>{" "}
+        to write local commits, plus{" "}
+        <Text span ff="monospace">
+          --push
+        </Text>{" "}
+        to update the remote.
+      </Alert>
+    );
+  }
+  if (!push) {
+    return (
+      <Alert color="yellow" title="Local commits only">
+        Mutations commit locally and do not push. Start the API with{" "}
+        <Text span ff="monospace">
+          --push
+        </Text>{" "}
+        to update the ops remote. Never force-pushes.
+      </Alert>
+    );
+  }
+  return null;
 }
 
 function CompactImage({

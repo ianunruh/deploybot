@@ -36,6 +36,18 @@ func TestRunSyncUnknownStage(t *testing.T) {
 	}
 }
 
+func TestRunPushRequiresApply(t *testing.T) {
+	t.Parallel()
+	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
+	err := Run(t.Context(), []string{
+		"pin", "--spec", spec, "--stage", "homelab",
+		"--image", "ghcr.io/ianunruh/kmc:x", "--push",
+	})
+	if err == nil || err.Error() != "--push requires --apply" {
+		t.Fatalf("got %v", err)
+	}
+}
+
 func TestRunRender(t *testing.T) {
 	t.Parallel()
 	out := t.TempDir()

@@ -27,26 +27,32 @@ just check
 just dev          # API :8080 + console :5173
 ```
 
-CLI (local git commits only; nothing is pushed):
+CLI (dry-run unless `--apply`; nothing is pushed unless `--push`):
 
 ```bash
 just build
 ./build/deploybot render examples/kmc.yaml --out /tmp/kmc-out
 ./build/deploybot pin --spec examples/kmc.yaml --stage homelab \
-  --image ghcr.io/ianunruh/kmc@sha256:… --repo /path/to/kcloud-ops --apply
+  --image ghcr.io/ianunruh/kmc@sha256:… --repo /path/to/kcloud-ops --apply --push
 ./build/deploybot promote --spec examples/kmc.yaml --from homelab --to prod \
-  --repo /path/to/kcloud-ops --apply
+  --repo /path/to/kcloud-ops --apply --push
 ./build/deploybot sync --spec examples/kmc.yaml --stage homelab \
-  --repo /path/to/kcloud-ops --apply
+  --repo /path/to/kcloud-ops --apply --push
 ```
 
-`--apply` commits locally. `--sync` talks to Argo (`DEPLOYBOT_ARGO_URL` /
-`DEPLOYBOT_ARGO_URL_<STAGE>`). Default is dry-run.
+`--apply` commits locally. `--push` (requires `--apply`) pushes the current
+branch; it never force-pushes. `--sync` talks to Argo (`DEPLOYBOT_ARGO_URL` /
+`DEPLOYBOT_ARGO_URL_<STAGE>`). Default is dry-run. For `serve`, set
+`DEPLOYBOT_APPLY=1`, `DEPLOYBOT_PUSH=1`, and `DEPLOYBOT_SYNC=1`.
 
 The pin picker lists GHCR versions (newest first) via the GitHub Packages
 API. Auth is `DEPLOYBOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`, or
 `gh auth token`. The token needs `read:packages` (or `write:packages`).
 Without that scope it falls back to `main-<sha>` tags from git history.
+
+HTTPS git push uses `DEPLOYBOT_GIT_TOKEN`, then the same GitHub tokens as
+the pin picker. SSH remotes use the ssh-agent (or `~/.ssh/id_ed25519` /
+`id_rsa`).
 
 Lint Go with golangci-lint v2.13+ built with Go 1.27 (Homebrew 2.10 is too old
 for this toolchain):

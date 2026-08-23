@@ -26,8 +26,8 @@ API, not a replacement for them.
 ## Product shape
 
 - **Git remains source of truth.** Deploybot writes git and asks Argo to sync.
-  It does not `kubectl apply` app workloads. Commits are local; nothing is
-  pushed.
+  It does not `kubectl apply` app workloads. `--apply` commits locally;
+  `--push` updates the remote (never force-pushes).
 - **Dashboard is not enough.** A UI over GitLab + Argo does not kill the
   copy-paste CI. Deploybot owns the spec → manifests → pin → health-gated
   promote loop.
@@ -68,8 +68,8 @@ Kaniko or rewrite `docker-build.yml` for this.
 ## What this repo already did
 
 Spec + renderer + goldens for both customers, image pin (GHCR picker, newest
-first), local git write (never push), Argo sync/health/promote, RR console
-(catalog, stage matrix, pin, promote, per-stage sync).
+first), local git write, opt-in git push (no force), Argo sync/health/promote,
+RR console (catalog, stage matrix, pin, promote, per-stage sync).
 
 Pin/promote **only** upsert `images:` on the stage overlay. They must not
 rewrite workload YAML or shared Argo project `kustomization.yaml` files
@@ -84,7 +84,6 @@ per probe without a shared `probes.path`.
 
 ## Explicitly not done yet
 
-- Git push (pin/promote/sync still commit locally).
 - Play / ivy as spec customers.
 - Preview apps, multi-service releases, replacing Actions/Kaniko.
 

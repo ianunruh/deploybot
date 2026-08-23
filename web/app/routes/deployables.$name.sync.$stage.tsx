@@ -78,8 +78,7 @@ export default function SyncStage({ loaderData, params }: Route.ComponentProps) 
       notifyActionError("Sync failed", data.error);
       return;
     }
-    const extra = data.result.dryRun ? " (dry-run)" : "";
-    notifyActionSuccess("Sync", `Wrote manifests${extra}`);
+    notifyActionSuccess("Sync", `Wrote manifests${mutationNote(data.result)}`);
     void revalidator.revalidate();
   });
 
@@ -124,25 +123,13 @@ export default function SyncStage({ loaderData, params }: Route.ComponentProps) 
                 void fetcher.submit({ intent: "sync" }, { method: "post" });
               }}
             >
-              {status.apply ? "Commit sync" : "API is dry-run"}
+              {commitLabel(status)}
             </Button>
           </Group>
         }
       />
 
-      {!status.apply && (
-        <Alert color="yellow" title="Dry-run">
-          Preview only. Start the API with{" "}
-          <Text span ff="monospace">
-            --apply
-          </Text>{" "}
-          and{" "}
-          <Text span ff="monospace">
-            DEPLOYBOT_OPS_REPO
-          </Text>{" "}
-          to write local commits.
-        </Alert>
-      )}
+      <MutationModeAlert apply={status.apply} push={status.push} />
 
       {!hasChanges ? (
         <Alert color="gray" title="Already in sync">
@@ -168,4 +155,50 @@ export default function SyncStage({ loaderData, params }: Route.ComponentProps) 
       <DiffPanel diff={preview.diff ?? ""} title="Sync preview" maxHeight="60vh" />
     </Stack>
   );
+}
+
+function commitLabel(status: { apply: boolean; push: boolean }): string {
+  if (!status.apply) return "API is dry-run";
+  if (status.push) return "Commit and push sync";
+  return "Commit sync";
+}
+
+function mutationNote(result: MutationResult): string {
+  if (result.dryRun) return " (dry-run)";
+  if (result.pushed) return " and pushed";
+  return "";
+}
+
+function MutationModeAlert({ apply, push }: { apply: boolean; push: boolean }) {
+  if (!apply) {
+    return (
+      <Alert color="yellow" title="Dry-run">
+        Preview only. Start the API with{" "}
+        <Text span ff="monospace">
+          --apply
+        </Text>{" "}
+        and{" "}
+        <Text span ff="monospace">
+          DEPLOYBOT_OPS_REPO
+        </Text>{" "}
+        to write local commits, plus{" "}
+        <Text span ff="monospace">
+          --push
+        </Text>{" "}
+        to update the remote.
+      </Alert>
+    );
+  }
+  if (!push) {
+    return (
+      <Alert color="yellow" title="Local commits only">
+        Sync commits locally and does not push. Start the API with{" "}
+        <Text span ff="monospace">
+          --push
+        </Text>{" "}
+        to update the ops remote. Never force-pushes.
+      </Alert>
+    );
+  }
+  return null;
 }

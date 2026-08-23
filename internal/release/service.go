@@ -19,6 +19,7 @@ type Service struct {
 	Catalog *catalog.Catalog
 	OpsRepo string
 	Apply   bool
+	Push    bool
 	Sync    bool
 	Author  gitwrite.Author
 	Argo    argo.Router
@@ -42,11 +43,14 @@ type Status struct {
 	ImageRepo string        `json:"imageRepo"`
 	Stages    []StageStatus `json:"stages"`
 	Apply     bool          `json:"apply"`
+	Push      bool          `json:"push"`
 }
 
 type Mutation struct {
 	DryRun bool     `json:"dryRun"`
 	Commit string   `json:"commit,omitempty"`
+	Pushed bool     `json:"pushed"`
+	Ref    string   `json:"ref,omitempty"`
 	Diff   string   `json:"diff"`
 	Files  []string `json:"files"`
 	Synced bool     `json:"synced"`
@@ -66,6 +70,7 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 		Namespace: d.Spec.Namespace,
 		ImageRepo: d.Spec.Image.Repository,
 		Apply:     s.Apply,
+		Push:      s.Push,
 	}
 	for _, st := range d.Spec.Stages {
 		ss := StageStatus{
@@ -269,6 +274,9 @@ func (s *Service) Diff(name, stage, imageRef string) (string, error) {
 }
 
 func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string, before render.Tree, edit func(render.Tree) error, syncStages []string) (Mutation, error) {
+	if s.Push && !s.Apply {
+		return Mutation{}, fmt.Errorf("push requires apply")
+	}
 	after, err := cloneTree(before)
 	if err != nil {
 		return Mutation{}, err
@@ -296,6 +304,14 @@ func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string
 		return Mutation{}, err
 	}
 	mut.Commit = res.Commit
+	if s.Push {
+		pushed, err := gitwrite.Push(ctx, s.OpsRepo)
+		if err != nil {
+			return mut, err
+		}
+		mut.Pushed = true
+		mut.Ref = pushed.Ref()
+	}
 	if s.Sync {
 		for _, st := range syncStages {
 			if err := s.syncStage(ctx, d, st); err != nil {

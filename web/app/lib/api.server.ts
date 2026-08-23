@@ -53,11 +53,14 @@ export type DeployableStatus = {
   imageRepo: string;
   stages: StageStatus[];
   apply: boolean;
+  push: boolean;
 };
 
 export type MutationResult = {
   dryRun: boolean;
   commit?: string;
+  pushed: boolean;
+  ref?: string;
   diff: string;
   files: string[];
   synced: boolean;
