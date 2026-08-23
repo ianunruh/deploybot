@@ -47,6 +47,7 @@ type Status struct {
 	Stages     []StageStatus `json:"stages"`
 	Apply      bool          `json:"apply"`
 	Push       bool          `json:"push"`
+	Sync       bool          `json:"sync"`
 }
 
 type Mutation struct {
@@ -76,6 +77,7 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 		ProjectURL: d.Spec.Links.ProjectURL,
 		Apply:      s.Apply,
 		Push:       s.Push,
+		Sync:       s.Sync,
 	}
 	for _, st := range d.Spec.Stages {
 		ss := StageStatus{

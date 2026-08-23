@@ -16,7 +16,7 @@ import { notifyActionError, notifyActionSuccess } from "~/lib/action-feedback";
 import { useFetcherResult } from "~/lib/use-fetcher-result";
 import { ConfirmActionModal } from "~/ui/confirm-action-modal";
 import { DiffPanel } from "~/ui/diff-panel";
-import { ArgoCDLink, DeployableLinkLabels, HostnameLink } from "~/ui/external-links";
+import { DeployableLinkLabels, HostnameLink } from "~/ui/external-links";
 import { PageHeader } from "~/ui/page-header";
 import { ResourceTable, Table } from "~/ui/resource-table";
 import { StatusBadge } from "~/ui/status-badge";
@@ -199,9 +199,9 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       <MutationModeAlert apply={status.apply} push={status.push} />
 
       <ResourceTable
-        headers={["Stage", "Hostname", "Image", "Sync", "Health", "", ""]}
+        headers={["Stage", "Hostname", "Image", "Sync", "Health", ""]}
         isEmpty={stages.length === 0}
-        minWidth={880}
+        minWidth={800}
       >
         {stages.map((st) => (
           <Table.Tr key={st.name}>
@@ -215,10 +215,10 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
               <CompactImage value={st.image} empty="—" />
             </Table.Td>
             <Table.Td className="db-cell-fit">
-              <StatusBadge status={st.sync} />
+              <StatusBadge status={st.sync} href={st.argoURL} />
             </Table.Td>
             <Table.Td>
-              <StatusBadge status={st.health} />
+              <StatusBadge status={st.health} href={st.argoURL} />
               {st.message ? (
                 <Text size="xs" c="dimmed">
                   {st.message}
@@ -234,15 +234,6 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
               >
                 Sync
               </Button>
-            </Table.Td>
-            <Table.Td className="db-cell-fit">
-              {st.argoURL ? (
-                <ArgoCDLink href={st.argoURL} />
-              ) : (
-                <Text size="sm" c="dimmed">
-                  —
-                </Text>
-              )}
             </Table.Td>
           </Table.Tr>
         ))}
@@ -324,7 +315,12 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
                 Newest GHCR versions first.
               </Text>
             )}
-            <MutationGitHint apply={status.apply} push={status.push} />
+            <MutationGitHint
+              apply={status.apply}
+              push={status.push}
+              sync={status.sync}
+              syncStage={stageValue}
+            />
           </Stack>
         }
         onConfirm={() => {
@@ -350,7 +346,12 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
                 <strong>{toStage.name}</strong>. Homelab must be healthy when Argo is
                 configured.
               </Text>
-              <MutationGitHint apply={status.apply} push={status.push} />
+              <MutationGitHint
+                apply={status.apply}
+                push={status.push}
+                sync={status.sync}
+                syncStage={toStage.name}
+              />
             </Stack>
           ) : (
             <Text size="sm">Need at least two stages to promote.</Text>
@@ -380,7 +381,17 @@ function mutationNote(result?: MutationResult): string {
   return "";
 }
 
-function MutationGitHint({ apply, push }: { apply: boolean; push: boolean }) {
+function MutationGitHint({
+  apply,
+  push,
+  sync,
+  syncStage,
+}: {
+  apply: boolean;
+  push: boolean;
+  sync: boolean;
+  syncStage?: string;
+}) {
   let text: string;
   if (!apply) {
     text = "Previews a git diff and does not commit.";
@@ -388,6 +399,14 @@ function MutationGitHint({ apply, push }: { apply: boolean; push: boolean }) {
     text = "Commits locally and does not push.";
   } else {
     text = "Commits and pushes the current branch. Never force-pushes.";
+  }
+  if (apply) {
+    if (sync) {
+      const where = syncStage ? ` on ${syncStage}` : "";
+      text += ` Then syncs Argo CD${where} and waits until healthy.`;
+    } else {
+      text += " Does not sync Argo CD.";
+    }
   }
   return (
     <Text size="sm" c="dimmed">
@@ -441,7 +460,7 @@ function CompactImage({ value, empty = "—" }: { value?: string; empty?: string
   const at = value.indexOf("@");
   const tag = at >= 0 ? value.slice(0, at) : value;
   return (
-    <Text className="db-clip-text" size="xs" ff="monospace" title={value}>
+    <Text className="db-clip-text" size="xs" ff="monospace" title={value} span>
       {tag}
     </Text>
   );

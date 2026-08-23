@@ -1,4 +1,4 @@
-import { Badge } from "@mantine/core";
+import { Badge, Tooltip } from "@mantine/core";
 
 const STATUS_COLORS: Record<string, string> = {
   Healthy: "teal",
@@ -12,10 +12,13 @@ const STATUS_COLORS: Record<string, string> = {
   Unknown: "gray",
 };
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status, href }: { status: string; href?: string }) {
   const color = STATUS_COLORS[status] ?? "gray";
-  return (
+  const badge = (
     <Badge
+      {...(href
+        ? { component: "a" as const, href, target: "_blank", rel: "noreferrer" }
+        : {})}
       color={color}
       variant="light"
       size="sm"
@@ -28,6 +31,8 @@ export function StatusBadge({ status }: { status: string }) {
           maxWidth: "none",
           overflow: "visible",
           flexShrink: 0,
+          cursor: href ? "pointer" : undefined,
+          textDecoration: "none",
         },
         label: {
           overflow: "visible",
@@ -38,5 +43,11 @@ export function StatusBadge({ status }: { status: string }) {
     >
       {status || "Unknown"}
     </Badge>
+  );
+  if (!href) return badge;
+  return (
+    <Tooltip label="Open in Argo CD" withArrow>
+      {badge}
+    </Tooltip>
   );
 }

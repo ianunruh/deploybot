@@ -4,7 +4,6 @@ import {
   IconBrandGithub,
   IconBrandGitlab,
   IconBrandTrello,
-  IconExternalLink,
   IconLayoutKanban,
   type Icon,
 } from "@tabler/icons-react";
@@ -146,9 +145,4 @@ export function HostnameLink({ hostname }: { hostname?: string }) {
       {hostname}
     </Anchor>
   );
-}
-
-export function ArgoCDLink({ href }: { href?: string }) {
-  if (!href) return null;
-  return <LinkIcon href={href} label="Argo CD" icon={IconExternalLink} />;
 }

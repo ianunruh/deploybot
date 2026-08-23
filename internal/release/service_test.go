@@ -339,10 +339,14 @@ func TestStatusLinksAndArgoURL(t *testing.T) {
 	svc := &Service{
 		Catalog: loadExamples(t),
 		Argo:    stageRouter{"homelab": homelab, "prod": prod},
+		Sync:    true,
 	}
 	st, err := svc.Status(t.Context(), "kmc")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !st.Sync {
+		t.Fatalf("expected sync flag, got %+v", st)
 	}
 	if st.RepoURL != "https://github.com/ianunruh/kmc" {
 		t.Fatalf("repo %q", st.RepoURL)

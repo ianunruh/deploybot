@@ -59,6 +59,7 @@ export type DeployableStatus = {
   stages: StageStatus[];
   apply: boolean;
   push: boolean;
+  sync: boolean;
 };
 
 export type MutationResult = {
