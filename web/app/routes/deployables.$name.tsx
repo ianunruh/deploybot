@@ -1,7 +1,7 @@
 import { Alert, Button, Group, Stack, Text, TextInput, Select } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useEffect, useMemo, useState } from "react";
-import { useFetcher, useRevalidator } from "react-router";
+import { Link, useFetcher, useRevalidator } from "react-router";
 
 import type { Route } from "./+types/deployables.$name";
 import {
@@ -181,9 +181,9 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       )}
 
       <ResourceTable
-        headers={["Stage", "Hostname", "Image", "Sync", "Health"]}
+        headers={["Stage", "Hostname", "Image", "Sync", "Health", ""]}
         isEmpty={stages.length === 0}
-        minWidth={640}
+        minWidth={720}
       >
         {stages.map((st) => (
           <Table.Tr key={st.name}>
@@ -208,6 +208,16 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
                   {st.message}
                 </Text>
               ) : null}
+            </Table.Td>
+            <Table.Td>
+              <Button
+                component={Link}
+                to={`/deployables/${status.name}/sync/${st.name}`}
+                variant="default"
+                size="compact-sm"
+              >
+                Sync
+              </Button>
             </Table.Td>
           </Table.Tr>
         ))}

@@ -1,7 +1,15 @@
 import { Box, Code, Group, Text } from "@mantine/core";
 import { ConsolePaper } from "./console-paper";
 
-export function DiffPanel({ diff, title = "Diff" }: { diff: string; title?: string }) {
+export function DiffPanel({
+  diff,
+  title = "Diff",
+  maxHeight = 360,
+}: {
+  diff: string;
+  title?: string;
+  maxHeight?: number | string;
+}) {
   return (
     <ConsolePaper>
       <Group justify="space-between" mb="sm">
@@ -13,7 +21,7 @@ export function DiffPanel({ diff, title = "Diff" }: { diff: string; title?: stri
         <Box
           className="db-yaml"
           style={{
-            maxHeight: 360,
+            maxHeight,
             overflow: "auto",
             borderRadius: 4,
             border: "1px solid #1e242c",

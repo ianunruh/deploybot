@@ -144,47 +144,75 @@ func (s *Service) Promote(ctx context.Context, name, from, to string) (Mutation,
 	}, []string{to})
 }
 
-func (s *Service) SyncManifests(ctx context.Context, name string, stages []string) (Mutation, error) {
+type syncPlan struct {
+	d      *spec.Deployable
+	stages []string
+	before render.Tree
+	after  render.Tree
+	msg    string
+}
+
+func (s *Service) planSync(name string, stages []string) (syncPlan, error) {
 	d, err := s.Catalog.Get(name)
 	if err != nil {
-		return Mutation{}, err
+		return syncPlan{}, err
 	}
 	stages, err = resolveStages(d, stages)
 	if err != nil {
-		return Mutation{}, err
+		return syncPlan{}, err
 	}
 	generated, err := render.Render(d)
 	if err != nil {
-		return Mutation{}, err
+		return syncPlan{}, err
 	}
 	generated, err = render.FilterStages(generated, d, stages)
 	if err != nil {
-		return Mutation{}, err
+		return syncPlan{}, err
 	}
 	before := render.Tree{}
 	if s.OpsRepo != "" {
 		before, err = gitwrite.ReadPaths(s.OpsRepo, render.SortedPaths(generated))
 		if err != nil {
-			return Mutation{}, err
+			return syncPlan{}, err
 		}
+	}
+	after, err := render.MergeTrees(before, generated)
+	if err != nil {
+		return syncPlan{}, err
 	}
 	msg := fmt.Sprintf("sync %s", name)
 	if len(stages) != len(d.Spec.Stages) {
 		msg = fmt.Sprintf("sync %s (%s)", name, strings.Join(stages, ", "))
 	}
-	return s.mutate(ctx, d, msg, before, func(tree render.Tree) error {
-		merged, err := render.MergeTrees(tree, generated)
-		if err != nil {
-			return err
-		}
+	return syncPlan{d: d, stages: stages, before: before, after: after, msg: msg}, nil
+}
+
+func (s *Service) DiffSync(name string, stages []string) (Mutation, error) {
+	plan, err := s.planSync(name, stages)
+	if err != nil {
+		return Mutation{}, err
+	}
+	return Mutation{
+		DryRun: true,
+		Diff:   diffx.Trees(plan.before, plan.after),
+		Files:  changedPaths(plan.before, plan.after),
+	}, nil
+}
+
+func (s *Service) SyncManifests(ctx context.Context, name string, stages []string) (Mutation, error) {
+	plan, err := s.planSync(name, stages)
+	if err != nil {
+		return Mutation{}, err
+	}
+	return s.mutate(ctx, plan.d, plan.msg, plan.before, func(tree render.Tree) error {
 		for p := range tree {
 			delete(tree, p)
 		}
-		for p, b := range merged {
+		for p, b := range plan.after {
 			tree[p] = b
 		}
 		return nil
-	}, stages)
+	}, plan.stages)
 }
 
 func (s *Service) Diff(name, stage, imageRef string) (string, error) {

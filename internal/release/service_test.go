@@ -222,6 +222,26 @@ func TestSyncWritesManifestsAndPreservesHumanBits(t *testing.T) {
 	}
 }
 
+func TestDiffSyncDoesNotWrite(t *testing.T) {
+	t.Parallel()
+	dir := initOpsRepo(t)
+	svc := &Service{Catalog: loadExamples(t), OpsRepo: dir, Apply: true}
+	mut, err := svc.DiffSync("kmc", []string{"homelab"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !mut.DryRun || mut.Commit != "" || mut.Diff == "" {
+		t.Fatalf("preview %+v", mut)
+	}
+	keep, err := os.ReadFile(filepath.Join(dir, "k8s/kmc/base/deployment.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(keep) != "KEEPME\n" {
+		t.Fatalf("DiffSync wrote workload YAML: %q", keep)
+	}
+}
+
 func TestSyncUnknownStage(t *testing.T) {
 	t.Parallel()
 	svc := &Service{Catalog: loadExamples(t)}

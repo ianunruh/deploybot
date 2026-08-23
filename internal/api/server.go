@@ -21,8 +21,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/deployables", s.list)
 	mux.HandleFunc("GET /api/v1/deployables/{name}", s.get)
 	mux.HandleFunc("GET /api/v1/deployables/{name}/diff", s.diff)
+	mux.HandleFunc("GET /api/v1/deployables/{name}/sync", s.syncDiff)
 	mux.HandleFunc("POST /api/v1/deployables/{name}/pin", s.pin)
 	mux.HandleFunc("POST /api/v1/deployables/{name}/promote", s.promote)
+	mux.HandleFunc("POST /api/v1/deployables/{name}/sync", s.syncManifests)
 	return withJSON(mux)
 }
 
@@ -102,6 +104,42 @@ func (s *Server) promote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	mut, err := s.Release.Promote(r.Context(), r.PathValue("name"), req.From, req.To)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, mut)
+}
+
+func (s *Server) syncDiff(w http.ResponseWriter, r *http.Request) {
+	stage := r.URL.Query().Get("stage")
+	if stage == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "stage is required"})
+		return
+	}
+	mut, err := s.Release.DiffSync(r.PathValue("name"), []string{stage})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, mut)
+}
+
+type syncRequest struct {
+	Stage string `json:"stage"`
+}
+
+func (s *Server) syncManifests(w http.ResponseWriter, r *http.Request) {
+	var req syncRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	if req.Stage == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "stage is required"})
+		return
+	}
+	mut, err := s.Release.SyncManifests(r.Context(), r.PathValue("name"), []string{req.Stage})
 	if err != nil {
 		writeError(w, err)
 		return

@@ -29,7 +29,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     <Stack gap="lg">
       <PageHeader
         title="Deployables"
-        description="Catalog of apps deploybot can pin and promote."
+        description="Catalog of apps deploybot can pin, promote, and sync."
       />
       {error != null && (
         <Alert color="red" title="API unavailable">

@@ -95,3 +95,20 @@ export function promoteDeployable(name: string, from: string, to: string) {
     },
   );
 }
+
+export function previewSync(name: string, stage: string) {
+  const q = new URLSearchParams({ stage });
+  return apiFetch<MutationResult>(
+    `/api/v1/deployables/${encodeURIComponent(name)}/sync?${q}`,
+  );
+}
+
+export function syncDeployable(name: string, stage: string) {
+  return apiFetch<MutationResult>(
+    `/api/v1/deployables/${encodeURIComponent(name)}/sync`,
+    {
+      method: "POST",
+      body: JSON.stringify({ stage }),
+    },
+  );
+}
