@@ -1,9 +1,9 @@
-import { Alert, Stack, Text } from "@mantine/core";
+import { Alert, Group, Stack, Text } from "@mantine/core";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/home";
 import { listDeployables } from "~/lib/api.server";
-import { DeployableLinkIcons } from "~/ui/external-links";
+import { DeployableLinkIcons, ObservabilityClusterMenus } from "~/ui/external-links";
 import { PageHeader } from "~/ui/page-header";
 import { ResourceTable, Table } from "~/ui/resource-table";
 
@@ -57,8 +57,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             </Table.Td>
             <Table.Td>{d.stages.join(" → ")}</Table.Td>
             <Table.Td>
-              {d.repoURL || d.projectURL ? (
-                <DeployableLinkIcons repoURL={d.repoURL} projectURL={d.projectURL} />
+              {d.repoURL ||
+              d.projectURL ||
+              (d.stageLinks ?? []).some(
+                (st) => st.headlampURL || st.grafanaURL || st.logsURL,
+              ) ? (
+                <Group gap={2} wrap="nowrap">
+                  <DeployableLinkIcons repoURL={d.repoURL} projectURL={d.projectURL} />
+                  <ObservabilityClusterMenus stages={d.stageLinks ?? []} />
+                </Group>
               ) : (
                 <Text size="sm" c="dimmed">
                   —

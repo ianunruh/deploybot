@@ -28,14 +28,17 @@ type Service struct {
 }
 
 type StageStatus struct {
-	Name     string `json:"name"`
-	Hostname string `json:"hostname"`
-	Image    string `json:"image,omitempty"`
-	Sync     string `json:"sync"`
-	Health   string `json:"health"`
-	Revision string `json:"revision,omitempty"`
-	Message  string `json:"message,omitempty"`
-	ArgoURL  string `json:"argoURL,omitempty"`
+	Name        string `json:"name"`
+	Hostname    string `json:"hostname"`
+	Image       string `json:"image,omitempty"`
+	Sync        string `json:"sync"`
+	Health      string `json:"health"`
+	Revision    string `json:"revision,omitempty"`
+	Message     string `json:"message,omitempty"`
+	ArgoURL     string `json:"argoURL,omitempty"`
+	HeadlampURL string `json:"headlampURL,omitempty"`
+	GrafanaURL  string `json:"grafanaURL,omitempty"`
+	LogsURL     string `json:"logsURL,omitempty"`
 }
 
 type Status struct {
@@ -86,6 +89,7 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 			Sync:     "unknown",
 			Health:   "unknown",
 		}
+		ss.HeadlampURL, ss.GrafanaURL, ss.LogsURL = ObservabilityURLs(st.Name, d.Spec.Namespace)
 		if img, err := render.CurrentImage(tree, d, st.Name); err == nil {
 			ss.Image = img.Compact()
 		}

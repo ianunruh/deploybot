@@ -43,6 +43,12 @@ func TestListAndGet(t *testing.T) {
 			Name       string `json:"name"`
 			RepoURL    string `json:"repoURL"`
 			ProjectURL string `json:"projectURL"`
+			StageLinks []struct {
+				Name        string `json:"name"`
+				HeadlampURL string `json:"headlampURL"`
+				GrafanaURL  string `json:"grafanaURL"`
+				LogsURL     string `json:"logsURL"`
+			} `json:"stageLinks"`
 		} `json:"deployables"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
@@ -64,6 +70,17 @@ func TestListAndGet(t *testing.T) {
 	if list.Deployables[1].RepoURL != "https://github.com/ianunruh/kmc" {
 		t.Fatalf("controller repo %q", list.Deployables[1].RepoURL)
 	}
+	if len(list.Deployables[0].StageLinks) != 2 {
+		t.Fatalf("kmc stageLinks %+v", list.Deployables[0].StageLinks)
+	}
+	hl := list.Deployables[0].StageLinks[0]
+	if hl.Name != "homelab" || hl.HeadlampURL == "" || hl.GrafanaURL == "" || hl.LogsURL == "" {
+		t.Fatalf("kmc homelab links %+v", hl)
+	}
+	pr := list.Deployables[0].StageLinks[1]
+	if pr.Name != "prod" || pr.HeadlampURL == "" || pr.GrafanaURL == "" || pr.LogsURL != "" {
+		t.Fatalf("kmc prod links %+v", pr)
+	}
 
 	res2, err := http.Get(srv.URL + "/api/v1/deployables/kmc")
 	if err != nil {
@@ -79,6 +96,9 @@ func TestListAndGet(t *testing.T) {
 	}
 	if st.RepoURL != "https://github.com/ianunruh/kmc" || st.ProjectURL != "https://trello.com/b/rPALXxJF/kcloud" {
 		t.Fatalf("status links %+v", st)
+	}
+	if len(st.Stages) != 2 || st.Stages[0].LogsURL == "" || st.Stages[1].LogsURL != "" {
+		t.Fatalf("status observability %+v", st.Stages)
 	}
 }
 

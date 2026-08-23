@@ -16,7 +16,11 @@ import { notifyActionError, notifyActionSuccess } from "~/lib/action-feedback";
 import { useFetcherResult } from "~/lib/use-fetcher-result";
 import { ConfirmActionModal } from "~/ui/confirm-action-modal";
 import { DiffPanel } from "~/ui/diff-panel";
-import { DeployableLinkLabels, HostnameLink } from "~/ui/external-links";
+import {
+  DeployableLinkLabels,
+  HostnameLink,
+  StageObservabilityIcons,
+} from "~/ui/external-links";
 import {
   ArgoSyncCheckbox,
   formFlag,
@@ -222,7 +226,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       <MutationModeAlert apply={status.apply} push={status.push} />
 
       <ResourceTable
-        headers={["Stage", "Hostname", "Image", "Sync", "Health", ""]}
+        headers={["Stage", "Hostname", "Image", "Sync", "Health", "Links", ""]}
         isEmpty={stages.length === 0}
         minWidth={800}
       >
@@ -247,6 +251,13 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
                   {st.message}
                 </Text>
               ) : null}
+            </Table.Td>
+            <Table.Td className="db-cell-fit">
+              <StageObservabilityIcons
+                headlampURL={st.headlampURL}
+                grafanaURL={st.grafanaURL}
+                logsURL={st.logsURL}
+              />
             </Table.Td>
             <Table.Td className="db-cell-fit">
               <Button

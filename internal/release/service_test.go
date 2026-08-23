@@ -363,6 +363,14 @@ func TestStatusLinksAndArgoURL(t *testing.T) {
 	if st.Stages[1].ArgoURL != "https://argo.kcloud.io/applications/kmc" {
 		t.Fatalf("prod argo %q", st.Stages[1].ArgoURL)
 	}
+	if st.Stages[0].HeadlampURL == "" || st.Stages[0].GrafanaURL == "" || st.Stages[0].LogsURL == "" {
+		t.Fatalf("homelab observability %+v", st.Stages[0])
+	}
+	if st.Stages[1].HeadlampURL == "" || st.Stages[1].GrafanaURL == "" || st.Stages[1].LogsURL != "" {
+		t.Fatalf("prod observability %+v", st.Stages[1])
+	}
+	assertURL(t, "status headlamp", st.Stages[0].HeadlampURL, "https://headlamp.k8s.kcloud.zone/c/main/deployments?namespace=kmc-system")
+	assertURL(t, "status grafana", st.Stages[1].GrafanaURL, "https://grafana.k8s.kcloud.io/d/a87fb0d919ec0ea5f6543124e16c42a5/kubernetes-compute-resources-namespace-workloads?from=now-1h&to=now&var-namespace=kmc-system")
 }
 
 func TestListImages(t *testing.T) {
