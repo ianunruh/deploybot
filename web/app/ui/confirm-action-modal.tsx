@@ -1,4 +1,4 @@
-import { Button, Group, Modal, Stack, Text } from "@mantine/core";
+import { Button, Group, Modal, Stack } from "@mantine/core";
 import type { ReactNode } from "react";
 
 export function ConfirmActionModal({
@@ -9,6 +9,8 @@ export function ConfirmActionModal({
   title,
   confirmLabel = "Confirm",
   confirmColor = "accent",
+  confirmDisabled,
+  size = "md",
   message,
 }: {
   opened: boolean;
@@ -18,17 +20,24 @@ export function ConfirmActionModal({
   title: string;
   confirmLabel?: string;
   confirmColor?: string;
+  confirmDisabled?: boolean;
+  size?: string;
   message: ReactNode;
 }) {
   return (
-    <Modal opened={opened} onClose={onClose} title={title} centered>
+    <Modal opened={opened} onClose={onClose} title={title} centered size={size}>
       <Stack gap="md">
-        <Text size="sm">{message}</Text>
+        {message}
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button color={confirmColor} loading={loading} onClick={onConfirm}>
+          <Button
+            color={confirmColor}
+            loading={loading}
+            disabled={confirmDisabled}
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </Button>
         </Group>

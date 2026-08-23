@@ -16,6 +16,7 @@ import (
 	"github.com/ianunruh/deploybot/internal/argo"
 	"github.com/ianunruh/deploybot/internal/catalog"
 	"github.com/ianunruh/deploybot/internal/gitwrite"
+	"github.com/ianunruh/deploybot/internal/image"
 	"github.com/ianunruh/deploybot/internal/release"
 	"github.com/ianunruh/deploybot/internal/render"
 	"github.com/ianunruh/deploybot/internal/spec"
@@ -179,6 +180,7 @@ func runServe(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	token, tokenSrc := image.ResolveToken()
 	svc := &release.Service{
 		Catalog: cat,
 		OpsRepo: *repo,
@@ -187,6 +189,7 @@ func runServe(ctx context.Context, args []string) error {
 		Author:  gitwrite.DefaultAuthor(),
 		Argo:    argo.EndpointsFromEnv(),
 		Wait:    5 * time.Minute,
+		Images:  &image.GitHub{Token: token, HTTPClient: &http.Client{Timeout: 20 * time.Second}},
 	}
 	h := (&api.Server{Release: svc, Catalog: cat}).Handler()
 	srv := &http.Server{Addr: *addr, Handler: h}
@@ -196,7 +199,7 @@ func runServe(ctx context.Context, args []string) error {
 		defer cancel()
 		_ = srv.Shutdown(shCtx)
 	}()
-	slog.Info("api listening", "addr", *addr, "specs", *specs, "apply", *apply, "sync", *sync)
+	slog.Info("api listening", "addr", *addr, "specs", *specs, "apply", *apply, "sync", *sync, "github", tokenSrc)
 	err = srv.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil

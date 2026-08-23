@@ -2,6 +2,7 @@ package release
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,6 +15,7 @@ import (
 	"github.com/ianunruh/deploybot/internal/argo"
 	"github.com/ianunruh/deploybot/internal/catalog"
 	"github.com/ianunruh/deploybot/internal/gitwrite"
+	"github.com/ianunruh/deploybot/internal/image"
 	"github.com/ianunruh/deploybot/internal/render"
 	"github.com/ianunruh/deploybot/internal/spec"
 )
@@ -240,6 +242,44 @@ func TestDiffSyncDoesNotWrite(t *testing.T) {
 	if string(keep) != "KEEPME\n" {
 		t.Fatalf("DiffSync wrote workload YAML: %q", keep)
 	}
+}
+
+func TestListImages(t *testing.T) {
+	t.Parallel()
+	cat := loadExamples(t)
+	svc := &Service{
+		Catalog: cat,
+		Images: fakeImages{listing: image.Listing{
+			Source: "ghcr",
+			Versions: []image.Version{{
+				Repository: "ghcr.io/ianunruh/kmc",
+				Ref:        "ghcr.io/ianunruh/kmc:main-b8e5098@sha256:abc",
+				Tag:        "main-b8e5098",
+			}},
+		}},
+	}
+	got, err := svc.ListImages(t.Context(), "kmc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Source != "ghcr" || got.Repository != "ghcr.io/ianunruh/kmc" || len(got.Images) != 1 {
+		t.Fatalf("%+v", got)
+	}
+	if _, err := svc.ListImages(t.Context(), "nope"); err == nil {
+		t.Fatal("expected unknown deployable")
+	}
+	if _, err := (&Service{Catalog: cat}).ListImages(t.Context(), "kmc"); err == nil {
+		t.Fatal("expected unconfigured listing")
+	}
+}
+
+type fakeImages struct {
+	listing image.Listing
+	err     error
+}
+
+func (f fakeImages) List(_ context.Context, _ string, _ string) (image.Listing, error) {
+	return f.listing, f.err
 }
 
 func TestSyncUnknownStage(t *testing.T) {

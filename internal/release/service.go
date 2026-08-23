@@ -23,6 +23,7 @@ type Service struct {
 	Author  gitwrite.Author
 	Argo    argo.Router
 	Wait    time.Duration
+	Images  image.Lister
 }
 
 type StageStatus struct {
@@ -92,6 +93,35 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 		out.Stages = append(out.Stages, ss)
 	}
 	return out, nil
+}
+
+type ImageList struct {
+	Repository string          `json:"repository"`
+	Source     string          `json:"source"`
+	Images     []image.Version `json:"images"`
+}
+
+func (s *Service) ListImages(ctx context.Context, name string) (ImageList, error) {
+	d, err := s.Catalog.Get(name)
+	if err != nil {
+		return ImageList{}, err
+	}
+	if s.Images == nil {
+		return ImageList{}, fmt.Errorf("image listing is not configured")
+	}
+	listing, err := s.Images.List(ctx, d.Spec.Image.Repository, d.Spec.Image.Tag)
+	if err != nil {
+		return ImageList{}, err
+	}
+	images := listing.Versions
+	if images == nil {
+		images = []image.Version{}
+	}
+	return ImageList{
+		Repository: d.Spec.Image.Repository,
+		Source:     listing.Source,
+		Images:     images,
+	}, nil
 }
 
 func (s *Service) Pin(ctx context.Context, name, stage, imageRef string) (Mutation, error) {

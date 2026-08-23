@@ -72,6 +72,27 @@ export function getDeployable(name: string) {
   return apiFetch<DeployableStatus>(`/api/v1/deployables/${encodeURIComponent(name)}`);
 }
 
+export type ImageVersion = {
+  repository: string;
+  ref: string;
+  tag?: string;
+  digest?: string;
+  tags: string[];
+  createdAt: string;
+};
+
+export type ImageList = {
+  repository: string;
+  source: string;
+  images: ImageVersion[];
+};
+
+export function listImages(name: string) {
+  return apiFetch<ImageList>(`/api/v1/deployables/${encodeURIComponent(name)}/images`, {
+    signal: AbortSignal.timeout(30_000),
+  });
+}
+
 export function diffPin(name: string, stage: string, image: string) {
   const q = new URLSearchParams({ stage, image });
   return apiFetch<{ diff: string }>(

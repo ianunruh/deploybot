@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useFetcher, useRevalidator } from "react-router";
 
 import type { Route } from "./+types/deployables.$name";
+import type { ImagesLoaderData } from "./deployables.$name.images";
 import {
   getDeployable,
   pinDeployable,
   promoteDeployable,
+  type ImageVersion,
   type MutationResult,
 } from "~/lib/api.server";
 import { notifyActionError, notifyActionSuccess } from "~/lib/action-feedback";
@@ -85,6 +87,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
   const revalidator = useRevalidator();
   const pinFetcher = useFetcher<ActionData>();
   const promoteFetcher = useFetcher<ActionData>();
+  const imagesFetcher = useFetcher<ImagesLoaderData>();
   const [pinOpen, pinHandlers] = useDisclosure(false);
   const [promoteOpen, promoteHandlers] = useDisclosure(false);
   const [image, setImage] = useState("");
@@ -103,6 +106,20 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
     return () => window.clearInterval(id);
   }, [revalidator]);
 
+  useEffect(() => {
+    if (!pinOpen || !status?.name) return;
+    void imagesFetcher.load(`/deployables/${encodeURIComponent(status.name)}/images`);
+    // Fetcher identity changes; reload only when the modal opens for a deployable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load on open
+  }, [pinOpen, status?.name]);
+
+  const imageOptions = imagesFetcher.data?.images ?? [];
+  const imagesError = imagesFetcher.data?.error ?? null;
+  const imagesLoading =
+    pinOpen && (imagesFetcher.state !== "idle" || imagesFetcher.data == null);
+  const imagesSource = imagesFetcher.data?.source ?? "";
+  const selectedImage = image || imageOptions[0]?.ref || "";
+
   useFetcherResult(pinFetcher, (data) => {
     if (!data.ok) {
       notifyActionError("Pin failed", data.error);
@@ -111,6 +128,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
     const extra = data.result?.dryRun ? " (dry-run)" : "";
     notifyActionSuccess("Pin", `Wrote overlay${extra}`);
     pinHandlers.close();
+    setImage("");
     void revalidator.revalidate();
   });
 
@@ -227,10 +245,15 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
 
       <ConfirmActionModal
         opened={pinOpen}
-        onClose={pinHandlers.close}
+        onClose={() => {
+          pinHandlers.close();
+          setImage("");
+        }}
         loading={pinFetcher.state !== "idle"}
         title={`Pin ${status.name}`}
         confirmLabel={status.apply ? "Commit pin" : "Preview pin"}
+        confirmDisabled={!selectedImage.trim() || imagesLoading}
+        size="lg"
         message={
           <Stack gap="sm">
             <Select
@@ -239,20 +262,66 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
               value={stageValue}
               onChange={(v) => setPinStage(v ?? "")}
             />
-            <TextInput
-              label="Image"
-              placeholder="ghcr.io/ianunruh/kmc@sha256:…"
-              value={image}
-              onChange={(e) => setImage(e.currentTarget.value)}
-            />
-            <Text size="xs" c="dimmed">
-              Actions already publish main-&lt;sha&gt; and digest tags.
-            </Text>
+            {imagesLoading ? (
+              <Select
+                label="Image"
+                data={[]}
+                placeholder="Loading published images…"
+                disabled
+              />
+            ) : imageOptions.length > 0 ? (
+              <Select
+                label="Image"
+                searchable
+                allowDeselect={false}
+                data={imageOptions.map((img) => ({
+                  value: img.ref,
+                  label: img.tag || shortDigest(img.digest) || img.ref,
+                }))}
+                value={selectedImage || null}
+                onChange={(v) => setImage(v ?? "")}
+                nothingFoundMessage="No matching images"
+                maxDropdownHeight={320}
+                renderOption={({ option }) => {
+                  const img = imageOptions.find((i) => i.ref === option.value);
+                  return <ImageOption img={img} label={option.label} />;
+                }}
+              />
+            ) : (
+              <TextInput
+                label="Image"
+                placeholder="ghcr.io/ianunruh/kmc@sha256:…"
+                value={selectedImage}
+                onChange={(e) => setImage(e.currentTarget.value)}
+              />
+            )}
+            {imagesLoading ? (
+              <Text size="xs" c="dimmed">
+                Loading published images…
+              </Text>
+            ) : imagesError != null ? (
+              <Text size="xs" c="dimmed">
+                Could not list images ({imagesError}). Paste a ref instead.
+              </Text>
+            ) : imageOptions.length === 0 ? (
+              <Text size="xs" c="dimmed">
+                No tagged GHCR versions. Paste a ref instead.
+              </Text>
+            ) : imagesSource === "commits" ? (
+              <Text size="xs" c="dimmed">
+                Newest git commits first (`main-&lt;sha&gt;` tags). Token needs
+                read:packages for GHCR digests.
+              </Text>
+            ) : (
+              <Text size="xs" c="dimmed">
+                Newest GHCR versions first.
+              </Text>
+            )}
           </Stack>
         }
         onConfirm={() => {
           void pinFetcher.submit(
-            { intent: "pin", stage: stageValue, image },
+            { intent: "pin", stage: stageValue, image: selectedImage },
             { method: "post" },
           );
         }}
@@ -285,4 +354,42 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       />
     </Stack>
   );
+}
+
+function ImageOption({ img, label }: { img?: ImageVersion; label: string }) {
+  return (
+    <Group justify="space-between" gap="sm" wrap="nowrap" w="100%">
+      <Stack gap={0}>
+        <Text size="sm">{img?.tag || label}</Text>
+        {img?.digest ? (
+          <Text size="xs" c="dimmed" ff="monospace">
+            {shortDigest(img.digest)}
+          </Text>
+        ) : null}
+      </Stack>
+      {img?.createdAt ? (
+        <Text size="xs" c="dimmed">
+          {formatWhen(img.createdAt)}
+        </Text>
+      ) : null}
+    </Group>
+  );
+}
+
+function shortDigest(digest?: string): string {
+  if (!digest) return "";
+  const hex = digest.replace(/^sha256:/, "");
+  return hex ? `sha256:${hex.slice(0, 12)}` : digest;
+}
+
+function formatWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
 }

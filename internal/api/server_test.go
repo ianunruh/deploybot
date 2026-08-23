@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/ianunruh/deploybot/internal/catalog"
+	"github.com/ianunruh/deploybot/internal/image"
 	"github.com/ianunruh/deploybot/internal/release"
 )
 
@@ -126,4 +128,70 @@ func TestSyncDiffAndPost(t *testing.T) {
 	if missing.StatusCode != http.StatusBadRequest {
 		t.Fatalf("missing stage status %s", missing.Status)
 	}
+}
+
+func TestListImages(t *testing.T) {
+	t.Parallel()
+	_, file, _, _ := runtime.Caller(0)
+	specs := filepath.Join(filepath.Dir(file), "..", "..", "examples")
+	cat, err := catalog.Load(specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := release.ImageList{
+		Repository: "ghcr.io/ianunruh/kmc",
+		Source:     "ghcr",
+		Images: []image.Version{
+			{
+				Repository: "ghcr.io/ianunruh/kmc",
+				Ref:        "ghcr.io/ianunruh/kmc:main-b8e5098@sha256:abc",
+				Tag:        "main-b8e5098",
+				Digest:     "sha256:abc",
+				Tags:       []string{"main-b8e5098", "main"},
+			},
+		},
+	}
+	s := &Server{
+		Catalog: cat,
+		Release: &release.Service{Catalog: cat, Images: fakeImages{list: want}},
+	}
+	srv := httptest.NewServer(s.Handler())
+	t.Cleanup(srv.Close)
+
+	res, err := http.Get(srv.URL + "/api/v1/deployables/kmc/images")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		t.Fatal(res.Status)
+	}
+	var got release.ImageList
+	if err := json.NewDecoder(res.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Source != "ghcr" || len(got.Images) != 1 || got.Images[0].Tag != "main-b8e5098" {
+		t.Fatalf("%+v", got)
+	}
+
+	missing, err := http.Get(srv.URL + "/api/v1/deployables/nope/images")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = missing.Body.Close() }()
+	if missing.StatusCode != http.StatusNotFound {
+		t.Fatalf("status %s", missing.Status)
+	}
+}
+
+type fakeImages struct {
+	list release.ImageList
+	err  error
+}
+
+func (f fakeImages) List(_ context.Context, _ string, _ string) (image.Listing, error) {
+	if f.err != nil {
+		return image.Listing{}, f.err
+	}
+	return image.Listing{Source: f.list.Source, Versions: f.list.Images}, nil
 }

@@ -41,6 +41,11 @@ just build
 `--apply` commits locally. `--sync` talks to Argo (`DEPLOYBOT_ARGO_URL` /
 `DEPLOYBOT_ARGO_URL_<STAGE>`). Default is dry-run.
 
+The pin picker lists GHCR versions (newest first) via the GitHub Packages
+API. Auth is `DEPLOYBOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`, or
+`gh auth token`. The token needs `read:packages` (or `write:packages`).
+Without that scope it falls back to `main-<sha>` tags from git history.
+
 Lint Go with golangci-lint v2.13+ built with Go 1.27 (Homebrew 2.10 is too old
 for this toolchain):
 

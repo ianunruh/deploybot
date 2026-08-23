@@ -20,6 +20,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("GET /api/v1/deployables", s.list)
 	mux.HandleFunc("GET /api/v1/deployables/{name}", s.get)
+	mux.HandleFunc("GET /api/v1/deployables/{name}/images", s.images)
 	mux.HandleFunc("GET /api/v1/deployables/{name}/diff", s.diff)
 	mux.HandleFunc("GET /api/v1/deployables/{name}/sync", s.syncDiff)
 	mux.HandleFunc("POST /api/v1/deployables/{name}/pin", s.pin)
@@ -61,6 +62,15 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, st)
+}
+
+func (s *Server) images(w http.ResponseWriter, r *http.Request) {
+	out, err := s.Release.ListImages(r.Context(), r.PathValue("name"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) diff(w http.ResponseWriter, r *http.Request) {
