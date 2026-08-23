@@ -3,6 +3,7 @@ package release
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ianunruh/deploybot/internal/argo"
@@ -105,9 +106,13 @@ func (s *Service) Pin(ctx context.Context, name, stage, imageRef string) (Mutati
 	if err != nil {
 		return Mutation{}, err
 	}
-	return s.mutate(ctx, d, fmt.Sprintf("pin %s %s to %s", name, stage, ref.String()), func(tree render.Tree) error {
+	tree, err := s.overlayTree(d)
+	if err != nil {
+		return Mutation{}, err
+	}
+	return s.mutate(ctx, d, fmt.Sprintf("pin %s %s to %s", name, stage, ref.String()), tree, func(tree render.Tree) error {
 		return render.Pin(tree, d, stage, ref)
-	}, stage)
+	}, []string{stage})
 }
 
 func (s *Service) Promote(ctx context.Context, name, from, to string) (Mutation, error) {
@@ -134,9 +139,52 @@ func (s *Service) Promote(ctx context.Context, name, from, to string) (Mutation,
 	if err != nil {
 		return Mutation{}, fmt.Errorf("source stage %s: %w", from, err)
 	}
-	return s.mutate(ctx, d, fmt.Sprintf("promote %s %s -> %s (%s)", name, from, to, img.String()), func(tree render.Tree) error {
+	return s.mutate(ctx, d, fmt.Sprintf("promote %s %s -> %s (%s)", name, from, to, img.String()), tree, func(tree render.Tree) error {
 		return render.Pin(tree, d, to, img)
-	}, to)
+	}, []string{to})
+}
+
+func (s *Service) SyncManifests(ctx context.Context, name string, stages []string) (Mutation, error) {
+	d, err := s.Catalog.Get(name)
+	if err != nil {
+		return Mutation{}, err
+	}
+	stages, err = resolveStages(d, stages)
+	if err != nil {
+		return Mutation{}, err
+	}
+	generated, err := render.Render(d)
+	if err != nil {
+		return Mutation{}, err
+	}
+	generated, err = render.FilterStages(generated, d, stages)
+	if err != nil {
+		return Mutation{}, err
+	}
+	before := render.Tree{}
+	if s.OpsRepo != "" {
+		before, err = gitwrite.ReadPaths(s.OpsRepo, render.SortedPaths(generated))
+		if err != nil {
+			return Mutation{}, err
+		}
+	}
+	msg := fmt.Sprintf("sync %s", name)
+	if len(stages) != len(d.Spec.Stages) {
+		msg = fmt.Sprintf("sync %s (%s)", name, strings.Join(stages, ", "))
+	}
+	return s.mutate(ctx, d, msg, before, func(tree render.Tree) error {
+		merged, err := render.MergeTrees(tree, generated)
+		if err != nil {
+			return err
+		}
+		for p := range tree {
+			delete(tree, p)
+		}
+		for p, b := range merged {
+			tree[p] = b
+		}
+		return nil
+	}, stages)
 }
 
 func (s *Service) Diff(name, stage, imageRef string) (string, error) {
@@ -162,11 +210,7 @@ func (s *Service) Diff(name, stage, imageRef string) (string, error) {
 	return diffx.Trees(before, after), nil
 }
 
-func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string, edit func(render.Tree) error, syncStage string) (Mutation, error) {
-	before, err := s.overlayTree(d)
-	if err != nil {
-		return Mutation{}, err
-	}
+func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string, before render.Tree, edit func(render.Tree) error, syncStages []string) (Mutation, error) {
 	after, err := cloneTree(before)
 	if err != nil {
 		return Mutation{}, err
@@ -195,15 +239,36 @@ func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string
 	}
 	mut.Commit = res.Commit
 	if s.Sync {
-		if err := s.syncStage(ctx, d, syncStage); err != nil {
-			return mut, err
+		for _, st := range syncStages {
+			if err := s.syncStage(ctx, d, st); err != nil {
+				return mut, err
+			}
+			if err := s.waitStage(ctx, d, st); err != nil {
+				return mut, err
+			}
 		}
-		mut.Synced = true
-		if err := s.waitStage(ctx, d, syncStage); err != nil {
-			return mut, err
-		}
+		mut.Synced = len(syncStages) > 0
 	}
 	return mut, nil
+}
+
+func resolveStages(d *spec.Deployable, stages []string) ([]string, error) {
+	if len(stages) == 0 {
+		return d.StageNames(), nil
+	}
+	seen := make(map[string]struct{}, len(stages))
+	out := make([]string, 0, len(stages))
+	for _, name := range stages {
+		if _, err := d.Stage(name); err != nil {
+			return nil, err
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	return out, nil
 }
 
 func (s *Service) workingTree(d *spec.Deployable) (render.Tree, error) {

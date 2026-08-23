@@ -64,13 +64,15 @@ Pin/promote **only** upsert `images:` on the stage overlay. They must not
 rewrite workload YAML or shared Argo project `kustomization.yaml` files
 (sandbox app list).
 
+`deploybot sync` renders generated manifests into the ops repo (merge
+kustomizations, keep pins and human generators) and can limit stages.
+Argo Applications are full docs per overlay, not a shared base + path patch.
+
 ## Explicitly not done yet
 
-- **`deploybot sync` (or equivalent):** adopt and keep generated manifests
-  (Deployment, Service, HTTPRoute, our patches, Application YAML) in the ops
-  repo, merging human bits (`configMapGenerator`, extra patches). This is
-  what cutover should use — not pin.
-- Cut kmc console over in `kcloud-ops` (stop floating `:main`).
+- Cutover kmc via `deploybot sync` (CLI exists; still need to run it against
+  `kcloud-ops` and stop floating `:main`).
+
 - kmc controller as deployable #2.
 - Play / ivy as spec customers.
 - Preview apps, multi-service releases, replacing Actions/Kaniko.

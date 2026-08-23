@@ -20,6 +20,22 @@ func TestRunUnknown(t *testing.T) {
 	}
 }
 
+func TestRunSync(t *testing.T) {
+	t.Parallel()
+	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
+	if err := Run(t.Context(), []string{"sync", "--spec", spec, "--stage", "homelab"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRunSyncUnknownStage(t *testing.T) {
+	t.Parallel()
+	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
+	if err := Run(t.Context(), []string{"sync", "--spec", spec, "--stage", "nope"}); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func TestRunRender(t *testing.T) {
 	t.Parallel()
 	out := t.TempDir()

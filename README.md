@@ -34,6 +34,8 @@ just build
   --image ghcr.io/ianunruh/kmc@sha256:… --repo /path/to/kcloud-ops --apply
 ./build/deploybot promote --spec examples/kmc.yaml --from homelab --to prod \
   --repo /path/to/kcloud-ops --apply
+./build/deploybot sync --spec examples/kmc.yaml --stage homelab \
+  --repo /path/to/kcloud-ops --apply
 ```
 
 `--apply` commits locally. `--sync` talks to Argo (`DEPLOYBOT_ARGO_URL` /

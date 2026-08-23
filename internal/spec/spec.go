@@ -262,10 +262,6 @@ func (d *Deployable) BaseStage() Stage {
 	return d.Spec.Stages[0]
 }
 
-func (d *Deployable) LastStage() Stage {
-	return d.Spec.Stages[len(d.Spec.Stages)-1]
-}
-
 func (d *Deployable) ImageRef() string {
 	if d.Spec.Image.Tag == "" {
 		return d.Spec.Image.Repository

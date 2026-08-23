@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ianunruh/deploybot/internal/api"
@@ -26,6 +27,7 @@ Usage:
   deploybot render [--out dir] <spec>
   deploybot pin --spec <file> --stage <name> --image <ref> [--repo dir] [--apply] [--sync]
   deploybot promote --spec <file> --from <stage> --to <stage> [--repo dir] [--apply] [--sync]
+  deploybot sync --spec <file> [--stage name]... [--repo dir] [--apply] [--sync]
   deploybot serve [--addr host:port] [--specs dir] [--repo dir] [--apply] [--sync]
   deploybot version
 `
@@ -48,6 +50,8 @@ func Run(ctx context.Context, args []string) error {
 		return runPin(ctx, args[1:])
 	case "promote":
 		return runPromote(ctx, args[1:])
+	case "sync":
+		return runSync(ctx, args[1:])
 	case "serve":
 		return runServe(ctx, args[1:])
 	default:
@@ -131,6 +135,29 @@ func runPromote(ctx context.Context, args []string) error {
 		return err
 	}
 	mut, err := svc.Promote(ctx, name, *from, *to)
+	if err != nil {
+		return err
+	}
+	printMutation(mut)
+	return nil
+}
+
+func runSync(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
+	specPath, repo, apply, syncArgo := mutationFlags(fs)
+	var stages stringList
+	fs.Var(&stages, "stage", "stage to write (repeatable or comma-separated; default: all)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *specPath == "" {
+		return fmt.Errorf("sync requires --spec")
+	}
+	svc, name, err := serviceFromSpec(*specPath, *repo, *apply, *syncArgo)
+	if err != nil {
+		return err
+	}
+	mut, err := svc.SyncManifests(ctx, name, []string(stages))
 	if err != nil {
 		return err
 	}
@@ -225,4 +252,24 @@ func envOr(k, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+type stringList []string
+
+func (s *stringList) String() string { return strings.Join(*s, ",") }
+
+func (s *stringList) Set(v string) error {
+	n := 0
+	for _, p := range strings.Split(v, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		*s = append(*s, p)
+		n++
+	}
+	if n == 0 {
+		return fmt.Errorf("empty stage")
+	}
+	return nil
 }
