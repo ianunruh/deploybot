@@ -1,11 +1,13 @@
 # deploybot
 
-Small-scale release control plane: a deployable spec in git becomes
-Deployment / Service / HTTPRoute / Argo Application, then you pin an image
-digest and promote homelab → prod.
+Small-scale release control plane: a deployable spec in git becomes a
+Deployment and Argo Application (plus Service / HTTPRoute when the app is
+routed), then you pin an image digest and promote homelab → prod.
 
-The first customer is the kmc console. ConfigMaps, secrets, impersonator RBAC,
-and the kmc controller are not generated.
+Customers today: kmc console (`examples/kmc.yaml`) and kmc-controller
+(`examples/kmc-controller.yaml`). Deploybot generates the skeleton and the
+image pin. ConfigMaps, secrets, CRDs, RBAC, and extra pod fields (args,
+securityContext, CIDRs) stay as extra files / overlay patches.
 
 Original intent and non-goals: [docs/goals.md](docs/goals.md).
 
@@ -15,7 +17,7 @@ Original intent and non-goals: [docs/goals.md](docs/goals.md).
 |------|------|
 | `internal/` | Go: spec, render, pin, git write, Argo, HTTP API |
 | `web/` | React Router 8 + Mantine console |
-| `examples/` | Deployable specs (start with `kmc.yaml`) |
+| `examples/` | Deployable specs and overlay patches |
 
 ## Develop
 
