@@ -1,7 +1,10 @@
-# Shared process config. Secrets stay in env or tokenFile.
+# Shared process config. Secrets stay in env.
 # Precedence: CLI flags > DEPLOYBOT_* env > this file > defaults.
+# Argo status/sync uses Application CRs via kubeconfig.
+# kubeContext defaults to the stage name.
 argo:
   homelab:
     url: https://argocd.k8s.kcloud.zone
   prod:
     url: https://argocd.k8s.kcloud.io
+    kubeContext: prod-sjc1

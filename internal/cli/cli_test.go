@@ -16,7 +16,7 @@ func isolateEnv(t *testing.T) {
 	t.Setenv("DEPLOYBOT_ADDR", "")
 	t.Setenv("DEPLOYBOT_SPECS_DIR", "")
 	t.Setenv("DEPLOYBOT_ARGO_URL", "")
-	t.Setenv("DEPLOYBOT_ARGO_TOKEN", "")
+	t.Setenv("KUBECONFIG", filepath.Join(t.TempDir(), "kubeconfig"))
 }
 
 func TestRunVersion(t *testing.T) {

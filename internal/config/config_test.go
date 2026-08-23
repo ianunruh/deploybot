@@ -18,8 +18,8 @@ argo:
     url: https://argocd.k8s.kcloud.zone/
   prod:
     url: https://argocd.k8s.kcloud.io
-    tokenFile: secrets/prod.token
-    tokenEnv: DEPLOYBOT_ARGO_TOKEN_PROD
+    kubeContext: prod-sjc1
+    namespace: argocd
 `)
 	if err := os.WriteFile(path, body, 0o644); err != nil {
 		t.Fatal(err)
@@ -31,9 +31,9 @@ argo:
 	want := map[string]Argo{
 		"homelab": {URL: "https://argocd.k8s.kcloud.zone"},
 		"prod": {
-			URL:       "https://argocd.k8s.kcloud.io",
-			TokenFile: "secrets/prod.token",
-			TokenEnv:  "DEPLOYBOT_ARGO_TOKEN_PROD",
+			URL:         "https://argocd.k8s.kcloud.io",
+			KubeContext: "prod-sjc1",
+			Namespace:   "argocd",
 		},
 	}
 	if diff := cmp.Diff(want, f.Argo); diff != "" {

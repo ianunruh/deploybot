@@ -7,17 +7,47 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/ianunruh/deploybot/internal/config"
+	"github.com/ianunruh/deploybot/internal/kube"
 )
 
-func TestHTTPClientGetAndSync(t *testing.T) {
+func writeKubeconfig(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "kubeconfig")
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+const testKubeconfig = `
+apiVersion: v1
+kind: Config
+current-context: homelab
+clusters:
+- name: homelab
+  cluster:
+    server: https://k8s.example
+    insecure-skip-tls-verify: true
+contexts:
+- name: homelab
+  context: {cluster: homelab, user: u}
+- name: prod-sjc1
+  context: {cluster: homelab, user: u}
+users:
+- name: u
+  user: {token: kube-tok}
+`
+
+func TestKubeClientGetAndSync(t *testing.T) {
 	t.Parallel()
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/applications/kmc", func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("Authorization"); got != "Bearer tok" {
+	mux.HandleFunc("GET /apis/argoproj.io/v1alpha1/namespaces/argocd/applications/kmc", func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer kube-tok" {
 			t.Errorf("auth %q", got)
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -28,10 +58,13 @@ func TestHTTPClientGetAndSync(t *testing.T) {
 			},
 		})
 	})
-	mux.HandleFunc("POST /api/v1/applications/kmc/sync", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PATCH /apis/argoproj.io/v1alpha1/namespaces/argocd/applications/kmc", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Content-Type") != kube.MergePatch {
+			t.Errorf("content-type %q", r.Header.Get("Content-Type"))
+		}
 		body, _ := io.ReadAll(r.Body)
-		if string(body) == "" {
-			t.Error("empty body")
+		if !strings.Contains(string(body), `"prune":true`) {
+			t.Errorf("body %s", body)
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{}`))
@@ -39,7 +72,11 @@ func TestHTTPClientGetAndSync(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	c := &HTTPClient{BaseURL: srv.URL, Token: "tok", HTTPClient: srv.Client()}
+	c := &KubeClient{
+		REST:      &kube.REST{BaseURL: srv.URL, HTTP: srv.Client(), Auth: kube.Bearer("kube-tok")},
+		Namespace: "argocd",
+		UIBaseURL: "https://argocd.k8s.kcloud.zone",
+	}
 	st, err := c.Get(t.Context(), "kmc")
 	if err != nil {
 		t.Fatal(err)
@@ -50,97 +87,88 @@ func TestHTTPClientGetAndSync(t *testing.T) {
 	if err := c.Sync(t.Context(), "kmc", true); err != nil {
 		t.Fatal(err)
 	}
+	if got := c.AppURL("kmc"); got != "https://argocd.k8s.kcloud.zone/applications/kmc" {
+		t.Fatalf("app url %q", got)
+	}
 }
 
-func TestEndpointsFromConfigAndEnv(t *testing.T) {
-	dir := t.TempDir()
-	tokenPath := filepath.Join(dir, "homelab.token")
-	if err := os.WriteFile(tokenPath, []byte(" file-token \n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+func TestEndpointsFromConfig(t *testing.T) {
+	cfg := writeKubeconfig(t, testKubeconfig)
+	t.Setenv("KUBECONFIG", cfg)
 	t.Setenv("DEPLOYBOT_ARGO_URL", "")
-	t.Setenv("DEPLOYBOT_ARGO_TOKEN", "")
 	t.Setenv("DEPLOYBOT_ARGO_URL_HOMELAB", "")
-	t.Setenv("DEPLOYBOT_ARGO_TOKEN_HOMELAB", "")
 	t.Setenv("DEPLOYBOT_ARGO_URL_PROD", "")
-	t.Setenv("DEPLOYBOT_ARGO_TOKEN_PROD", "")
-	t.Setenv("YAML_TOKEN", "env-named")
 
 	eps, err := EndpointsFromConfig(map[string]config.Argo{
-		"homelab": {URL: "https://argocd.k8s.kcloud.zone", TokenFile: tokenPath},
-		"prod":    {URL: "https://argocd.k8s.kcloud.io", TokenEnv: "YAML_TOKEN"},
+		"homelab": {URL: "https://argocd.k8s.kcloud.zone"},
+		"prod":    {URL: "https://argocd.k8s.kcloud.io", KubeContext: "prod-sjc1", Namespace: "argocd"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := eps.ForStage("homelab").(*HTTPClient)
-	if h.BaseURL != "https://argocd.k8s.kcloud.zone" || h.Token != "file-token" {
-		t.Fatalf("homelab %+v", h)
+	h, ok := eps.ForStage("homelab").(*KubeClient)
+	if !ok || h.Namespace != "argocd" || h.UIBaseURL != "https://argocd.k8s.kcloud.zone" {
+		t.Fatalf("homelab %T %+v", eps.ForStage("homelab"), h)
 	}
-	if got := h.AppURL("kmc"); got != "https://argocd.k8s.kcloud.zone/applications/kmc" {
+	if got := AppURL(h, "kmc"); got != "https://argocd.k8s.kcloud.zone/applications/kmc" {
 		t.Fatalf("homelab app %q", got)
 	}
-	p := eps.ForStage("prod").(*HTTPClient)
-	if p.BaseURL != "https://argocd.k8s.kcloud.io" || p.Token != "env-named" {
-		t.Fatalf("prod %+v", p)
-	}
-	if got := p.AppURL("kmc"); got != "https://argocd.k8s.kcloud.io/applications/kmc" {
-		t.Fatalf("prod app %q", got)
+	p, ok := eps.ForStage("prod").(*KubeClient)
+	if !ok || p.REST.BaseURL != "https://k8s.example" || p.UIBaseURL != "https://argocd.k8s.kcloud.io" {
+		t.Fatalf("prod %T %+v", eps.ForStage("prod"), p)
 	}
 
 	t.Setenv("DEPLOYBOT_ARGO_URL_HOMELAB", "https://argo.override.zone")
-	t.Setenv("DEPLOYBOT_ARGO_TOKEN_PROD", "env-wins")
 	eps, err = EndpointsFromConfig(map[string]config.Argo{
-		"homelab": {URL: "https://argocd.k8s.kcloud.zone", TokenFile: tokenPath},
-		"prod":    {URL: "https://argocd.k8s.kcloud.io"},
+		"homelab": {URL: "https://argocd.k8s.kcloud.zone"},
+		"prod":    {URL: "https://argocd.k8s.kcloud.io", KubeContext: "prod-sjc1"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	h = eps.ForStage("homelab").(*HTTPClient)
-	if h.BaseURL != "https://argo.override.zone" || h.Token != "file-token" {
+	h = eps.ForStage("homelab").(*KubeClient)
+	if h.UIBaseURL != "https://argo.override.zone" {
 		t.Fatalf("env url overlay %+v", h)
-	}
-	p = eps.ForStage("prod").(*HTTPClient)
-	if p.Token != "env-wins" {
-		t.Fatalf("env token overlay %+v", p)
 	}
 }
 
-func TestEndpointsFromConfigMissingTokenFile(t *testing.T) {
-	t.Parallel()
+func TestEndpointsSkipsMissingKubeconfig(t *testing.T) {
+	t.Setenv("KUBECONFIG", filepath.Join(t.TempDir(), "missing"))
+	eps, err := EndpointsFromConfig(map[string]config.Argo{
+		"homelab": {URL: "https://argocd.k8s.kcloud.zone"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if eps.ForStage("homelab") != nil {
+		t.Fatalf("got %+v", eps.ForStage("homelab"))
+	}
+}
+
+func TestEndpointsUnknownKubeContext(t *testing.T) {
+	t.Setenv("KUBECONFIG", writeKubeconfig(t, testKubeconfig))
 	_, err := EndpointsFromConfig(map[string]config.Argo{
-		"homelab": {URL: "https://argocd.k8s.kcloud.zone", TokenFile: "/nope/token"},
+		"prod": {URL: "https://argocd.k8s.kcloud.io", KubeContext: "nope"},
 	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 }
 
-func TestHTTPClientAppURL(t *testing.T) {
+func TestAppURL(t *testing.T) {
 	t.Parallel()
-	c := &HTTPClient{BaseURL: "https://argo.kcloud.zone/"}
+	c := &KubeClient{UIBaseURL: "https://argo.kcloud.zone/"}
 	if got := c.AppURL("kmc"); got != "https://argo.kcloud.zone/applications/kmc" {
 		t.Fatalf("got %q", got)
 	}
 	if got := AppURL(c, "kmc"); got != "https://argo.kcloud.zone/applications/kmc" {
 		t.Fatalf("helper %q", got)
 	}
-	if got := (&HTTPClient{}).AppURL("kmc"); got != "" {
+	if got := (&KubeClient{}).AppURL("kmc"); got != "" {
 		t.Fatalf("empty base %q", got)
 	}
 	if got := AppURL(NewFake(), "kmc"); got != "" {
 		t.Fatalf("fake without UI %q", got)
-	}
-	e := Endpoints{
-		"homelab": {BaseURL: "https://argo.kcloud.zone"},
-		"":        {BaseURL: "https://argo.kcloud.io"},
-	}
-	if got := AppURL(e.ForStage("homelab"), "kmc"); got != "https://argo.kcloud.zone/applications/kmc" {
-		t.Fatalf("stage %q", got)
-	}
-	if got := AppURL(e.ForStage("prod"), "kmc"); got != "https://argo.kcloud.io/applications/kmc" {
-		t.Fatalf("fallback %q", got)
 	}
 }
 

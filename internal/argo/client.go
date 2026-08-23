@@ -1,12 +1,8 @@
 package argo
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -41,96 +37,11 @@ type Client interface {
 	Sync(ctx context.Context, app string, prune bool) error
 }
 
-type HTTPClient struct {
-	BaseURL    string
-	Token      string
-	HTTPClient *http.Client
-}
-
-func (c *HTTPClient) client() *http.Client {
-	if c.HTTPClient != nil {
-		return c.HTTPClient
-	}
-	return http.DefaultClient
-}
-
-func (c *HTTPClient) Get(ctx context.Context, app string) (Status, error) {
-	u, err := url.JoinPath(c.BaseURL, "/api/v1/applications", app)
-	if err != nil {
-		return Status{}, err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return Status{}, err
-	}
-	c.auth(req)
-	resp, err := c.client().Do(req)
-	if err != nil {
-		return Status{}, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return Status{}, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return Status{}, fmt.Errorf("argo get %s: %s: %s", app, resp.Status, body)
-	}
-	var raw argoApp
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return Status{}, fmt.Errorf("decode argo app: %w", err)
-	}
-	return Status{
-		Name:     raw.Metadata.Name,
-		Health:   raw.Status.Health.Status,
-		Sync:     raw.Status.Sync.Status,
-		Revision: raw.Status.Sync.Revision,
-		Message:  raw.Status.Health.Message,
-	}, nil
-}
-
-func (c *HTTPClient) Sync(ctx context.Context, app string, prune bool) error {
-	u, err := url.JoinPath(c.BaseURL, "/api/v1/applications", app, "sync")
-	if err != nil {
-		return err
-	}
-	payload, err := json.Marshal(map[string]any{"prune": prune})
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(payload))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	c.auth(req)
-	resp, err := c.client().Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("argo sync %s: %s: %s", app, resp.Status, body)
-	}
-	return nil
-}
-
-func (c *HTTPClient) auth(req *http.Request) {
-	if c.Token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.Token)
-	}
-}
-
-// AppURL is the Argo CD UI page for an application on this server.
-func (c *HTTPClient) AppURL(app string) string {
-	if c == nil || c.BaseURL == "" || app == "" {
+func joinAppURL(base, app string) string {
+	if base == "" || app == "" {
 		return ""
 	}
-	u, err := url.JoinPath(c.BaseURL, "applications", app)
+	u, err := url.JoinPath(strings.TrimRight(base, "/"), "applications", app)
 	if err != nil {
 		return ""
 	}
@@ -196,16 +107,8 @@ type Router interface {
 	ForStage(stage string) Client
 }
 
-// Endpoints maps stage name -> Argo API.
-type Endpoints map[string]HTTPClient
-
-func EndpointsFromEnv() Endpoints {
-	out, err := EndpointsFromConfig(nil)
-	if err != nil {
-		return Endpoints{}
-	}
-	return out
-}
+// Endpoints maps stage name -> Kubernetes Application client.
+type Endpoints map[string]*KubeClient
 
 func EndpointsFromConfig(stages map[string]config.Argo) (Endpoints, error) {
 	out := Endpoints{}
@@ -214,45 +117,36 @@ func EndpointsFromConfig(stages map[string]config.Argo) (Endpoints, error) {
 		if name == "" {
 			continue
 		}
-		token, err := stageToken(st, name)
+		ui := strings.TrimRight(st.URL, "/")
+		k, err := kubeClientFor(st, name, ui)
 		if err != nil {
 			return nil, err
 		}
-		out[name] = HTTPClient{BaseURL: strings.TrimRight(st.URL, "/"), Token: token}
+		if k != nil {
+			out[name] = k
+		}
 	}
 	overlayEnv(out)
 	return out, nil
-}
-
-func stageToken(st config.Argo, stage string) (string, error) {
-	if st.TokenFile != "" {
-		b, err := os.ReadFile(st.TokenFile)
-		if err != nil {
-			return "", fmt.Errorf("argo %s tokenFile: %w", stage, err)
-		}
-		if t := strings.TrimSpace(string(b)); t != "" {
-			return t, nil
-		}
-	}
-	if st.TokenEnv != "" {
-		if t := strings.TrimSpace(os.Getenv(st.TokenEnv)); t != "" {
-			return t, nil
-		}
-	}
-	return "", nil
 }
 
 func overlayEnv(out Endpoints) {
 	if out == nil {
 		return
 	}
-	if base := os.Getenv("DEPLOYBOT_ARGO_URL"); base != "" {
-		ep := out[""]
-		ep.BaseURL = strings.TrimRight(base, "/")
-		if t := os.Getenv("DEPLOYBOT_ARGO_TOKEN"); t != "" {
-			ep.Token = t
+	setURL := func(stage, base string) {
+		c := out[stage]
+		if c == nil {
+			return
 		}
-		out[""] = ep
+		c.UIBaseURL = strings.TrimRight(base, "/")
+	}
+	if base := os.Getenv("DEPLOYBOT_ARGO_URL"); base != "" {
+		for _, c := range out {
+			if c != nil && c.UIBaseURL == "" {
+				c.UIBaseURL = strings.TrimRight(base, "/")
+			}
+		}
 	}
 	for _, e := range os.Environ() {
 		key, val, ok := strings.Cut(e, "=")
@@ -260,36 +154,17 @@ func overlayEnv(out Endpoints) {
 			continue
 		}
 		if name, ok := strings.CutPrefix(key, "DEPLOYBOT_ARGO_URL_"); ok {
-			stage := strings.ToLower(name)
-			ep := out[stage]
-			ep.BaseURL = strings.TrimRight(val, "/")
-			out[stage] = ep
-		}
-		if name, ok := strings.CutPrefix(key, "DEPLOYBOT_ARGO_TOKEN_"); ok {
-			stage := strings.ToLower(name)
-			ep := out[stage]
-			ep.Token = val
-			out[stage] = ep
-		}
-	}
-	if t := os.Getenv("DEPLOYBOT_ARGO_TOKEN"); t != "" {
-		for stage, ep := range out {
-			if ep.Token == "" {
-				ep.Token = t
-				out[stage] = ep
-			}
+			setURL(strings.ToLower(name), val)
 		}
 	}
 }
 
 func (e Endpoints) ForStage(stage string) Client {
-	if c, ok := e[strings.ToLower(stage)]; ok && c.BaseURL != "" {
-		cp := c
-		return &cp
+	if e == nil {
+		return nil
 	}
-	if c, ok := e[""]; ok && c.BaseURL != "" {
-		cp := c
-		return &cp
+	if c := e[strings.ToLower(stage)]; c != nil {
+		return c
 	}
 	return nil
 }

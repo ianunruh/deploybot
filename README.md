@@ -18,7 +18,7 @@ Original intent and non-goals: [docs/goals.md](docs/goals.md).
 | `internal/` | Go: spec, render, pin, git write, Argo, HTTP API |
 | `web/` | React Router 8 + Mantine console |
 | `examples/` | Deployable specs and overlay patches |
-| `deploybot.yaml` | Process config (Argo URLs). Secrets stay in env / token files |
+| `deploybot.yaml` | Process config (Argo UI URLs, kube contexts). GitHub tokens stay in env |
 
 ## Develop
 
@@ -54,13 +54,14 @@ argo:
     url: https://argocd.k8s.kcloud.zone
   prod:
     url: https://argocd.k8s.kcloud.io
-    # tokenFile: secrets/argocd-prod.token
-    # tokenEnv: DEPLOYBOT_ARGO_TOKEN_PROD
+    kubeContext: prod-sjc1
 ```
 
-Tokens stay out of YAML values: `tokenFile`, `tokenEnv`, or
-`DEPLOYBOT_ARGO_TOKEN` / `DEPLOYBOT_ARGO_TOKEN_<STAGE>`.
-`DEPLOYBOT_ARGO_URL_<STAGE>` still overrides a stage URL.
+`url` is the Argo CD UI. Status and sync talk to Application CRs through
+kubeconfig (`KUBECONFIG` or `~/.kube/config`) — there is no Argo API token.
+`kubeContext` defaults to the stage name; `namespace` defaults to `argocd`.
+Optional `kubeconfig:` points at a specific file.
+`DEPLOYBOT_ARGO_URL_<STAGE>` overrides a stage UI URL.
 
 The pin picker lists GHCR versions (newest first) via the GitHub Packages
 API. Auth is `DEPLOYBOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`, or

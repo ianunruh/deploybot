@@ -10,7 +10,7 @@ import (
 
 const DefaultPath = "deploybot.yaml"
 
-// File is process config: structured non-secrets. Tokens live in env or tokenFile.
+// File is process config: structured non-secrets. Git and GitHub tokens stay in env.
 type File struct {
 	Addr     string          `yaml:"addr,omitempty"`
 	SpecsDir string          `yaml:"specsDir,omitempty"`
@@ -21,12 +21,13 @@ type File struct {
 	Argo     map[string]Argo `yaml:"argo,omitempty"`
 }
 
-// Argo is a per-stage Argo CD origin. URL is API and UI base
-// (https://argocd.k8s.kcloud.zone).
+// Argo is a per-stage Argo CD origin. URL is the UI. Application CRs are
+// read and synced via kubeconfig (kubeContext defaults to the stage name).
 type Argo struct {
-	URL       string `yaml:"url,omitempty"`
-	TokenFile string `yaml:"tokenFile,omitempty"`
-	TokenEnv  string `yaml:"tokenEnv,omitempty"`
+	URL         string `yaml:"url,omitempty"`
+	KubeContext string `yaml:"kubeContext,omitempty"`
+	Kubeconfig  string `yaml:"kubeconfig,omitempty"`
+	Namespace   string `yaml:"namespace,omitempty"`
 }
 
 func Load(path string) (*File, error) {
