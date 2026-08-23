@@ -23,6 +23,9 @@ func (s *Service) Promote(ctx context.Context, name, from, to string) (Mutation,
 			return Mutation{}, fmt.Errorf("health gate %s: %w", from, err)
 		}
 	}
+	if err := s.syncRepo(ctx); err != nil {
+		return Mutation{}, err
+	}
 	tree, err := s.workingTree(ctx, d)
 	if err != nil {
 		return Mutation{}, err

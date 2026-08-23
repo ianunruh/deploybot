@@ -2,10 +2,14 @@ package release
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	"github.com/ianunruh/deploybot/internal/argo"
 	"github.com/ianunruh/deploybot/internal/render"
 )
+
+const statusArgoTimeout = 4 * time.Second
 
 type StageStatus struct {
 	Name        string `json:"name"`
@@ -52,7 +56,9 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 		Push:       s.Push,
 		Sync:       s.Sync,
 	}
-	for _, st := range d.Spec.Stages {
+	out.Stages = make([]StageStatus, len(d.Spec.Stages))
+	var wg sync.WaitGroup
+	for i, st := range d.Spec.Stages {
 		ss := StageStatus{
 			Name:     st.Name,
 			Hostname: st.Hostname,
@@ -66,18 +72,27 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 		if s.Argo != nil {
 			if c := s.Argo.ForStage(st.Name); c != nil {
 				ss.ArgoURL = argo.AppURL(c, d.Spec.Argo.Name)
-				got, err := c.Get(ctx, d.Spec.Argo.Name)
-				if err != nil {
-					ss.Message = err.Error()
-				} else {
-					ss.Health = got.Health
-					ss.Sync = got.Sync
-					ss.Revision = got.Revision
-					ss.Message = got.Message
-				}
+				out.Stages[i] = ss
+				wg.Add(1)
+				go func(i int, c argo.Client) {
+					defer wg.Done()
+					gctx, cancel := context.WithTimeout(ctx, statusArgoTimeout)
+					defer cancel()
+					got, err := c.Get(gctx, d.Spec.Argo.Name)
+					if err != nil {
+						out.Stages[i].Message = err.Error()
+						return
+					}
+					out.Stages[i].Health = got.Health
+					out.Stages[i].Sync = got.Sync
+					out.Stages[i].Revision = got.Revision
+					out.Stages[i].Message = got.Message
+				}(i, c)
+				continue
 			}
 		}
-		out.Stages = append(out.Stages, ss)
+		out.Stages[i] = ss
 	}
+	wg.Wait()
 	return out, nil
 }

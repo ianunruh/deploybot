@@ -21,6 +21,9 @@ func (s *Service) Pin(ctx context.Context, name, stage, imageRef string) (Mutati
 	if err != nil {
 		return Mutation{}, err
 	}
+	if err := s.syncRepo(ctx); err != nil {
+		return Mutation{}, err
+	}
 	tree, err := s.overlayTree(ctx, d)
 	if err != nil {
 		return Mutation{}, err
@@ -37,6 +40,9 @@ func (s *Service) Diff(ctx context.Context, name, stage, imageRef string) (strin
 	}
 	ref, err := image.Parse(imageRef)
 	if err != nil {
+		return "", err
+	}
+	if err := s.syncRepo(ctx); err != nil {
 		return "", err
 	}
 	before, err := s.overlayTree(ctx, d)
