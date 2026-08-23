@@ -35,6 +35,8 @@ export type DeployableSummary = {
   namespace: string;
   image: string;
   stages: string[];
+  repoURL?: string;
+  projectURL?: string;
 };
 
 export type StageStatus = {
@@ -45,12 +47,15 @@ export type StageStatus = {
   health: string;
   revision?: string;
   message?: string;
+  argoURL?: string;
 };
 
 export type DeployableStatus = {
   name: string;
   namespace: string;
   imageRepo: string;
+  repoURL?: string;
+  projectURL?: string;
   stages: StageStatus[];
   apply: boolean;
   push: boolean;

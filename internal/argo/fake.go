@@ -3,6 +3,7 @@ package argo
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"sync"
 )
 
@@ -11,6 +12,7 @@ type Fake struct {
 	mu     sync.Mutex
 	Apps   map[string]Status
 	Synced []string
+	UIBase string
 }
 
 func NewFake() *Fake {
@@ -46,4 +48,15 @@ func (f *Fake) Set(app string, st Status) {
 	defer f.mu.Unlock()
 	st.Name = app
 	f.Apps[app] = st
+}
+
+func (f *Fake) AppURL(app string) string {
+	if f == nil || f.UIBase == "" || app == "" {
+		return ""
+	}
+	u, err := url.JoinPath(f.UIBase, "applications", app)
+	if err != nil {
+		return ""
+	}
+	return u
 }

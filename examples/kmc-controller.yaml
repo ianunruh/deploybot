@@ -8,6 +8,9 @@ metadata:
   name: kmc-controller
 spec:
   namespace: kmc-system
+  links:
+    repoURL: https://github.com/ianunruh/kmc
+    projectURL: https://trello.com/b/rPALXxJF/kcloud
   git:
     repoURL: https://github.com/ianunruh/kcloud-ops
     workloadPath: k8s/kmc-controller

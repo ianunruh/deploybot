@@ -16,6 +16,7 @@ import { notifyActionError, notifyActionSuccess } from "~/lib/action-feedback";
 import { useFetcherResult } from "~/lib/use-fetcher-result";
 import { ConfirmActionModal } from "~/ui/confirm-action-modal";
 import { DiffPanel } from "~/ui/diff-panel";
+import { ArgoCDLink, DeployableLinkLabels, HostnameLink } from "~/ui/external-links";
 import { PageHeader } from "~/ui/page-header";
 import { ResourceTable, Table } from "~/ui/resource-table";
 import { StatusBadge } from "~/ui/status-badge";
@@ -165,7 +166,17 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       <PageHeader
         title={status.name}
         crumbs={[deployablesCrumb]}
-        description={`${status.namespace} · ${status.imageRepo}`}
+        description={
+          <Stack gap={6}>
+            <Text size="sm" c="dimmed">
+              {status.namespace} · {status.imageRepo}
+            </Text>
+            <DeployableLinkLabels
+              repoURL={status.repoURL}
+              projectURL={status.projectURL}
+            />
+          </Stack>
+        }
         actions={
           <Group gap="sm">
             <Button
@@ -188,22 +199,22 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       <MutationModeAlert apply={status.apply} push={status.push} />
 
       <ResourceTable
-        headers={["Stage", "Hostname", "Image", "Sync", "Health", ""]}
+        headers={["Stage", "Hostname", "Image", "Sync", "Health", "", ""]}
         isEmpty={stages.length === 0}
-        minWidth={720}
+        minWidth={880}
       >
         {stages.map((st) => (
           <Table.Tr key={st.name}>
-            <Table.Td fw={600}>{st.name}</Table.Td>
-            <Table.Td>
-              <Text size="sm" ff="monospace">
-                {st.hostname}
-              </Text>
+            <Table.Td className="db-cell-fit" fw={600}>
+              {st.name}
             </Table.Td>
-            <Table.Td maw={220} style={{ maxWidth: 220 }}>
-              <CompactImage value={st.image} empty="—" multiline />
+            <Table.Td className="db-cell-fit">
+              <HostnameLink hostname={st.hostname} />
             </Table.Td>
-            <Table.Td>
+            <Table.Td className="db-cell-clip">
+              <CompactImage value={st.image} empty="—" />
+            </Table.Td>
+            <Table.Td className="db-cell-fit">
               <StatusBadge status={st.sync} />
             </Table.Td>
             <Table.Td>
@@ -214,7 +225,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
                 </Text>
               ) : null}
             </Table.Td>
-            <Table.Td>
+            <Table.Td className="db-cell-fit">
               <Button
                 component={Link}
                 to={`/deployables/${status.name}/sync/${st.name}`}
@@ -223,6 +234,15 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
               >
                 Sync
               </Button>
+            </Table.Td>
+            <Table.Td className="db-cell-fit">
+              {st.argoURL ? (
+                <ArgoCDLink href={st.argoURL} />
+              ) : (
+                <Text size="sm" c="dimmed">
+                  —
+                </Text>
+              )}
             </Table.Td>
           </Table.Tr>
         ))}
@@ -410,15 +430,7 @@ function MutationModeAlert({ apply, push }: { apply: boolean; push: boolean }) {
   return null;
 }
 
-function CompactImage({
-  value,
-  empty = "—",
-  multiline = false,
-}: {
-  value?: string;
-  empty?: string;
-  multiline?: boolean;
-}) {
+function CompactImage({ value, empty = "—" }: { value?: string; empty?: string }) {
   if (!value) {
     return (
       <Text size="xs" c="dimmed" span>
@@ -428,23 +440,10 @@ function CompactImage({
   }
   const at = value.indexOf("@");
   const tag = at >= 0 ? value.slice(0, at) : value;
-  const digest = at >= 0 ? value.slice(at + 1) : "";
-  if (!multiline || !digest) {
-    return (
-      <Text size="xs" ff="monospace" span title={value}>
-        {tag}
-      </Text>
-    );
-  }
   return (
-    <Stack gap={0} title={value}>
-      <Text size="xs" ff="monospace">
-        {tag}
-      </Text>
-      <Text size="xs" c="dimmed" ff="monospace">
-        {digest}
-      </Text>
-    </Stack>
+    <Text className="db-clip-text" size="xs" ff="monospace" title={value}>
+      {tag}
+    </Text>
   );
 }
 

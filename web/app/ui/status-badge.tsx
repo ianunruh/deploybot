@@ -21,7 +21,20 @@ export function StatusBadge({ status }: { status: string }) {
       size="sm"
       radius="sm"
       tt="uppercase"
-      style={{ fontFamily: "inherit", letterSpacing: "0.04em" }}
+      styles={{
+        root: {
+          fontFamily: "inherit",
+          letterSpacing: "0.04em",
+          maxWidth: "none",
+          overflow: "visible",
+          flexShrink: 0,
+        },
+        label: {
+          overflow: "visible",
+          textOverflow: "unset",
+          whiteSpace: "nowrap",
+        },
+      }}
     >
       {status || "Unknown"}
     </Badge>

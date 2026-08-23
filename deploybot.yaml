@@ -1,0 +1,7 @@
+# Shared process config. Secrets stay in env or tokenFile.
+# Precedence: CLI flags > DEPLOYBOT_* env > this file > defaults.
+argo:
+  homelab:
+    url: https://argocd.k8s.kcloud.zone
+  prod:
+    url: https://argocd.k8s.kcloud.io

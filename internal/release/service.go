@@ -35,15 +35,18 @@ type StageStatus struct {
 	Health   string `json:"health"`
 	Revision string `json:"revision,omitempty"`
 	Message  string `json:"message,omitempty"`
+	ArgoURL  string `json:"argoURL,omitempty"`
 }
 
 type Status struct {
-	Name      string        `json:"name"`
-	Namespace string        `json:"namespace"`
-	ImageRepo string        `json:"imageRepo"`
-	Stages    []StageStatus `json:"stages"`
-	Apply     bool          `json:"apply"`
-	Push      bool          `json:"push"`
+	Name       string        `json:"name"`
+	Namespace  string        `json:"namespace"`
+	ImageRepo  string        `json:"imageRepo"`
+	RepoURL    string        `json:"repoURL,omitempty"`
+	ProjectURL string        `json:"projectURL,omitempty"`
+	Stages     []StageStatus `json:"stages"`
+	Apply      bool          `json:"apply"`
+	Push       bool          `json:"push"`
 }
 
 type Mutation struct {
@@ -66,11 +69,13 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 		return Status{}, err
 	}
 	out := Status{
-		Name:      d.Metadata.Name,
-		Namespace: d.Spec.Namespace,
-		ImageRepo: d.Spec.Image.Repository,
-		Apply:     s.Apply,
-		Push:      s.Push,
+		Name:       d.Metadata.Name,
+		Namespace:  d.Spec.Namespace,
+		ImageRepo:  d.Spec.Image.Repository,
+		RepoURL:    d.Spec.Links.RepoURL,
+		ProjectURL: d.Spec.Links.ProjectURL,
+		Apply:      s.Apply,
+		Push:       s.Push,
 	}
 	for _, st := range d.Spec.Stages {
 		ss := StageStatus{
@@ -84,6 +89,7 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 		}
 		if s.Argo != nil {
 			if c := s.Argo.ForStage(st.Name); c != nil {
+				ss.ArgoURL = argo.AppURL(c, d.Spec.Argo.Name)
 				got, err := c.Get(ctx, d.Spec.Argo.Name)
 				if err != nil {
 					ss.Message = err.Error()

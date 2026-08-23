@@ -6,6 +6,19 @@ import (
 	"testing"
 )
 
+func isolateEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("DEPLOYBOT_CONFIG", "")
+	t.Setenv("DEPLOYBOT_APPLY", "")
+	t.Setenv("DEPLOYBOT_PUSH", "")
+	t.Setenv("DEPLOYBOT_SYNC", "")
+	t.Setenv("DEPLOYBOT_OPS_REPO", "")
+	t.Setenv("DEPLOYBOT_ADDR", "")
+	t.Setenv("DEPLOYBOT_SPECS_DIR", "")
+	t.Setenv("DEPLOYBOT_ARGO_URL", "")
+	t.Setenv("DEPLOYBOT_ARGO_TOKEN", "")
+}
+
 func TestRunVersion(t *testing.T) {
 	t.Parallel()
 	if err := Run(t.Context(), []string{"version"}); err != nil {
@@ -21,7 +34,7 @@ func TestRunUnknown(t *testing.T) {
 }
 
 func TestRunSync(t *testing.T) {
-	t.Parallel()
+	isolateEnv(t)
 	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
 	if err := Run(t.Context(), []string{"sync", "--spec", spec, "--stage", "homelab"}); err != nil {
 		t.Fatal(err)
@@ -29,7 +42,7 @@ func TestRunSync(t *testing.T) {
 }
 
 func TestRunSyncUnknownStage(t *testing.T) {
-	t.Parallel()
+	isolateEnv(t)
 	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
 	if err := Run(t.Context(), []string{"sync", "--spec", spec, "--stage", "nope"}); err == nil {
 		t.Fatal("expected error")
@@ -37,7 +50,7 @@ func TestRunSyncUnknownStage(t *testing.T) {
 }
 
 func TestRunPushRequiresApply(t *testing.T) {
-	t.Parallel()
+	isolateEnv(t)
 	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
 	err := Run(t.Context(), []string{
 		"pin", "--spec", spec, "--stage", "homelab",
@@ -45,6 +58,34 @@ func TestRunPushRequiresApply(t *testing.T) {
 	})
 	if err == nil || err.Error() != "--push requires --apply" {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestRunMissingConfig(t *testing.T) {
+	isolateEnv(t)
+	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
+	err := Run(t.Context(), []string{
+		"sync", "--spec", spec, "--stage", "homelab",
+		"--config", filepath.Join(t.TempDir(), "nope.yaml"),
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestRunConfigArgoYAML(t *testing.T) {
+	isolateEnv(t)
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "deploybot.yaml")
+	body := []byte("argo:\n  homelab:\n    url: https://argocd.k8s.kcloud.zone\n")
+	if err := os.WriteFile(cfg, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
+	if err := Run(t.Context(), []string{
+		"sync", "--spec", spec, "--stage", "homelab", "--config", cfg,
+	}); err != nil {
+		t.Fatal(err)
 	}
 }
 

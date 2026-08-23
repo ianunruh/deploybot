@@ -18,6 +18,7 @@ Original intent and non-goals: [docs/goals.md](docs/goals.md).
 | `internal/` | Go: spec, render, pin, git write, Argo, HTTP API |
 | `web/` | React Router 8 + Mantine console |
 | `examples/` | Deployable specs and overlay patches |
+| `deploybot.yaml` | Process config (Argo URLs). Secrets stay in env / token files |
 
 ## Develop
 
@@ -41,9 +42,25 @@ just build
 ```
 
 `--apply` commits locally. `--push` (requires `--apply`) pushes the current
-branch; it never force-pushes. `--sync` talks to Argo (`DEPLOYBOT_ARGO_URL` /
-`DEPLOYBOT_ARGO_URL_<STAGE>`). Default is dry-run. For `serve`, set
-`DEPLOYBOT_APPLY=1`, `DEPLOYBOT_PUSH=1`, and `DEPLOYBOT_SYNC=1`.
+branch; it never force-pushes. `--sync` talks to Argo. Default is dry-run. For
+`serve`, set `DEPLOYBOT_APPLY=1`, `DEPLOYBOT_PUSH=1`, and `DEPLOYBOT_SYNC=1`.
+
+Process config is YAML (`deploybot.yaml` or `--config` / `DEPLOYBOT_CONFIG`).
+Flags override env, env overrides the file. Argo CD origins live in the file:
+
+```yaml
+argo:
+  homelab:
+    url: https://argocd.k8s.kcloud.zone
+  prod:
+    url: https://argocd.k8s.kcloud.io
+    # tokenFile: secrets/argocd-prod.token
+    # tokenEnv: DEPLOYBOT_ARGO_TOKEN_PROD
+```
+
+Tokens stay out of YAML values: `tokenFile`, `tokenEnv`, or
+`DEPLOYBOT_ARGO_TOKEN` / `DEPLOYBOT_ARGO_TOKEN_<STAGE>`.
+`DEPLOYBOT_ARGO_URL_<STAGE>` still overrides a stage URL.
 
 The pin picker lists GHCR versions (newest first) via the GitHub Packages
 API. Auth is `DEPLOYBOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`, or

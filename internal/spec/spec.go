@@ -3,6 +3,7 @@ package spec
 import (
 	"cmp"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -28,12 +29,20 @@ type Metadata struct {
 
 type Spec struct {
 	Namespace string   `yaml:"namespace"`
+	Links     Links    `yaml:"links,omitempty"`
 	Git       Git      `yaml:"git"`
 	Argo      Argo     `yaml:"argo"`
 	Image     Image    `yaml:"image"`
 	Workload  Workload `yaml:"workload"`
 	Route     Route    `yaml:"route"`
 	Stages    []Stage  `yaml:"stages"`
+}
+
+// Links are optional URLs shown in the console. RepoURL is the app source
+// (GitHub/GitLab). ProjectURL is a tracker or board (Trello, Linear, …).
+type Links struct {
+	RepoURL    string `yaml:"repoURL,omitempty"`
+	ProjectURL string `yaml:"projectURL,omitempty"`
 }
 
 type Git struct {
@@ -202,6 +211,12 @@ func (d *Deployable) Validate() error {
 	if d.Spec.Argo.Project == "" {
 		errs = append(errs, "spec.argo.project is required")
 	}
+	if err := httpURLError("spec.links.repoURL", d.Spec.Links.RepoURL); err != "" {
+		errs = append(errs, err)
+	}
+	if err := httpURLError("spec.links.projectURL", d.Spec.Links.ProjectURL); err != "" {
+		errs = append(errs, err)
+	}
 	if d.Spec.Workload.Kind != "Deployment" {
 		errs = append(errs, "spec.workload.kind must be Deployment")
 	}
@@ -279,4 +294,15 @@ func (d *Deployable) ImageRef() string {
 		return d.Spec.Image.Repository
 	}
 	return d.Spec.Image.Repository + ":" + d.Spec.Image.Tag
+}
+
+func httpURLError(field, raw string) string {
+	if raw == "" {
+		return ""
+	}
+	u, err := url.ParseRequestURI(raw)
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return fmt.Sprintf("%s must be an http(s) URL", field)
+	}
+	return ""
 }

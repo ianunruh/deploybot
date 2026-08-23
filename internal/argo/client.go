@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/ianunruh/deploybot/internal/config"
 )
 
 type Status struct {
@@ -123,6 +125,29 @@ func (c *HTTPClient) auth(req *http.Request) {
 	}
 }
 
+// AppURL is the Argo CD UI page for an application on this server.
+func (c *HTTPClient) AppURL(app string) string {
+	if c == nil || c.BaseURL == "" || app == "" {
+		return ""
+	}
+	u, err := url.JoinPath(c.BaseURL, "applications", app)
+	if err != nil {
+		return ""
+	}
+	return u
+}
+
+// AppURL returns the Argo CD UI page for app when the client knows one.
+func AppURL(c Client, app string) string {
+	type linker interface {
+		AppURL(app string) string
+	}
+	if l, ok := c.(linker); ok {
+		return l.AppURL(app)
+	}
+	return ""
+}
+
 type argoApp struct {
 	Metadata struct {
 		Name string `json:"name"`
@@ -175,10 +200,59 @@ type Router interface {
 type Endpoints map[string]HTTPClient
 
 func EndpointsFromEnv() Endpoints {
+	out, err := EndpointsFromConfig(nil)
+	if err != nil {
+		return Endpoints{}
+	}
+	return out
+}
+
+func EndpointsFromConfig(stages map[string]config.Argo) (Endpoints, error) {
 	out := Endpoints{}
+	for name, st := range stages {
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name == "" {
+			continue
+		}
+		token, err := stageToken(st, name)
+		if err != nil {
+			return nil, err
+		}
+		out[name] = HTTPClient{BaseURL: strings.TrimRight(st.URL, "/"), Token: token}
+	}
+	overlayEnv(out)
+	return out, nil
+}
+
+func stageToken(st config.Argo, stage string) (string, error) {
+	if st.TokenFile != "" {
+		b, err := os.ReadFile(st.TokenFile)
+		if err != nil {
+			return "", fmt.Errorf("argo %s tokenFile: %w", stage, err)
+		}
+		if t := strings.TrimSpace(string(b)); t != "" {
+			return t, nil
+		}
+	}
+	if st.TokenEnv != "" {
+		if t := strings.TrimSpace(os.Getenv(st.TokenEnv)); t != "" {
+			return t, nil
+		}
+	}
+	return "", nil
+}
+
+func overlayEnv(out Endpoints) {
+	if out == nil {
+		return
+	}
 	if base := os.Getenv("DEPLOYBOT_ARGO_URL"); base != "" {
-		def := HTTPClient{BaseURL: base, Token: os.Getenv("DEPLOYBOT_ARGO_TOKEN")}
-		out[""] = def
+		ep := out[""]
+		ep.BaseURL = strings.TrimRight(base, "/")
+		if t := os.Getenv("DEPLOYBOT_ARGO_TOKEN"); t != "" {
+			ep.Token = t
+		}
+		out[""] = ep
 	}
 	for _, e := range os.Environ() {
 		key, val, ok := strings.Cut(e, "=")
@@ -188,7 +262,7 @@ func EndpointsFromEnv() Endpoints {
 		if name, ok := strings.CutPrefix(key, "DEPLOYBOT_ARGO_URL_"); ok {
 			stage := strings.ToLower(name)
 			ep := out[stage]
-			ep.BaseURL = val
+			ep.BaseURL = strings.TrimRight(val, "/")
 			out[stage] = ep
 		}
 		if name, ok := strings.CutPrefix(key, "DEPLOYBOT_ARGO_TOKEN_"); ok {
@@ -198,7 +272,14 @@ func EndpointsFromEnv() Endpoints {
 			out[stage] = ep
 		}
 	}
-	return out
+	if t := os.Getenv("DEPLOYBOT_ARGO_TOKEN"); t != "" {
+		for stage, ep := range out {
+			if ep.Token == "" {
+				ep.Token = t
+				out[stage] = ep
+			}
+		}
+	}
 }
 
 func (e Endpoints) ForStage(stage string) Client {

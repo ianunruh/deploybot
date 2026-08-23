@@ -35,18 +35,22 @@ func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	type item struct {
-		Name      string   `json:"name"`
-		Namespace string   `json:"namespace"`
-		Image     string   `json:"image"`
-		Stages    []string `json:"stages"`
+		Name       string   `json:"name"`
+		Namespace  string   `json:"namespace"`
+		Image      string   `json:"image"`
+		Stages     []string `json:"stages"`
+		RepoURL    string   `json:"repoURL,omitempty"`
+		ProjectURL string   `json:"projectURL,omitempty"`
 	}
 	var items []item
 	for _, d := range s.Catalog.List() {
 		items = append(items, item{
-			Name:      d.Metadata.Name,
-			Namespace: d.Spec.Namespace,
-			Image:     d.Spec.Image.Repository,
-			Stages:    d.StageNames(),
+			Name:       d.Metadata.Name,
+			Namespace:  d.Spec.Namespace,
+			Image:      d.Spec.Image.Repository,
+			Stages:     d.StageNames(),
+			RepoURL:    d.Spec.Links.RepoURL,
+			ProjectURL: d.Spec.Links.ProjectURL,
 		})
 	}
 	if items == nil {

@@ -328,6 +328,39 @@ func TestDiffSyncDoesNotWrite(t *testing.T) {
 	}
 }
 
+func TestStatusLinksAndArgoURL(t *testing.T) {
+	t.Parallel()
+	homelab := argo.NewFake()
+	homelab.UIBase = "https://argo.kcloud.zone"
+	homelab.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
+	prod := argo.NewFake()
+	prod.UIBase = "https://argo.kcloud.io"
+	prod.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
+	svc := &Service{
+		Catalog: loadExamples(t),
+		Argo:    stageRouter{"homelab": homelab, "prod": prod},
+	}
+	st, err := svc.Status(t.Context(), "kmc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.RepoURL != "https://github.com/ianunruh/kmc" {
+		t.Fatalf("repo %q", st.RepoURL)
+	}
+	if st.ProjectURL != "https://trello.com/b/rPALXxJF/kcloud" {
+		t.Fatalf("project %q", st.ProjectURL)
+	}
+	if len(st.Stages) != 2 {
+		t.Fatalf("stages %+v", st.Stages)
+	}
+	if st.Stages[0].ArgoURL != "https://argo.kcloud.zone/applications/kmc" {
+		t.Fatalf("homelab argo %q", st.Stages[0].ArgoURL)
+	}
+	if st.Stages[1].ArgoURL != "https://argo.kcloud.io/applications/kmc" {
+		t.Fatalf("prod argo %q", st.Stages[1].ArgoURL)
+	}
+}
+
 func TestListImages(t *testing.T) {
 	t.Parallel()
 	cat := loadExamples(t)

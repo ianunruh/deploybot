@@ -47,10 +47,12 @@ export function PageHeader({
           <Title order={2} size="h3">
             {title}
           </Title>
-          {description != null && (
+          {typeof description === "string" ? (
             <Text size="sm" c="dimmed">
               {description}
             </Text>
+          ) : (
+            description
           )}
         </Stack>
         {actions != null && <Group gap="sm">{actions}</Group>}

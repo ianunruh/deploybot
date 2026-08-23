@@ -15,6 +15,7 @@ import (
 	"github.com/ianunruh/deploybot/internal/api"
 	"github.com/ianunruh/deploybot/internal/argo"
 	"github.com/ianunruh/deploybot/internal/catalog"
+	"github.com/ianunruh/deploybot/internal/config"
 	"github.com/ianunruh/deploybot/internal/gitwrite"
 	"github.com/ianunruh/deploybot/internal/image"
 	"github.com/ianunruh/deploybot/internal/release"
@@ -26,10 +27,10 @@ const usage = `deploybot — small-scale release control plane
 
 Usage:
   deploybot render [--out dir] <spec>
-  deploybot pin --spec <file> --stage <name> --image <ref> [--repo dir] [--apply] [--push] [--sync]
-  deploybot promote --spec <file> --from <stage> --to <stage> [--repo dir] [--apply] [--push] [--sync]
-  deploybot sync --spec <file> [--stage name]... [--repo dir] [--apply] [--push] [--sync]
-  deploybot serve [--addr host:port] [--specs dir] [--repo dir] [--apply] [--push] [--sync]
+  deploybot pin --spec <file> --stage <name> --image <ref> [--config file] [--repo dir] [--apply] [--push] [--sync]
+  deploybot promote --spec <file> --from <stage> --to <stage> [--config file] [--repo dir] [--apply] [--push] [--sync]
+  deploybot sync --spec <file> [--stage name]... [--config file] [--repo dir] [--apply] [--push] [--sync]
+  deploybot serve [--config file] [--addr host:port] [--specs dir] [--repo dir] [--apply] [--push] [--sync]
   deploybot version
 `
 
@@ -108,7 +109,7 @@ func runPin(ctx context.Context, args []string) error {
 	if *flags.spec == "" || *stage == "" || *imageRef == "" {
 		return fmt.Errorf("pin requires --spec, --stage, and --image")
 	}
-	svc, name, err := serviceFromSpec(*flags.spec, *flags.repo, *flags.apply, *flags.push, *flags.sync)
+	svc, name, err := serviceFromFlags(fs, flags)
 	if err != nil {
 		return err
 	}
@@ -131,7 +132,7 @@ func runPromote(ctx context.Context, args []string) error {
 	if *flags.spec == "" || *from == "" || *to == "" {
 		return fmt.Errorf("promote requires --spec, --from, and --to")
 	}
-	svc, name, err := serviceFromSpec(*flags.spec, *flags.repo, *flags.apply, *flags.push, *flags.sync)
+	svc, name, err := serviceFromFlags(fs, flags)
 	if err != nil {
 		return err
 	}
@@ -154,7 +155,7 @@ func runSync(ctx context.Context, args []string) error {
 	if *flags.spec == "" {
 		return fmt.Errorf("sync requires --spec")
 	}
-	svc, name, err := serviceFromSpec(*flags.spec, *flags.repo, *flags.apply, *flags.push, *flags.sync)
+	svc, name, err := serviceFromFlags(fs, flags)
 	if err != nil {
 		return err
 	}
@@ -168,43 +169,61 @@ func runSync(ctx context.Context, args []string) error {
 
 func runServe(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
-	addr := fs.String("addr", envOr("DEPLOYBOT_ADDR", "127.0.0.1:8080"), "listen address")
-	specs := fs.String("specs", envOr("DEPLOYBOT_SPECS_DIR", "examples"), "directory of deployable specs")
-	repo := fs.String("repo", os.Getenv("DEPLOYBOT_OPS_REPO"), "local ops git repo")
-	apply := fs.Bool("apply", os.Getenv("DEPLOYBOT_APPLY") == "1", "commit mutations to the ops repo")
-	push := fs.Bool("push", os.Getenv("DEPLOYBOT_PUSH") == "1", "push the current branch after commit (requires --apply; never force-pushes)")
-	sync := fs.Bool("sync", os.Getenv("DEPLOYBOT_SYNC") == "1", "sync Argo after commit")
+	cfgPath := configFlag(fs)
+	addr := fs.String("addr", "127.0.0.1:8080", "listen address")
+	specs := fs.String("specs", "examples", "directory of deployable specs")
+	repo := fs.String("repo", "", "local ops git repo")
+	apply := fs.Bool("apply", false, "commit mutations to the ops repo")
+	push := fs.Bool("push", false, "push the current branch after commit (requires --apply; never force-pushes)")
+	sync := fs.Bool("sync", false, "sync Argo after commit")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *push && !*apply {
+	file, path, err := config.Open(*cfgPath)
+	if err != nil {
+		return err
+	}
+	got := visited(fs)
+	s := settings{
+		addr:  pickString(got["addr"], *addr, "DEPLOYBOT_ADDR", file.Addr),
+		specs: pickString(got["specs"], *specs, "DEPLOYBOT_SPECS_DIR", file.SpecsDir),
+		repo:  pickString(got["repo"], *repo, "DEPLOYBOT_OPS_REPO", file.OpsRepo),
+		apply: pickBool(got["apply"], *apply, "DEPLOYBOT_APPLY", file.Apply),
+		push:  pickBool(got["push"], *push, "DEPLOYBOT_PUSH", file.Push),
+		sync:  pickBool(got["sync"], *sync, "DEPLOYBOT_SYNC", file.Sync),
+	}
+	if s.push && !s.apply {
 		return fmt.Errorf("--push requires --apply")
 	}
-	cat, err := catalog.Load(*specs)
+	cat, err := catalog.Load(s.specs)
+	if err != nil {
+		return err
+	}
+	eps, err := argo.EndpointsFromConfig(file.Argo)
 	if err != nil {
 		return err
 	}
 	token, tokenSrc := image.ResolveToken()
 	svc := &release.Service{
 		Catalog: cat,
-		OpsRepo: *repo,
-		Apply:   *apply,
-		Push:    *push,
-		Sync:    *sync,
+		OpsRepo: s.repo,
+		Apply:   s.apply,
+		Push:    s.push,
+		Sync:    s.sync,
 		Author:  gitwrite.DefaultAuthor(),
-		Argo:    argo.EndpointsFromEnv(),
+		Argo:    eps,
 		Wait:    5 * time.Minute,
 		Images:  &image.GitHub{Token: token, HTTPClient: &http.Client{Timeout: 20 * time.Second}},
 	}
 	h := (&api.Server{Release: svc, Catalog: cat}).Handler()
-	srv := &http.Server{Addr: *addr, Handler: h}
+	srv := &http.Server{Addr: s.addr, Handler: h}
 	go func() {
 		<-ctx.Done()
 		shCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shCtx)
 	}()
-	slog.Info("api listening", "addr", *addr, "specs", *specs, "apply", *apply, "push", *push, "sync", *sync, "github", tokenSrc)
+	slog.Info("api listening", "addr", s.addr, "specs", s.specs, "config", path, "apply", s.apply, "push", s.push, "sync", s.sync, "github", tokenSrc)
 	err = srv.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
@@ -213,43 +232,101 @@ func runServe(ctx context.Context, args []string) error {
 }
 
 type mutFlags struct {
-	spec  *string
-	repo  *string
-	apply *bool
-	push  *bool
-	sync  *bool
+	spec   *string
+	config *string
+	repo   *string
+	apply  *bool
+	push   *bool
+	sync   *bool
 }
 
 func mutationFlags(fs *flag.FlagSet) mutFlags {
 	return mutFlags{
-		spec:  fs.String("spec", "", "deployable spec YAML"),
-		repo:  fs.String("repo", os.Getenv("DEPLOYBOT_OPS_REPO"), "local ops git repo"),
-		apply: fs.Bool("apply", false, "commit to the ops repo"),
-		push:  fs.Bool("push", false, "push the current branch after commit (requires --apply; never force-pushes)"),
-		sync:  fs.Bool("sync", false, "sync Argo and wait healthy after commit"),
+		spec:   fs.String("spec", "", "deployable spec YAML"),
+		config: configFlag(fs),
+		repo:   fs.String("repo", "", "local ops git repo"),
+		apply:  fs.Bool("apply", false, "commit to the ops repo"),
+		push:   fs.Bool("push", false, "push the current branch after commit (requires --apply; never force-pushes)"),
+		sync:   fs.Bool("sync", false, "sync Argo and wait healthy after commit"),
 	}
 }
 
-func serviceFromSpec(specPath, repo string, apply, push, sync bool) (*release.Service, string, error) {
-	if push && !apply {
-		return nil, "", fmt.Errorf("--push requires --apply")
+func configFlag(fs *flag.FlagSet) *string {
+	return fs.String("config", "", "YAML config (default: DEPLOYBOT_CONFIG or ./deploybot.yaml)")
+}
+
+type settings struct {
+	addr, specs, repo string
+	apply, push, sync bool
+}
+
+func visited(fs *flag.FlagSet) map[string]bool {
+	out := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { out[f.Name] = true })
+	return out
+}
+
+func pickString(explicit bool, flagVal, envKey, yamlVal string) string {
+	if explicit {
+		return flagVal
 	}
-	d, err := spec.Load(specPath)
+	if v := config.EnvOr(envKey, ""); v != "" {
+		return v
+	}
+	if yamlVal != "" {
+		return yamlVal
+	}
+	return flagVal
+}
+
+func pickBool(explicit bool, flagVal bool, envKey string, yamlVal *bool) bool {
+	if explicit {
+		return flagVal
+	}
+	if v, set := config.EnvBool(envKey); set {
+		return v
+	}
+	if yamlVal != nil {
+		return *yamlVal
+	}
+	return flagVal
+}
+
+func serviceFromFlags(fs *flag.FlagSet, flags mutFlags) (*release.Service, string, error) {
+	file, _, err := config.Open(*flags.config)
 	if err != nil {
 		return nil, "", err
 	}
-	cat, err := catalog.Load(filepath.Dir(specPath))
+	got := visited(fs)
+	s := settings{
+		repo:  pickString(got["repo"], *flags.repo, "DEPLOYBOT_OPS_REPO", file.OpsRepo),
+		apply: pickBool(got["apply"], *flags.apply, "DEPLOYBOT_APPLY", file.Apply),
+		push:  pickBool(got["push"], *flags.push, "DEPLOYBOT_PUSH", file.Push),
+		sync:  pickBool(got["sync"], *flags.sync, "DEPLOYBOT_SYNC", file.Sync),
+	}
+	if s.push && !s.apply {
+		return nil, "", fmt.Errorf("--push requires --apply")
+	}
+	eps, err := argo.EndpointsFromConfig(file.Argo)
+	if err != nil {
+		return nil, "", err
+	}
+	d, err := spec.Load(*flags.spec)
+	if err != nil {
+		return nil, "", err
+	}
+	cat, err := catalog.Load(filepath.Dir(*flags.spec))
 	if err != nil {
 		return nil, "", err
 	}
 	return &release.Service{
 		Catalog: cat,
-		OpsRepo: repo,
-		Apply:   apply,
-		Push:    push,
-		Sync:    sync,
+		OpsRepo: s.repo,
+		Apply:   s.apply,
+		Push:    s.push,
+		Sync:    s.sync,
 		Author:  gitwrite.DefaultAuthor(),
-		Argo:    argo.EndpointsFromEnv(),
+		Argo:    eps,
 		Wait:    5 * time.Minute,
 	}, d.Metadata.Name, nil
 }
@@ -270,13 +347,6 @@ func printMutation(mut release.Mutation) {
 	if mut.Diff != "" {
 		fmt.Print(mut.Diff)
 	}
-}
-
-func envOr(k, fallback string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
-	}
-	return fallback
 }
 
 type stringList []string

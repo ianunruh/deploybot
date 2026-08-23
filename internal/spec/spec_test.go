@@ -55,6 +55,9 @@ func TestParseKMC(t *testing.T) {
 	if d.Metadata.Name != "kmc" {
 		t.Fatalf("name %q", d.Metadata.Name)
 	}
+	if d.Spec.Links.RepoURL != "" || d.Spec.Links.ProjectURL != "" {
+		t.Fatalf("links %+v", d.Spec.Links)
+	}
 	if got := d.StageNames(); !cmp.Equal(got, []string{"homelab", "prod"}) {
 		t.Fatalf("stages %v", got)
 	}
@@ -155,6 +158,43 @@ func TestRouteRequiresPort(t *testing.T) {
 	body := strings.ReplaceAll(kmcYAML, "containerPort: 3000\n", "")
 	if _, err := Parse([]byte(body)); err == nil {
 		t.Fatal("expected port required when a route is configured")
+	}
+}
+
+func TestParseLinks(t *testing.T) {
+	t.Parallel()
+	body := kmcYAML + `
+  links:
+    repoURL: https://github.com/ianunruh/kmc
+    projectURL: https://trello.com/b/abc/kmc
+`
+	d, err := Parse([]byte(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Spec.Links.RepoURL != "https://github.com/ianunruh/kmc" {
+		t.Fatalf("repo %q", d.Spec.Links.RepoURL)
+	}
+	if d.Spec.Links.ProjectURL != "https://trello.com/b/abc/kmc" {
+		t.Fatalf("project %q", d.Spec.Links.ProjectURL)
+	}
+}
+
+func TestLinksMustBeHTTP(t *testing.T) {
+	t.Parallel()
+	body := kmcYAML + `
+  links:
+    repoURL: "git@github.com:ianunruh/kmc.git"
+`
+	if _, err := Parse([]byte(body)); err == nil {
+		t.Fatal("expected ssh repo URL rejected")
+	}
+	body = kmcYAML + `
+  links:
+    projectURL: "javascript:alert(1)"
+`
+	if _, err := Parse([]byte(body)); err == nil {
+		t.Fatal("expected javascript project URL rejected")
 	}
 }
 

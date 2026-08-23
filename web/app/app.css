@@ -31,6 +31,22 @@ a {
   width: 100%;
 }
 
+.db-table td.db-cell-fit {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.db-table td.db-cell-clip {
+  max-width: 22rem;
+}
+
+.db-table td.db-cell-clip .db-clip-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .db-shell-main {
   background: #0b0d0f;
   min-width: 0;

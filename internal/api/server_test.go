@@ -40,7 +40,9 @@ func TestListAndGet(t *testing.T) {
 	}
 	var list struct {
 		Deployables []struct {
-			Name string `json:"name"`
+			Name       string `json:"name"`
+			RepoURL    string `json:"repoURL"`
+			ProjectURL string `json:"projectURL"`
 		} `json:"deployables"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
@@ -53,6 +55,15 @@ func TestListAndGet(t *testing.T) {
 	if len(names) != 2 || names[0] != "kmc" || names[1] != "kmc-controller" {
 		t.Fatalf("%+v", list)
 	}
+	if list.Deployables[0].RepoURL != "https://github.com/ianunruh/kmc" {
+		t.Fatalf("kmc repo %q", list.Deployables[0].RepoURL)
+	}
+	if list.Deployables[0].ProjectURL != "https://trello.com/b/rPALXxJF/kcloud" {
+		t.Fatalf("kmc project %q", list.Deployables[0].ProjectURL)
+	}
+	if list.Deployables[1].RepoURL != "https://github.com/ianunruh/kmc" {
+		t.Fatalf("controller repo %q", list.Deployables[1].RepoURL)
+	}
 
 	res2, err := http.Get(srv.URL + "/api/v1/deployables/kmc")
 	if err != nil {
@@ -61,6 +72,13 @@ func TestListAndGet(t *testing.T) {
 	defer func() { _ = res2.Body.Close() }()
 	if res2.StatusCode != http.StatusOK {
 		t.Fatal(res2.Status)
+	}
+	var st release.Status
+	if err := json.NewDecoder(res2.Body).Decode(&st); err != nil {
+		t.Fatal(err)
+	}
+	if st.RepoURL != "https://github.com/ianunruh/kmc" || st.ProjectURL != "https://trello.com/b/rPALXxJF/kcloud" {
+		t.Fatalf("status links %+v", st)
 	}
 }
 
