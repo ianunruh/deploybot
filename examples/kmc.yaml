@@ -1,0 +1,78 @@
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: kmc
+spec:
+  namespace: kmc-system
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/kmc
+    applicationPath: k8s/apps/projects/sandbox
+  argo:
+    project: sandbox
+    createNamespace: true
+  image:
+    repository: ghcr.io/ianunruh/kmc
+    tag: main
+    pullSecrets:
+      - ghcr-auth
+  workload:
+    kind: Deployment
+    replicas: 1
+    serviceAccountName: kmc
+    containerName: web
+    containerPort: 3000
+    portName: http
+    envFrom:
+      configMaps:
+        - kmc-env
+      secrets:
+        - kmc-env
+    env:
+      - name: KMC_CLUSTERS_CONFIG
+        value: /app/config/clusters.yaml
+    volumes:
+      - name: clusters
+        configMap: kmc-clusters
+        mountPath: /app/config
+        readOnly: true
+    probes:
+      path: /login
+      port: http
+      startup:
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        failureThreshold: 30
+      liveness:
+        initialDelaySeconds: 10
+        periodSeconds: 15
+      readiness:
+        periodSeconds: 10
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+  route:
+    port: 3000
+    timeout: 3600s
+    gatewayNamespace: envoy-gateway-system
+  stages:
+    - name: homelab
+      hostname: console.kcloud.zone
+      gateway:
+        name: internal
+        sectionName: https-public
+    - name: prod
+      hostname: console.kcloud.io
+      gateway:
+        name: external
+        sectionName: https-public
+      volumes:
+        - name: cluster-tokens
+          secret: kmc-cluster-tokens
+          mountPath: /var/run/secrets/kmc/clusters
+          readOnly: true
+          optional: true

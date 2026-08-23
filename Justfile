@@ -1,0 +1,44 @@
+set dotenv-load := false
+
+go_files := "./..."
+
+build:
+    mkdir -p build
+    go build -o build/deploybot .
+
+test:
+    go test {{go_files}}
+
+golangci := `echo "$(go env GOPATH)/bin/golangci-lint"`
+
+lint:
+    {{golangci}} run
+    cd web && pnpm lint
+    cd web && pnpm format:check
+
+fmt:
+    {{golangci}} fmt
+    cd web && pnpm format
+
+typecheck:
+    cd web && pnpm typecheck
+
+check: lint test typecheck
+
+web-install:
+    cd web && pnpm install
+
+web-dev:
+    cd web && pnpm dev
+
+serve *args:
+    go run . serve {{args}}
+
+# API on :8080 and the React Router console on :5173.
+dev:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    go run . serve --addr 127.0.0.1:8080 &
+    api=$!
+    trap 'kill "$api"' EXIT
+    cd web && pnpm dev
