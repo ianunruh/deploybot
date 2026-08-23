@@ -157,11 +157,11 @@ func TestEndpointsUnknownKubeContext(t *testing.T) {
 
 func TestAppURL(t *testing.T) {
 	t.Parallel()
-	c := &KubeClient{UIBaseURL: "https://argo.kcloud.zone/"}
-	if got := c.AppURL("kmc"); got != "https://argo.kcloud.zone/applications/kmc" {
+	c := &KubeClient{UIBaseURL: "https://argocd.k8s.kcloud.zone/"}
+	if got := c.AppURL("kmc"); got != "https://argocd.k8s.kcloud.zone/applications/kmc" {
 		t.Fatalf("got %q", got)
 	}
-	if got := AppURL(c, "kmc"); got != "https://argo.kcloud.zone/applications/kmc" {
+	if got := AppURL(c, "kmc"); got != "https://argocd.k8s.kcloud.zone/applications/kmc" {
 		t.Fatalf("helper %q", got)
 	}
 	if got := (&KubeClient{}).AppURL("kmc"); got != "" {
