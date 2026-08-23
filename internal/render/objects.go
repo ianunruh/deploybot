@@ -67,7 +67,10 @@ type probe struct {
 
 type httpGet struct {
 	Path string `yaml:"path"`
-	Port string `yaml:"port"`
+	// Port is a Kubernetes IntOrString: numeric ports must marshal as
+	// integers. A quoted string like "8081" is treated as a named port and
+	// rejected (must contain at least one letter).
+	Port any `yaml:"port"`
 }
 
 type resources struct {

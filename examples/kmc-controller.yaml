@@ -26,12 +26,12 @@ spec:
     probes:
       liveness:
         path: /healthz
-        port: "8081"
+        port: 8081
         initialDelaySeconds: 15
         periodSeconds: 20
       readiness:
         path: /readyz
-        port: "8081"
+        port: 8081
         initialDelaySeconds: 5
         periodSeconds: 10
     resources:

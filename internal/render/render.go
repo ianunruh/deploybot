@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/ianunruh/deploybot/internal/image"
@@ -190,7 +191,7 @@ func deploymentObj(d *spec.Deployable) deployment {
 			ContainerPort: w.ContainerPort,
 		}}
 	}
-	probePort := w.Probes.Port
+	probePort := string(w.Probes.Port)
 	c.StartupProbe = buildProbe(w.Probes.Path, probePort, w.Probes.Startup)
 	c.LivenessProbe = buildProbe(w.Probes.Path, probePort, w.Probes.Liveness)
 	c.ReadinessProbe = buildProbe(w.Probes.Path, probePort, w.Probes.Readiness)
@@ -234,12 +235,21 @@ func buildProbe(path, port string, override spec.HTTPProbe) *probe {
 	return &probe{
 		HTTPGet: httpGet{
 			Path: pth,
-			Port: cmpOr(override.Port, port),
+			Port: yamlProbePort(cmpOr(string(override.Port), port)),
 		},
 		InitialDelaySeconds: override.InitialDelaySeconds,
 		PeriodSeconds:       override.PeriodSeconds,
 		FailureThreshold:    override.FailureThreshold,
 	}
+}
+
+// yamlProbePort emits numeric ports as ints so Kubernetes IntOrString
+// validation treats them as port numbers, not named ports.
+func yamlProbePort(port string) any {
+	if n, err := strconv.Atoi(port); err == nil {
+		return n
+	}
+	return port
 }
 
 func cmpOr[T comparable](v, fallback T) T {

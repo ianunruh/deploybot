@@ -41,6 +41,25 @@ func TestGoldens(t *testing.T) {
 	}
 }
 
+func TestYAMLProbePort(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		in, want string
+	}{
+		{"8081", "port: 8081\n"},
+		{"http", "port: http\n"},
+	}
+	for _, tc := range cases {
+		b, err := yamlx.Marshal(httpGet{Path: "/", Port: yamlProbePort(tc.in)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(b), tc.want) || strings.Contains(string(b), `port: "8081"`) {
+			t.Fatalf("port %q marshaled as:\n%s", tc.in, b)
+		}
+	}
+}
+
 func TestPinIsOnlyOverlayImageDiff(t *testing.T) {
 	t.Parallel()
 	d := loadExample(t, "kmc")
@@ -149,6 +168,12 @@ func TestControllerOmitsServiceAndRoute(t *testing.T) {
 	}
 	if !strings.Contains(dep, "path: /healthz") || !strings.Contains(dep, "path: /readyz") {
 		t.Fatalf("generated deployment missing probes:\n%s", dep)
+	}
+	if strings.Contains(dep, `port: "8081"`) {
+		t.Fatalf("numeric probe ports must marshal as integers, not quoted strings:\n%s", dep)
+	}
+	if !strings.Contains(dep, "port: 8081") {
+		t.Fatalf("generated deployment missing numeric probe port:\n%s", dep)
 	}
 }
 
