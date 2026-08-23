@@ -33,6 +33,10 @@ function hopLabel(hop: FlowHop): string {
   return HOP_LABEL[hop.state] ?? hop.state;
 }
 
+function hopColor(hop: FlowHop): string {
+  return HOP_COLOR[hop.state] ?? "gray";
+}
+
 export function ReleaseFlow({ stages, flow }: { stages: StageStatus[]; flow?: Flow }) {
   if (stages.length === 0) return null;
   const hops = flow?.hops ?? [];
@@ -66,12 +70,7 @@ export function ReleaseFlow({ stages, flow }: { stages: StageStatus[]; flow?: Fl
                   <div className="db-flow-edge">
                     <div className="db-flow-edge-rule" />
                     {hop ? (
-                      <Badge
-                        size="sm"
-                        variant="light"
-                        color={HOP_COLOR[hop.state] ?? "gray"}
-                        tt="none"
-                      >
+                      <Badge size="sm" variant="light" color={hopColor(hop)} tt="none">
                         {hopLabel(hop)}
                       </Badge>
                     ) : null}
@@ -89,5 +88,50 @@ export function ReleaseFlow({ stages, flow }: { stages: StageStatus[]; flow?: Fl
         </div>
       </ConsolePaper>
     </Stack>
+  );
+}
+
+export function ReleaseFlowInline({
+  stages,
+  flow,
+}: {
+  stages: StageStatus[];
+  flow?: Flow;
+}) {
+  if (stages.length === 0) {
+    return (
+      <Text size="sm" c="dimmed">
+        —
+      </Text>
+    );
+  }
+  const hops = flow?.hops ?? [];
+  return (
+    <div className="db-flow-inline">
+      {stages.map((st, i) => {
+        const hop = hops.find((h) => h.from === st.name && h.to === stages[i + 1]?.name);
+        return (
+          <Fragment key={st.name}>
+            <Text size="sm" fw={600}>
+              {st.name}
+            </Text>
+            {i < stages.length - 1 ? (
+              <span className="db-flow-inline-edge">
+                {hop ? (
+                  <Badge size="sm" variant="light" color={hopColor(hop)} tt="none">
+                    {hopLabel(hop)}
+                  </Badge>
+                ) : null}
+                <IconArrowRight
+                  size={14}
+                  stroke={1.5}
+                  color="var(--mantine-color-dimmed)"
+                />
+              </span>
+            ) : null}
+          </Fragment>
+        );
+      })}
+    </div>
   );
 }

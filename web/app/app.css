@@ -93,6 +93,19 @@ a {
   background: #2c333d;
 }
 
+.db-flow-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.db-flow-inline-edge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .db-yaml {
   font-size: 12px;
   line-height: 1.5;

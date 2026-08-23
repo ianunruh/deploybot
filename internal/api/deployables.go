@@ -9,43 +9,42 @@ import (
 )
 
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {
-	type itemStage struct {
-		Name        string `json:"name"`
-		HeadlampURL string `json:"headlampURL,omitempty"`
-		GrafanaURL  string `json:"grafanaURL,omitempty"`
-		LogsURL     string `json:"logsURL,omitempty"`
-	}
 	type item struct {
-		Name       string      `json:"name"`
-		Namespace  string      `json:"namespace"`
-		Image      string      `json:"image"`
-		Stages     []string    `json:"stages"`
-		RepoURL    string      `json:"repoURL,omitempty"`
-		ProjectURL string      `json:"projectURL,omitempty"`
-		DeployedAt *time.Time  `json:"deployedAt,omitempty"`
-		StageLinks []itemStage `json:"stageLinks,omitempty"`
+		Name       string                `json:"name"`
+		Namespace  string                `json:"namespace"`
+		RepoURL    string                `json:"repoURL,omitempty"`
+		ProjectURL string                `json:"projectURL,omitempty"`
+		DeployedAt *time.Time            `json:"deployedAt,omitempty"`
+		Flow       release.Flow          `json:"flow"`
+		Stages     []release.StageStatus `json:"stages"`
 	}
-	var times map[string]*time.Time
+	var latest map[string]release.Live
 	if s.Release != nil {
-		times = s.Release.LatestDeployedAt(r.Context())
+		latest = s.Release.Latest(r.Context())
 	}
 	var items []item
 	for _, d := range s.Catalog.List() {
-		var links []itemStage
-		for _, name := range d.StageNames() {
-			st := itemStage{Name: name}
-			st.HeadlampURL, st.GrafanaURL, st.LogsURL = release.ObservabilityURLs(name, d.Spec.Namespace)
-			links = append(links, st)
+		live := latest[d.Metadata.Name]
+		stages := live.Stages
+		if len(stages) == 0 {
+			for _, st := range d.Spec.Stages {
+				ss := release.StageStatus{Name: st.Name, Hostname: st.Hostname}
+				ss.HeadlampURL, ss.GrafanaURL, ss.LogsURL = release.ObservabilityURLs(st.Name, d.Spec.Namespace)
+				stages = append(stages, ss)
+			}
+		}
+		flow := live.Flow
+		if flow.Hops == nil {
+			flow.Hops = []release.Hop{}
 		}
 		items = append(items, item{
 			Name:       d.Metadata.Name,
 			Namespace:  d.Spec.Namespace,
-			Image:      d.Spec.Image.Repository,
-			Stages:     d.StageNames(),
 			RepoURL:    d.Spec.Links.RepoURL,
 			ProjectURL: d.Spec.Links.ProjectURL,
-			DeployedAt: times[d.Metadata.Name],
-			StageLinks: links,
+			DeployedAt: live.DeployedAt,
+			Flow:       flow,
+			Stages:     stages,
 		})
 	}
 	if items == nil {

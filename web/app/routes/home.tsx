@@ -6,6 +6,7 @@ import { listDeployables } from "~/lib/api.server";
 import { DeployableLinkIcons, ObservabilityClusterMenus } from "~/ui/external-links";
 import { PageHeader } from "~/ui/page-header";
 import { RelativeTime } from "~/ui/relative-time";
+import { ReleaseFlowInline } from "~/ui/release-flow";
 import { ResourceTable, Table } from "~/ui/resource-table";
 
 export function meta(_args: Route.MetaArgs) {
@@ -39,7 +40,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </Alert>
       )}
       <ResourceTable
-        headers={["Name", "Namespace", "Image", "Stages", "Last deploy", "Links"]}
+        headers={["Name", "Namespace", "Flow", "Last deploy", "Links"]}
         isEmpty={deployables.length === 0 && error == null}
         emptyMessage="No deployable specs found."
       >
@@ -52,23 +53,20 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             </Table.Td>
             <Table.Td>{d.namespace}</Table.Td>
             <Table.Td>
-              <Text size="sm" ff="monospace">
-                {d.image}
-              </Text>
+              <ReleaseFlowInline stages={d.stages ?? []} flow={d.flow} />
             </Table.Td>
-            <Table.Td>{d.stages.join(" → ")}</Table.Td>
             <Table.Td className="db-cell-fit">
               <RelativeTime value={d.deployedAt} />
             </Table.Td>
             <Table.Td>
               {d.repoURL ||
               d.projectURL ||
-              (d.stageLinks ?? []).some(
+              (d.stages ?? []).some(
                 (st) => st.headlampURL || st.grafanaURL || st.logsURL,
               ) ? (
                 <Group gap={2} wrap="nowrap">
                   <DeployableLinkIcons repoURL={d.repoURL} projectURL={d.projectURL} />
-                  <ObservabilityClusterMenus stages={d.stageLinks ?? []} />
+                  <ObservabilityClusterMenus stages={d.stages ?? []} />
                 </Group>
               ) : (
                 <Text size="sm" c="dimmed">

@@ -45,12 +45,19 @@ func TestListAndGet(t *testing.T) {
 			Name       string `json:"name"`
 			RepoURL    string `json:"repoURL"`
 			ProjectURL string `json:"projectURL"`
-			StageLinks []struct {
+			Flow       struct {
+				Hops []struct {
+					From  string `json:"from"`
+					To    string `json:"to"`
+					State string `json:"state"`
+				} `json:"hops"`
+			} `json:"flow"`
+			Stages []struct {
 				Name        string `json:"name"`
 				HeadlampURL string `json:"headlampURL"`
 				GrafanaURL  string `json:"grafanaURL"`
 				LogsURL     string `json:"logsURL"`
-			} `json:"stageLinks"`
+			} `json:"stages"`
 		} `json:"deployables"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
@@ -81,16 +88,22 @@ func TestListAndGet(t *testing.T) {
 	if list.Deployables[1].RepoURL != "https://github.com/ianunruh/deploybot" {
 		t.Fatalf("deploybot repo %q", list.Deployables[1].RepoURL)
 	}
-	if len(kmc.StageLinks) != 2 {
-		t.Fatalf("kmc stageLinks %+v", kmc.StageLinks)
+	if len(kmc.Stages) != 2 {
+		t.Fatalf("kmc stages %+v", kmc.Stages)
 	}
-	hl := kmc.StageLinks[0]
+	hl := kmc.Stages[0]
 	if hl.Name != "homelab" || hl.HeadlampURL == "" || hl.GrafanaURL == "" || hl.LogsURL == "" {
 		t.Fatalf("kmc homelab links %+v", hl)
 	}
-	pr := kmc.StageLinks[1]
+	pr := kmc.Stages[1]
 	if pr.Name != "prod" || pr.HeadlampURL == "" || pr.GrafanaURL == "" || pr.LogsURL != "" {
 		t.Fatalf("kmc prod links %+v", pr)
+	}
+	if len(kmc.Flow.Hops) != 1 || kmc.Flow.Hops[0].From != "homelab" || kmc.Flow.Hops[0].To != "prod" {
+		t.Fatalf("kmc flow %+v", kmc.Flow)
+	}
+	if kmc.Flow.Hops[0].State != release.HopCaughtUp {
+		t.Fatalf("unpinned kmc hop %q", kmc.Flow.Hops[0].State)
 	}
 
 	res2, err := http.Get(srv.URL + "/api/v1/deployables/kmc")
@@ -146,19 +159,39 @@ func TestListAndGetDeployedAt(t *testing.T) {
 		Deployables []struct {
 			Name       string     `json:"name"`
 			DeployedAt *time.Time `json:"deployedAt"`
+			Flow       struct {
+				Hops []struct {
+					State string `json:"state"`
+				} `json:"hops"`
+			} `json:"flow"`
+			Stages []struct {
+				Name   string `json:"name"`
+				Health string `json:"health"`
+			} `json:"stages"`
 		} `json:"deployables"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
 		t.Fatal(err)
 	}
-	var kmc *time.Time
-	for _, d := range list.Deployables {
+	idx := -1
+	for i, d := range list.Deployables {
 		if d.Name == "kmc" {
-			kmc = d.DeployedAt
+			idx = i
+			break
 		}
 	}
-	if kmc == nil || !kmc.Equal(prodAt) {
-		t.Fatalf("list kmc deployedAt %+v", kmc)
+	if idx < 0 {
+		t.Fatal("kmc missing from list")
+	}
+	kmc := list.Deployables[idx]
+	if kmc.DeployedAt == nil || !kmc.DeployedAt.Equal(prodAt) {
+		t.Fatalf("list kmc deployedAt %+v", kmc.DeployedAt)
+	}
+	if len(kmc.Flow.Hops) != 1 || kmc.Flow.Hops[0].State != release.HopCaughtUp {
+		t.Fatalf("list kmc flow %+v", kmc.Flow)
+	}
+	if len(kmc.Stages) != 2 || kmc.Stages[0].Health != "Healthy" || kmc.Stages[1].Health != "Healthy" {
+		t.Fatalf("list kmc stages %+v", kmc.Stages)
 	}
 
 	res2, err := http.Get(srv.URL + "/api/v1/deployables/kmc")

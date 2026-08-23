@@ -8,6 +8,7 @@ import (
 	"github.com/ianunruh/deploybot/internal/argo"
 	"github.com/ianunruh/deploybot/internal/image"
 	"github.com/ianunruh/deploybot/internal/render"
+	"github.com/ianunruh/deploybot/internal/spec"
 )
 
 const statusArgoTimeout = 4 * time.Second
@@ -41,6 +42,14 @@ type Status struct {
 	Sync       bool          `json:"sync"`
 }
 
+// Live is a catalog-list snapshot: newest Argo deployedAt, stage health, and
+// the current release flow. Source commit lookup is omitted.
+type Live struct {
+	DeployedAt *time.Time    `json:"deployedAt,omitempty"`
+	Stages     []StageStatus `json:"stages"`
+	Flow       Flow          `json:"flow"`
+}
+
 func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 	d, err := s.Catalog.Get(name)
 	if err != nil {
@@ -50,6 +59,46 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
+	out := s.buildStatus(ctx, d, tree)
+	if out.Flow.Tag != "" {
+		sctx, cancel := context.WithTimeout(ctx, sourceCommitTimeout)
+		out.Flow.Source = s.resolveSource(sctx, d.Spec.Links.RepoURL, out.Flow.Tag)
+		cancel()
+	}
+	return out, nil
+}
+
+// Latest returns live flow, stages, and newest Argo deployedAt for each
+// catalog deployable. Missing Argo clients, git, and Get errors are skipped.
+func (s *Service) Latest(ctx context.Context) map[string]Live {
+	out := map[string]Live{}
+	if s == nil || s.Catalog == nil {
+		return out
+	}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, d := range s.Catalog.List() {
+		wg.Go(func() {
+			tree, err := s.workingTree(ctx, d)
+			if err != nil {
+				tree = render.Tree{}
+			}
+			st := s.buildStatus(ctx, d, tree)
+			live := Live{
+				DeployedAt: newestDeployedAt(st.Stages),
+				Stages:     st.Stages,
+				Flow:       st.Flow,
+			}
+			mu.Lock()
+			out[d.Metadata.Name] = live
+			mu.Unlock()
+		})
+	}
+	wg.Wait()
+	return out
+}
+
+func (s *Service) buildStatus(ctx context.Context, d *spec.Deployable, tree render.Tree) Status {
 	out := Status{
 		Name:       d.Metadata.Name,
 		Namespace:  d.Spec.Namespace,
@@ -116,46 +165,18 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 		}
 	}
 	out.Flow = buildFlow(snaps, time.Now().UTC())
-	if out.Flow.Tag != "" {
-		sctx, cancel := context.WithTimeout(ctx, sourceCommitTimeout)
-		out.Flow.Source = s.resolveSource(sctx, d.Spec.Links.RepoURL, out.Flow.Tag)
-		cancel()
-	}
-	return out, nil
+	return out
 }
 
-// LatestDeployedAt returns the newest Argo history deployedAt across stages
-// for each catalog deployable. Missing Argo clients and Get errors are skipped.
-func (s *Service) LatestDeployedAt(ctx context.Context) map[string]*time.Time {
-	out := map[string]*time.Time{}
-	if s == nil || s.Argo == nil || s.Catalog == nil {
-		return out
-	}
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	for _, d := range s.Catalog.List() {
-		name := d.Metadata.Name
-		app := d.Spec.Argo.Name
-		for _, stage := range d.StageNames() {
-			c := s.Argo.ForStage(stage)
-			if c == nil {
-				continue
-			}
-			wg.Go(func() {
-				gctx, cancel := context.WithTimeout(ctx, statusArgoTimeout)
-				defer cancel()
-				got, err := c.Get(gctx, app)
-				if err != nil || got.DeployedAt == nil {
-					return
-				}
-				mu.Lock()
-				defer mu.Unlock()
-				if prev := out[name]; prev == nil || got.DeployedAt.After(*prev) {
-					out[name] = got.DeployedAt
-				}
-			})
+func newestDeployedAt(stages []StageStatus) *time.Time {
+	var latest *time.Time
+	for _, st := range stages {
+		if st.DeployedAt == nil {
+			continue
+		}
+		if latest == nil || st.DeployedAt.After(*latest) {
+			latest = st.DeployedAt
 		}
 	}
-	wg.Wait()
-	return out
+	return latest
 }

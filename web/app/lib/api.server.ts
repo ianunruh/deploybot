@@ -30,24 +30,6 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export type StageLinks = {
-  name: string;
-  headlampURL?: string;
-  grafanaURL?: string;
-  logsURL?: string;
-};
-
-export type DeployableSummary = {
-  name: string;
-  namespace: string;
-  image: string;
-  stages: string[];
-  repoURL?: string;
-  projectURL?: string;
-  deployedAt?: string;
-  stageLinks?: StageLinks[];
-};
-
 export type StageStatus = {
   name: string;
   hostname: string;
@@ -88,6 +70,16 @@ export type Flow = {
   tag?: string;
   source?: SourceCommit;
   hops: FlowHop[];
+};
+
+export type DeployableSummary = {
+  name: string;
+  namespace: string;
+  repoURL?: string;
+  projectURL?: string;
+  deployedAt?: string;
+  stages: StageStatus[];
+  flow?: Flow;
 };
 
 export type DeployableStatus = {

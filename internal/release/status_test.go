@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ianunruh/deploybot/internal/argo"
+	"github.com/ianunruh/deploybot/internal/gitwrite"
 	"github.com/ianunruh/deploybot/internal/image"
 )
 
@@ -67,9 +68,42 @@ func TestStatusLinksAndArgoURL(t *testing.T) {
 		t.Fatalf("unpinned stages should be caught up, got %q", st.Flow.Hops[0].State)
 	}
 
-	latest := svc.LatestDeployedAt(t.Context())
-	if latest["kmc"] == nil || !latest["kmc"].Equal(prodAt) {
-		t.Fatalf("latest kmc %+v", latest["kmc"])
+	latest := svc.Latest(t.Context())
+	kmc := latest["kmc"]
+	if kmc.DeployedAt == nil || !kmc.DeployedAt.Equal(prodAt) {
+		t.Fatalf("latest kmc deployedAt %+v", kmc.DeployedAt)
+	}
+	if len(kmc.Flow.Hops) != 1 || kmc.Flow.Hops[0].State != HopCaughtUp {
+		t.Fatalf("latest kmc flow %+v", kmc.Flow)
+	}
+	if len(kmc.Stages) != 2 || kmc.Stages[0].Health != "Healthy" {
+		t.Fatalf("latest kmc stages %+v", kmc.Stages)
+	}
+}
+
+func TestLatestWaitingApproval(t *testing.T) {
+	t.Parallel()
+	homelab := argo.NewFake()
+	homelab.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
+	prod := argo.NewFake()
+	prod.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
+	svc := &Service{
+		Catalog: loadExamples(t),
+		OpsRepo: initOpsRepo(t),
+		Apply:   true,
+		Argo:    stageRouter{"homelab": homelab, "prod": prod},
+		Author:  gitwrite.Author{Name: "t", Email: "t@t"},
+	}
+	if _, err := svc.Pin(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc@sha256:abc"); err != nil {
+		t.Fatal(err)
+	}
+	latest := svc.Latest(t.Context())
+	kmc := latest["kmc"]
+	if len(kmc.Flow.Hops) != 1 || kmc.Flow.Hops[0].State != HopWaitingApproval {
+		t.Fatalf("flow %+v", kmc.Flow)
+	}
+	if len(kmc.Stages) != 2 || kmc.Stages[0].Image == "" {
+		t.Fatalf("homelab image %+v", kmc.Stages)
 	}
 }
 
