@@ -72,6 +72,44 @@ export type Flow = {
   hops: FlowHop[];
 };
 
+export type UpdateSummary = {
+  stale: boolean;
+  auto?: string;
+};
+
+export type UpdatePin = {
+  tag?: string;
+  digest?: string;
+  compact?: string;
+  ref?: string;
+};
+
+export type UpdateNewest = {
+  tag?: string;
+  digest?: string;
+  ref?: string;
+  createdAt?: string;
+};
+
+export type UpdateStatus = {
+  name: string;
+  repository: string;
+  stage: string;
+  current: UpdatePin;
+  newest?: UpdateNewest;
+  stale: boolean;
+  auto?: string;
+  checkedAt?: string;
+  error?: string;
+};
+
+export type UpdateList = {
+  updates: UpdateStatus[];
+  apply: boolean;
+  push: boolean;
+  sync: boolean;
+};
+
 export type DeployableSummary = {
   name: string;
   namespace: string;
@@ -80,6 +118,7 @@ export type DeployableSummary = {
   deployedAt?: string;
   stages: StageStatus[];
   flow?: Flow;
+  update?: UpdateSummary;
 };
 
 export type DeployableStatus = {
@@ -93,6 +132,7 @@ export type DeployableStatus = {
   apply: boolean;
   push: boolean;
   sync: boolean;
+  update?: UpdateStatus;
 };
 
 export type ReleaseStageHit = {
@@ -139,6 +179,10 @@ export type MutationResult = {
 
 export function listDeployables() {
   return apiFetch<{ deployables: DeployableSummary[] }>("/api/v1/deployables");
+}
+
+export function listUpdates() {
+  return apiFetch<UpdateList>("/api/v1/updates");
 }
 
 export function getDeployable(name: string) {

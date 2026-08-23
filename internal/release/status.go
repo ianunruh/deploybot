@@ -40,6 +40,7 @@ type Status struct {
 	Apply      bool          `json:"apply"`
 	Push       bool          `json:"push"`
 	Sync       bool          `json:"sync"`
+	Update     *UpdateStatus `json:"update,omitempty"`
 }
 
 // Live is a catalog-list snapshot: newest Argo deployedAt, stage health, and
@@ -165,6 +166,11 @@ func (s *Service) buildStatus(ctx context.Context, d *spec.Deployable, tree rend
 		}
 	}
 	out.Flow = buildFlow(snaps, time.Now().UTC())
+	if d.TracksRegistry() {
+		st := s.updateFromTree(d, tree)
+		s.applyListing(&st, d, ctx, fetchNone)
+		out.Update = &st
+	}
 	return out
 }
 

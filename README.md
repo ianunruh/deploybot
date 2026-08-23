@@ -74,6 +74,9 @@ just build
 `--apply` commits locally. `--push` (requires `--apply`) pushes the current
 branch; it never force-pushes. `--sync` talks to Argo. Default is dry-run. For
 `serve`, set `DEPLOYBOT_APPLY=1`, `DEPLOYBOT_PUSH=1`, and `DEPLOYBOT_SYNC=1`.
+Scheduled auto-pin is off unless `DEPLOYBOT_AUTO_PIN=1` (or `--auto-pin` /
+`autoPin: true`); enable it on exactly one serve instance so homelab and
+prod do not race the same ops repo.
 
 ### Config
 
@@ -119,6 +122,13 @@ auth is `DEPLOYBOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`, or
 Without that scope GHCR falls back to `main-<sha>` tags from git history.
 Docker Hub listing is unauthenticated for public images; set
 `DEPLOYBOT_DOCKERHUB_TOKEN` only if Hub rate-limits the API.
+
+Third-party images opt into registry tracking with `spec.update`. The
+console **Updates** page compares the first-stage pin to the newest
+published digest. `spec.update.auto: 24h` enrolls the app; `serve` only
+writes those pins when auto-pin is enabled on that process. Promote gates
+are unchanged — prod still needs approval. `deploybot update` is the same
+check from the CLI (dry-run unless `--apply`).
 
 HTTPS git push uses `DEPLOYBOT_GIT_TOKEN`, then the same GitHub tokens as
 the pin picker. SSH remotes use the ssh-agent (or `~/.ssh/id_ed25519` /

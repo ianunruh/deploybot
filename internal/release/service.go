@@ -13,20 +13,25 @@ import (
 )
 
 type Service struct {
-	Catalog   *catalog.Catalog
-	OpsRepo   string
-	Apply     bool
-	Push      bool
-	Sync      bool
-	Author    gitwrite.Author
-	Argo      argo.Router
-	Clusters  map[string]config.Cluster
-	Wait      time.Duration
-	FlowEvery time.Duration
-	Images    image.Lister
-	Commits   image.CommitLookup
+	Catalog     *catalog.Catalog
+	OpsRepo     string
+	Apply       bool
+	Push        bool
+	Sync        bool
+	AutoPin     bool
+	Author      gitwrite.Author
+	Argo        argo.Router
+	Clusters    map[string]config.Cluster
+	Wait        time.Duration
+	FlowEvery   time.Duration
+	UpdateEvery time.Duration
+	Images      image.Lister
+	Commits     image.CommitLookup
 
+	// Lock serializes git mutations (HTTP pin, auto-promote, auto-pin).
+	Lock     *sync.Mutex
 	overlays *overlayCache
+	update   *updateState
 }
 
 type overlayCache struct {

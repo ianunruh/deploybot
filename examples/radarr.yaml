@@ -19,6 +19,8 @@ spec:
   image:
     repository: docker.io/linuxserver/radarr
     tag: 5.26.2.10099-ls276
+  update:
+    auto: 24h
   workload:
     kind: StatefulSet
     containerName: radarr

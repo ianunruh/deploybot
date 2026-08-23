@@ -115,7 +115,7 @@ func PreferredTag(tags []string) string {
 			continue
 		}
 		switch {
-		case t == "latest" || t == "main" || t == "master":
+		case isUnstableTag(t):
 			if floating == "" {
 				floating = t
 			}
@@ -130,6 +130,20 @@ func PreferredTag(tags []string) string {
 		}
 	}
 	return cmp.Or(sha, other, floating)
+}
+
+func isUnstableTag(tag string) bool {
+	t := strings.ToLower(strings.TrimSpace(tag))
+	switch t {
+	case "latest", "main", "master", "nightly", "beta", "rc", "dev", "develop", "development", "edge":
+		return true
+	}
+	for _, p := range []string{"nightly", "beta", "dev", "develop", "development"} {
+		if strings.HasPrefix(t, p+"-") || strings.HasSuffix(t, "-"+p) || strings.Contains(t, "-"+p+"-") {
+			return true
+		}
+	}
+	return strings.Contains(t, "-rc") || strings.HasPrefix(t, "rc-")
 }
 
 func parseGHCR(repository string) (owner, name string, err error) {

@@ -40,8 +40,8 @@ func configFlag(fs *flag.FlagSet) *string {
 }
 
 type settings struct {
-	addr, specs, repo string
-	apply, push, sync bool
+	addr, specs, repo          string
+	apply, push, sync, autoPin bool
 }
 
 func visited(fs *flag.FlagSet) map[string]bool {
@@ -103,6 +103,40 @@ func serviceFromFlags(fs *flag.FlagSet, flags mutFlags) (*release.Service, strin
 	if err != nil {
 		return nil, "", err
 	}
+	return newMutationService(cat, s, file, eps), d.Metadata.Name, nil
+}
+
+func serviceFromSpecsDir(fs *flag.FlagSet, flags mutFlags, specs string) (*release.Service, error) {
+	file, _, err := config.Open(*flags.config)
+	if err != nil {
+		return nil, err
+	}
+	got := visited(fs)
+	s := settings{
+		specs: pickString(got["specs"], specs, "DEPLOYBOT_SPECS_DIR", file.SpecsDir),
+		repo:  pickString(got["repo"], *flags.repo, "DEPLOYBOT_OPS_REPO", file.OpsRepo),
+		apply: pickBool(got["apply"], *flags.apply, "DEPLOYBOT_APPLY", file.Apply),
+		push:  pickBool(got["push"], *flags.push, "DEPLOYBOT_PUSH", file.Push),
+		sync:  pickBool(got["sync"], *flags.sync, "DEPLOYBOT_SYNC", file.Sync),
+	}
+	if s.specs == "" {
+		s.specs = specs
+	}
+	if s.push && !s.apply {
+		return nil, fmt.Errorf("--push requires --apply")
+	}
+	eps, err := argo.EndpointsFromConfig(file.Clusters)
+	if err != nil {
+		return nil, err
+	}
+	cat, err := catalog.Load(s.specs)
+	if err != nil {
+		return nil, err
+	}
+	return newMutationService(cat, s, file, eps), nil
+}
+
+func newMutationService(cat *catalog.Catalog, s settings, file *config.File, eps argo.Router) *release.Service {
 	return &release.Service{
 		Catalog:  cat,
 		OpsRepo:  s.repo,
@@ -113,7 +147,7 @@ func serviceFromFlags(fs *flag.FlagSet, flags mutFlags) (*release.Service, strin
 		Argo:     eps,
 		Clusters: file.Clusters,
 		Wait:     5 * time.Minute,
-	}, d.Metadata.Name, nil
+	}
 }
 
 func printMutation(mut release.Mutation) {

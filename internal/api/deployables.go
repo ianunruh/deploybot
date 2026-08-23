@@ -10,13 +10,14 @@ import (
 
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	type item struct {
-		Name       string                `json:"name"`
-		Namespace  string                `json:"namespace"`
-		RepoURL    string                `json:"repoURL,omitempty"`
-		ProjectURL string                `json:"projectURL,omitempty"`
-		DeployedAt *time.Time            `json:"deployedAt,omitempty"`
-		Flow       release.Flow          `json:"flow"`
-		Stages     []release.StageStatus `json:"stages"`
+		Name       string                 `json:"name"`
+		Namespace  string                 `json:"namespace"`
+		RepoURL    string                 `json:"repoURL,omitempty"`
+		ProjectURL string                 `json:"projectURL,omitempty"`
+		DeployedAt *time.Time             `json:"deployedAt,omitempty"`
+		Flow       release.Flow           `json:"flow"`
+		Stages     []release.StageStatus  `json:"stages"`
+		Update     *release.UpdateSummary `json:"update,omitempty"`
 	}
 	var latest map[string]release.Live
 	if s.Release != nil {
@@ -39,6 +40,10 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 		if flow.Hops == nil {
 			flow.Hops = []release.Hop{}
 		}
+		var upd *release.UpdateSummary
+		if s.Release != nil {
+			upd = s.Release.UpdateSummary(d)
+		}
 		items = append(items, item{
 			Name:       d.Metadata.Name,
 			Namespace:  d.Spec.Namespace,
@@ -47,12 +52,21 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 			DeployedAt: live.DeployedAt,
 			Flow:       flow,
 			Stages:     stages,
+			Update:     upd,
 		})
 	}
 	if items == nil {
 		items = []item{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"deployables": items})
+}
+
+func (s *Server) updates(w http.ResponseWriter, r *http.Request) {
+	if s.Release == nil {
+		writeJSON(w, http.StatusOK, release.UpdateList{Updates: []release.UpdateStatus{}})
+		return
+	}
+	writeJSON(w, http.StatusOK, s.Release.ListUpdates(r.Context()))
 }
 
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {

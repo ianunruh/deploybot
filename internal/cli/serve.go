@@ -30,6 +30,7 @@ func runServe(ctx context.Context, args []string) error {
 	apply := fs.Bool("apply", false, "commit mutations to the ops repo")
 	push := fs.Bool("push", false, "push the current branch after commit (requires --apply; never force-pushes)")
 	syncArgo := fs.Bool("sync", false, "sync Argo after commit")
+	autoPin := fs.Bool("auto-pin", false, "periodically pin enrolled spec.update.auto apps (requires --apply; enable on one serve instance)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -39,15 +40,19 @@ func runServe(ctx context.Context, args []string) error {
 	}
 	got := visited(fs)
 	s := settings{
-		addr:  pickString(got["addr"], *addr, "DEPLOYBOT_ADDR", file.Addr),
-		specs: pickString(got["specs"], *specs, "DEPLOYBOT_SPECS_DIR", file.SpecsDir),
-		repo:  pickString(got["repo"], *repo, "DEPLOYBOT_OPS_REPO", file.OpsRepo),
-		apply: pickBool(got["apply"], *apply, "DEPLOYBOT_APPLY", file.Apply),
-		push:  pickBool(got["push"], *push, "DEPLOYBOT_PUSH", file.Push),
-		sync:  pickBool(got["sync"], *syncArgo, "DEPLOYBOT_SYNC", file.Sync),
+		addr:    pickString(got["addr"], *addr, "DEPLOYBOT_ADDR", file.Addr),
+		specs:   pickString(got["specs"], *specs, "DEPLOYBOT_SPECS_DIR", file.SpecsDir),
+		repo:    pickString(got["repo"], *repo, "DEPLOYBOT_OPS_REPO", file.OpsRepo),
+		apply:   pickBool(got["apply"], *apply, "DEPLOYBOT_APPLY", file.Apply),
+		push:    pickBool(got["push"], *push, "DEPLOYBOT_PUSH", file.Push),
+		sync:    pickBool(got["sync"], *syncArgo, "DEPLOYBOT_SYNC", file.Sync),
+		autoPin: pickBool(got["auto-pin"], *autoPin, "DEPLOYBOT_AUTO_PIN", file.AutoPin),
 	}
 	if s.push && !s.apply {
 		return fmt.Errorf("--push requires --apply")
+	}
+	if s.autoPin && !s.apply {
+		return fmt.Errorf("--auto-pin requires --apply")
 	}
 	repoURL := pickString(false, "", "DEPLOYBOT_OPS_REPO_URL", file.OpsRepoURL)
 	if repoURL != "" {
@@ -83,6 +88,8 @@ func runServe(ctx context.Context, args []string) error {
 		Wait:     5 * time.Minute,
 		Images:   &image.Registry{GitHub: gh, DockerHub: hub},
 		Commits:  gh,
+		AutoPin:  s.autoPin,
+		Lock:     new(sync.Mutex),
 	}
 	h := (&api.Server{Release: svc, Catalog: cat}).Handler()
 	srv := &http.Server{Addr: s.addr, Handler: h}
@@ -90,13 +97,14 @@ func runServe(ctx context.Context, args []string) error {
 	defer cancel()
 	var wg sync.WaitGroup
 	wg.Go(func() { svc.WatchFlows(ctx) })
+	wg.Go(func() { svc.WatchUpdates(ctx) })
 	wg.Go(func() {
 		<-ctx.Done()
 		shCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
 		defer stop()
 		_ = srv.Shutdown(shCtx)
 	})
-	slog.Info("api listening", "addr", s.addr, "specs", s.specs, "config", path, "apply", s.apply, "push", s.push, "sync", s.sync, "github", tokenSrc)
+	slog.Info("api listening", "addr", s.addr, "specs", s.specs, "config", path, "apply", s.apply, "push", s.push, "sync", s.sync, "autoPin", s.autoPin, "github", tokenSrc)
 	err = srv.ListenAndServe()
 	cancel()
 	wg.Wait()

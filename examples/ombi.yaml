@@ -19,6 +19,8 @@ spec:
   image:
     repository: docker.io/linuxserver/ombi
     tag: 4.43.5
+  update:
+    auto: 24h
   workload:
     kind: StatefulSet
     containerName: ombi

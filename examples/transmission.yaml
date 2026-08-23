@@ -21,6 +21,7 @@ spec:
   image:
     repository: docker.io/haugene/transmission-openvpn
     tag: 4.3.2
+  update: {}
   workload:
     kind: StatefulSet
     containerName: transmission

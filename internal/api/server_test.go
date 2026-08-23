@@ -331,6 +331,100 @@ func TestHistoryEmpty(t *testing.T) {
 	}
 }
 
+func TestUpdates(t *testing.T) {
+	t.Parallel()
+	_, file, _, _ := runtime.Caller(0)
+	specs := filepath.Join(filepath.Dir(file), "..", "..", "examples")
+	cat, err := catalog.Load(specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lister := fakeImages{list: release.ImageList{
+		Source: "dockerhub",
+		Images: []image.Version{{
+			Repository: "docker.io/linuxserver/sonarr",
+			Ref:        "docker.io/linuxserver/sonarr:4.0.16@sha256:new",
+			Tag:        "4.0.16",
+			Digest:     "sha256:new",
+			Tags:       []string{"4.0.16"},
+			CreatedAt:  time.Now().UTC(),
+		}},
+	}}
+	svc := &release.Service{Catalog: cat, Images: lister}
+	svc.RefreshUpdates(t.Context())
+	s := &Server{Catalog: cat, Release: svc}
+	srv := httptest.NewServer(s.Handler())
+	t.Cleanup(srv.Close)
+
+	res, err := http.Get(srv.URL + "/api/v1/updates")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		t.Fatal(res.Status)
+	}
+	var body release.UpdateList
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(body.Updates))
+	for _, u := range body.Updates {
+		names = append(names, u.Name)
+		if u.Name == "kmc" {
+			t.Fatal("owned kmc in updates")
+		}
+	}
+	found := false
+	for _, u := range body.Updates {
+		if u.Name == "sonarr" {
+			found = true
+			if u.Auto != "24h" || u.Newest == nil || u.Newest.Tag != "4.0.16" {
+				t.Fatalf("sonarr %+v", u)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("sonarr missing from %v", names)
+	}
+
+	listRes, err := http.Get(srv.URL + "/api/v1/deployables")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listRes.Body.Close() }()
+	var list struct {
+		Deployables []struct {
+			Name   string `json:"name"`
+			Update *struct {
+				Stale bool   `json:"stale"`
+				Auto  string `json:"auto"`
+			} `json:"update"`
+		} `json:"deployables"`
+	}
+	if err := json.NewDecoder(listRes.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	var sonarr, kmc bool
+	for _, d := range list.Deployables {
+		switch d.Name {
+		case "sonarr":
+			sonarr = true
+			if d.Update == nil || d.Update.Auto != "24h" {
+				t.Fatalf("sonarr update %+v", d.Update)
+			}
+		case "kmc":
+			kmc = true
+			if d.Update != nil {
+				t.Fatalf("kmc should not track, got %+v", d.Update)
+			}
+		}
+	}
+	if !sonarr || !kmc {
+		t.Fatal("missing catalog rows")
+	}
+}
+
 type fakeImages struct {
 	list release.ImageList
 	err  error

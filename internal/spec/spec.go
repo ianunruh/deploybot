@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/ianunruh/deploybot/internal/image"
 	"gopkg.in/yaml.v3"
@@ -27,14 +28,15 @@ type Metadata struct {
 }
 
 type Spec struct {
-	Namespace string   `yaml:"namespace"`
-	Links     Links    `yaml:"links,omitempty"`
-	Git       Git      `yaml:"git"`
-	Argo      Argo     `yaml:"argo"`
-	Image     Image    `yaml:"image"`
-	Workload  Workload `yaml:"workload"`
-	Route     Route    `yaml:"route"`
-	Stages    []Stage  `yaml:"stages"`
+	Namespace string        `yaml:"namespace"`
+	Links     Links         `yaml:"links,omitempty"`
+	Git       Git           `yaml:"git"`
+	Argo      Argo          `yaml:"argo"`
+	Image     Image         `yaml:"image"`
+	Update    *UpdatePolicy `yaml:"update,omitempty"`
+	Workload  Workload      `yaml:"workload"`
+	Route     Route         `yaml:"route"`
+	Stages    []Stage       `yaml:"stages"`
 }
 
 // Links are optional URLs shown in the console. RepoURL is the app source
@@ -62,6 +64,28 @@ type Image struct {
 	Repository  string   `yaml:"repository"`
 	Tag         string   `yaml:"tag,omitempty"`
 	PullSecrets []string `yaml:"pullSecrets,omitempty"`
+}
+
+// UpdatePolicy opts a deployable into registry tracking. Presence of the
+// block means deploybot compares the first-stage pin to the newest published
+// image. Auto, if set, enrolls in scheduled first-stage pins.
+type UpdatePolicy struct {
+	Auto *Duration `yaml:"auto,omitempty"`
+}
+
+const MinAutoUpdate = Duration(time.Hour)
+
+// TracksRegistry is true when spec.update is set.
+func (d *Deployable) TracksRegistry() bool {
+	return d != nil && d.Spec.Update != nil
+}
+
+// AutoUpdate is the enrolled pin interval, or 0 if the app is track-only.
+func (d *Deployable) AutoUpdate() time.Duration {
+	if d == nil || d.Spec.Update == nil || d.Spec.Update.Auto == nil {
+		return 0
+	}
+	return d.Spec.Update.Auto.Duration()
 }
 
 func Load(path string) (*Deployable, error) {

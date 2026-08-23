@@ -32,6 +32,9 @@ func (d *Deployable) Validate() error {
 	if d.Spec.Argo.Project == "" {
 		errs = append(errs, "spec.argo.project is required")
 	}
+	if err := validateUpdate(d.Spec.Update); err != "" {
+		errs = append(errs, err)
+	}
 	if err := httpURLError("spec.links.repoURL", d.Spec.Links.RepoURL); err != "" {
 		errs = append(errs, err)
 	}
@@ -75,6 +78,16 @@ func (d *Deployable) Validate() error {
 		return fmt.Errorf("invalid spec: %s", strings.Join(errs, "; "))
 	}
 	return nil
+}
+
+func validateUpdate(u *UpdatePolicy) string {
+	if u == nil || u.Auto == nil {
+		return ""
+	}
+	if u.Auto.Duration() < MinAutoUpdate.Duration() {
+		return "spec.update.auto must be at least 1h"
+	}
+	return ""
 }
 
 func validatePromote(st Stage, index int, earlier map[string]struct{}) string {

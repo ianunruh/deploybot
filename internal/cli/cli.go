@@ -13,7 +13,8 @@ Usage:
   deploybot pin --spec <file> --stage <name> --image <ref> [--config file] [--repo dir] [--apply] [--push] [--sync]
   deploybot promote --spec <file> --from <stage> --to <stage> [--image <ref>] [--config file] [--repo dir] [--apply] [--push] [--sync]
   deploybot reconcile --spec <file> [--stage name]... [--config file] [--repo dir] [--apply] [--push] [--sync]
-  deploybot serve [--config file] [--addr host:port] [--specs dir] [--repo dir] [--apply] [--push] [--sync]
+  deploybot update [--spec file] [--specs dir] [--config file] [--repo dir] [--apply] [--push] [--sync]
+  deploybot serve [--config file] [--addr host:port] [--specs dir] [--repo dir] [--apply] [--push] [--sync] [--auto-pin]
   deploybot version
 `
 
@@ -37,6 +38,8 @@ func Run(ctx context.Context, args []string) error {
 		return runPromote(ctx, args[1:])
 	case "reconcile":
 		return runReconcile(ctx, args[1:])
+	case "update":
+		return runUpdate(ctx, args[1:])
 	case "serve":
 		return runServe(ctx, args[1:])
 	default:

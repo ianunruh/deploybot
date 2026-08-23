@@ -12,6 +12,7 @@ func isolateEnv(t *testing.T) {
 	t.Setenv("DEPLOYBOT_APPLY", "")
 	t.Setenv("DEPLOYBOT_PUSH", "")
 	t.Setenv("DEPLOYBOT_SYNC", "")
+	t.Setenv("DEPLOYBOT_AUTO_PIN", "")
 	t.Setenv("DEPLOYBOT_OPS_REPO", "")
 	t.Setenv("DEPLOYBOT_OPS_REPO_URL", "")
 	t.Setenv("DEPLOYBOT_ADDR", "")
@@ -47,6 +48,23 @@ func TestRunReconcileUnknownStage(t *testing.T) {
 	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
 	if err := Run(t.Context(), []string{"reconcile", "--spec", spec, "--stage", "nope"}); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestRunUpdateRejectsOwned(t *testing.T) {
+	isolateEnv(t)
+	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
+	err := Run(t.Context(), []string{"update", "--spec", spec})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestRunServeAutoPinRequiresApply(t *testing.T) {
+	isolateEnv(t)
+	err := Run(t.Context(), []string{"serve", "--auto-pin"})
+	if err == nil || err.Error() != "--auto-pin requires --apply" {
+		t.Fatalf("got %v", err)
 	}
 }
 

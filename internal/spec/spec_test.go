@@ -2,6 +2,7 @@ package spec
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -181,6 +182,66 @@ func TestParseLinks(t *testing.T) {
 	if d.Spec.Links.ProjectURL != "https://trello.com/b/abc/kmc" {
 		t.Fatalf("project %q", d.Spec.Links.ProjectURL)
 	}
+}
+
+func TestParseUpdate(t *testing.T) {
+	t.Parallel()
+	d, err := Parse([]byte(sonarrUpdateYAML("")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !d.TracksRegistry() {
+		t.Fatal("expected tracking")
+	}
+	if d.AutoUpdate() != 0 {
+		t.Fatalf("auto %s", d.AutoUpdate())
+	}
+
+	d, err = Parse([]byte(sonarrUpdateYAML("    auto: 24h\n")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.AutoUpdate() != 24*time.Hour {
+		t.Fatalf("auto %s", d.AutoUpdate())
+	}
+}
+
+func TestParseUpdateRejectsShortAuto(t *testing.T) {
+	t.Parallel()
+	for _, auto := range []string{"0", "0s", "30m", "-1h"} {
+		if _, err := Parse([]byte(sonarrUpdateYAML("    auto: " + auto + "\n"))); err == nil {
+			t.Fatalf("expected error for auto %q", auto)
+		}
+	}
+}
+
+func sonarrUpdateYAML(autoBlock string) string {
+	update := "  update: {}\n"
+	if autoBlock != "" {
+		update = "  update:\n" + autoBlock
+	}
+	return `apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: sonarr
+spec:
+  namespace: play
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/play/sonarr
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+  image:
+    repository: docker.io/linuxserver/sonarr
+    tag: 4.0.15.2941-ls285
+` + update + `  workload:
+    kind: StatefulSet
+    containerName: sonarr
+    containerPort: 8989
+  stages:
+    - name: homelab
+`
 }
 
 func TestLinksMustBeHTTP(t *testing.T) {

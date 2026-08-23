@@ -18,6 +18,8 @@ spec:
   image:
     repository: ghcr.io/flaresolverr/flaresolverr
     tag: v3.3.25
+  update:
+    auto: 24h
   workload:
     kind: Deployment
     containerName: flaresolverr

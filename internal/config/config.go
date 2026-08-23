@@ -19,6 +19,7 @@ type File struct {
 	Apply      *bool              `yaml:"apply,omitempty"`
 	Push       *bool              `yaml:"push,omitempty"`
 	Sync       *bool              `yaml:"sync,omitempty"`
+	AutoPin    *bool              `yaml:"autoPin,omitempty"`
 	Clusters   map[string]Cluster `yaml:"clusters,omitempty"`
 }
 

@@ -93,8 +93,11 @@ Spec + renderer + goldens for kmc, kmc-controller, deploybot itself, and
 Play apps (sonarr, radarr, bazarr, jackett, tautulli, ombi, flaresolverr,
 nzbget, transmission, plex-exporter, plex, teamspeak). Image pin (GHCR or
 Docker Hub picker, newest first; `lscr.io` canonicalizes to `docker.io`),
-local git write, opt-in git push (no force), Argo sync/health/promote, RR
-console (catalog, stage matrix, pin, promote, per-stage reconcile).
+registry tracking for third-party images (`spec.update`, optional
+`auto: 24h` first-stage pin; `serve` auto-pin is a process flag so only
+one instance writes), local git write, opt-in git push (no force),
+Argo sync/health/promote, RR console (catalog, updates, stage matrix, pin,
+promote, per-stage reconcile).
 Deploybot is cut over in homelab and prod; push to `main` pins homelab via
 the prod API (GitHub OIDC).
 

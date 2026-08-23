@@ -20,6 +20,8 @@ spec:
   image:
     repository: ghcr.io/axsuul/plex-media-server-exporter
     tag: 2.1.0
+  update:
+    auto: 24h
   workload:
     kind: Deployment
     containerName: exporter

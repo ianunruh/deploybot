@@ -13,6 +13,10 @@ import (
 )
 
 func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string, before render.Tree, edit func(render.Tree) error, syncStages []string) (Mutation, error) {
+	if s != nil && s.Lock != nil {
+		s.Lock.Lock()
+		defer s.Lock.Unlock()
+	}
 	if s.Push && !s.Apply {
 		return Mutation{}, fmt.Errorf("push requires apply")
 	}

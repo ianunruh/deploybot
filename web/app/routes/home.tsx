@@ -8,6 +8,7 @@ import { PageHeader } from "~/ui/page-header";
 import { RelativeTime } from "~/ui/relative-time";
 import { ReleaseFlowInline } from "~/ui/release-flow";
 import { ResourceTable, Table } from "~/ui/resource-table";
+import { UpdateBadge } from "~/ui/status-badge";
 
 export function meta(_args: Route.MetaArgs) {
   return [{ title: "deploybot" }];
@@ -47,9 +48,17 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         {deployables.map((d) => (
           <Table.Tr key={d.name}>
             <Table.Td>
-              <Text component={Link} to={`/deployables/${d.name}`} fw={600} c="accent.4">
-                {d.name}
-              </Text>
+              <Group gap="xs" wrap="nowrap">
+                <Text
+                  component={Link}
+                  to={`/deployables/${d.name}`}
+                  fw={600}
+                  c="accent.4"
+                >
+                  {d.name}
+                </Text>
+                {d.update?.stale ? <UpdateBadge stale /> : null}
+              </Group>
             </Table.Td>
             <Table.Td>{d.namespace}</Table.Td>
             <Table.Td>

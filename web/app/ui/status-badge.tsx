@@ -12,6 +12,36 @@ const STATUS_COLORS: Record<string, string> = {
   Unknown: "gray",
 };
 
+export function UpdateBadge({ stale, error }: { stale?: boolean; error?: boolean }) {
+  const color = error ? "red" : stale ? "orange" : "teal";
+  const label = error ? "error" : stale ? "behind" : "up-to-date";
+  return (
+    <Badge
+      color={color}
+      variant="light"
+      size="sm"
+      radius="sm"
+      tt="uppercase"
+      styles={{
+        root: {
+          fontFamily: "inherit",
+          letterSpacing: "0.04em",
+          maxWidth: "none",
+          overflow: "visible",
+          flexShrink: 0,
+        },
+        label: {
+          overflow: "visible",
+          textOverflow: "unset",
+          whiteSpace: "nowrap",
+        },
+      }}
+    >
+      {label}
+    </Badge>
+  );
+}
+
 export function StatusBadge({ status, href }: { status: string; href?: string }) {
   const color = STATUS_COLORS[status] ?? "gray";
   const badge = (

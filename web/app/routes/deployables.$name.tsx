@@ -10,9 +10,9 @@ import {
   getDeployableHistory,
   pinDeployable,
   promoteDeployable,
-  type DeployableHistory,
   type ImageVersion,
   type MutationResult,
+  type UpdateStatus as RegistryUpdate,
 } from "~/lib/api.server";
 import { notifyActionError, notifyActionSuccess } from "~/lib/action-feedback";
 import { formatAbsolute } from "~/lib/time";
@@ -37,7 +37,7 @@ import {
 import { PageHeader } from "~/ui/page-header";
 import { RelativeTime } from "~/ui/relative-time";
 import { ResourceTable, Table } from "~/ui/resource-table";
-import { StatusBadge } from "~/ui/status-badge";
+import { StatusBadge, UpdateBadge } from "~/ui/status-badge";
 
 export function meta({ params }: Route.MetaArgs) {
   return [{ title: `${params.name} · deploybot` }];
@@ -118,6 +118,28 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 const deployablesCrumb = { label: "Deployables", to: "/" };
+
+function RegistryUpdateHint({ update }: { update: RegistryUpdate }) {
+  const interval = update.auto ? ` Auto-pin ${update.auto}.` : "";
+  let body: string;
+  if (update.error) {
+    body = `Registry check failed: ${update.error}`;
+  } else if (update.stale && update.newest?.tag) {
+    body = `${update.stage} is behind ${update.newest.tag}.${interval}`;
+  } else if (update.newest) {
+    body = `Up to date with registry.${interval}`;
+  } else {
+    body = `Tracking registry updates.${interval}`;
+  }
+  return (
+    <Group gap="xs" wrap="nowrap">
+      <UpdateBadge stale={update.stale} />
+      <Text size="sm" c="dimmed">
+        {body}
+      </Text>
+    </Group>
+  );
+}
 
 export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
   const { status, error, history, historyError } = loaderData;
@@ -213,6 +235,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
             <Text size="sm" c="dimmed">
               {status.namespace} · {status.imageRepo}
             </Text>
+            {status.update != null ? <RegistryUpdateHint update={status.update} /> : null}
             <DeployableLinkLabels
               repoURL={status.repoURL}
               projectURL={status.projectURL}

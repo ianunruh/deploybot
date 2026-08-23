@@ -1,6 +1,6 @@
 import { AppShell, Box, Burger, Group, NavLink, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { IconRocket } from "@tabler/icons-react";
+import { IconRefresh, IconRocket } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigation } from "react-router";
 
@@ -37,6 +37,15 @@ export function AppChrome({ children }: { children: ReactNode }) {
           leftSection={<IconRocket size={16} />}
           active={
             location.pathname === "/" || location.pathname.startsWith("/deployables")
+          }
+        />
+        <NavLink
+          component={Link}
+          to="/updates"
+          label="Updates"
+          leftSection={<IconRefresh size={16} />}
+          active={
+            location.pathname === "/updates" || location.pathname.startsWith("/updates")
           }
         />
       </AppShell.Navbar>

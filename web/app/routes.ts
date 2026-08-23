@@ -2,6 +2,7 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
 export default [
   index("routes/home.tsx"),
+  route("updates", "routes/updates.tsx"),
   route("deployables/:name", "routes/deployables.$name.tsx"),
   route("deployables/:name/images", "routes/deployables.$name.images.ts"),
   route(
