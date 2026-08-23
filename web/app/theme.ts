@@ -1,4 +1,10 @@
-import { createTheme, type MantineColorsTuple } from "@mantine/core";
+import {
+  Cascader,
+  createTheme,
+  MultiSelect,
+  Select,
+  type MantineColorsTuple,
+} from "@mantine/core";
 
 const accent: MantineColorsTuple = [
   "#e6fffa",
@@ -32,5 +38,16 @@ export const theme = createTheme({
     consoleBg: "#0b0d0f",
     consolePanel: "#12151a",
     consoleBorder: "#1e242c",
+  },
+  components: {
+    Select: Select.extend({
+      defaultProps: { checkIconPosition: "right" },
+    }),
+    MultiSelect: MultiSelect.extend({
+      defaultProps: { checkIconPosition: "right" },
+    }),
+    Cascader: Cascader.extend({
+      defaultProps: { checkIconPosition: "right" },
+    }),
   },
 });
