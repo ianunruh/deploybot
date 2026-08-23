@@ -41,24 +41,39 @@ patches:
 	}
 }
 
-func TestKMCOmitsPodWiring(t *testing.T) {
+func TestPinIsOnlyOverlayImageDiff(t *testing.T) {
 	t.Parallel()
 	d := loadExample(t, "kmc")
-	tree, err := Render(d)
+	before, err := Render(d)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := tree["k8s/kmc/overlays/prod/patch-volumes.yaml"]; ok {
-		t.Fatal("render must not emit patch-volumes.yaml")
+	after, err := Render(d)
+	if err != nil {
+		t.Fatal(err)
 	}
-	dep := string(tree["k8s/kmc/base/deployment.yaml"])
-	for _, refuse := range []string{"envFrom:", "KMC_CLUSTERS_CONFIG", "volumeMounts:", "kmc-clusters", "cluster-tokens"} {
-		if strings.Contains(dep, refuse) {
-			t.Fatalf("generated deployment must not include %q:\n%s", refuse, dep)
+	ref := image.MustParse("ghcr.io/ianunruh/kmc:main-abc123@sha256:deadbeef")
+	if err := Pin(after, d, "homelab", ref); err != nil {
+		t.Fatal(err)
+	}
+	changed := 0
+	for _, p := range SortedPaths(after) {
+		if string(before[p]) == string(after[p]) {
+			continue
+		}
+		changed++
+		if p != OverlayKustomizationPath(d, "homelab") {
+			t.Fatalf("pin changed unexpected file %s", p)
 		}
 	}
-	prodKust := string(tree["k8s/kmc/overlays/prod/kustomization.yaml"])
-	if strings.Contains(prodKust, "patch-volumes.yaml") {
-		t.Fatalf("prod overlay must not list volume patch:\n%s", prodKust)
+	if changed != 1 {
+		t.Fatalf("pin changed %d files, want 1", changed)
+	}
+	got, err := CurrentImage(after, d, "homelab")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != ref {
+		t.Fatalf("current image %+v want %+v", got, ref)
 	}
 }

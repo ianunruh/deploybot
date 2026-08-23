@@ -136,3 +136,25 @@ func imageNode(img kustomizeImage) *yaml.Node {
 	addKV("digest", img.Digest)
 	return n
 }
+
+func CurrentImage(tree Tree, d *spec.Deployable, stage string) (image.Ref, error) {
+	p := OverlayKustomizationPath(d, stage)
+	b, ok := tree[p]
+	if !ok {
+		return image.Ref{}, fmt.Errorf("no overlay kustomization for stage %s", stage)
+	}
+	var k kustomization
+	if err := yamlx.Unmarshal(b, &k); err != nil {
+		return image.Ref{}, err
+	}
+	for _, img := range k.Images {
+		if img.Name == d.Spec.Image.Repository || img.Name == "" {
+			repo := d.Spec.Image.Repository
+			if img.NewName != "" {
+				repo = img.NewName
+			}
+			return image.Ref{Repository: repo, Tag: img.NewTag, Digest: img.Digest}, nil
+		}
+	}
+	return image.Ref{}, fmt.Errorf("stage %s has no pinned image", stage)
+}
