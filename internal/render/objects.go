@@ -23,6 +23,32 @@ type deploySpec struct {
 	Template podTemplate `yaml:"template"`
 }
 
+// volumePatchDoc is a strategic-merge patch: only mount fields, never replicas/image.
+type volumePatchDoc struct {
+	APIVersion string          `yaml:"apiVersion"`
+	Kind       string          `yaml:"kind"`
+	Metadata   objectMeta      `yaml:"metadata"`
+	Spec       volumePatchSpec `yaml:"spec"`
+}
+
+type volumePatchSpec struct {
+	Template volumePatchTemplate `yaml:"template"`
+}
+
+type volumePatchTemplate struct {
+	Spec volumePatchPod `yaml:"spec"`
+}
+
+type volumePatchPod struct {
+	Containers []volumePatchContainer `yaml:"containers"`
+	Volumes    []podVolume            `yaml:"volumes"`
+}
+
+type volumePatchContainer struct {
+	Name         string        `yaml:"name"`
+	VolumeMounts []volumeMount `yaml:"volumeMounts"`
+}
+
 type labelSel struct {
 	MatchLabels map[string]string `yaml:"matchLabels"`
 }

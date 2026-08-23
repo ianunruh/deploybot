@@ -114,16 +114,7 @@ func writeArgo(out Tree, d *spec.Deployable) error {
 	if err != nil {
 		return err
 	}
-	baseKust, err := yamlx.MarshalGenerated(kustomization{
-		APIVersion: "kustomize.config.k8s.io/v1beta1",
-		Kind:       "Kustomization",
-		Resources:  []string{d.Metadata.Name + ".yaml"},
-	})
-	if err != nil {
-		return err
-	}
 	out[path.Join(appPath, "base", d.Metadata.Name+".yaml")] = baseApp
-	out[path.Join(appPath, "base/kustomization.yaml")] = baseKust
 
 	for _, st := range d.Spec.Stages {
 		patchApp, err := yamlx.MarshalGenerated(application{
@@ -139,15 +130,6 @@ func writeArgo(out Tree, d *spec.Deployable) error {
 		}
 		dir := path.Join(appPath, "overlays", st.Name)
 		out[path.Join(dir, d.Metadata.Name+".yaml")] = patchApp
-		okust, err := yamlx.MarshalGenerated(kustomization{
-			APIVersion: "kustomize.config.k8s.io/v1beta1",
-			Kind:       "Kustomization",
-			Resources:  []string{"../../base", d.Metadata.Name + ".yaml"},
-		})
-		if err != nil {
-			return err
-		}
-		out[path.Join(dir, "kustomization.yaml")] = okust
 	}
 	return nil
 }
@@ -342,7 +324,7 @@ func routePatches(base, st spec.Stage) []jsonPatchOp {
 	return ops
 }
 
-func volumePatch(d *spec.Deployable, vols []spec.Volume) deployment {
+func volumePatch(d *spec.Deployable, vols []spec.Volume) volumePatchDoc {
 	var mounts []volumeMount
 	var volumes []podVolume
 	for _, v := range vols {
@@ -353,14 +335,14 @@ func volumePatch(d *spec.Deployable, vols []spec.Volume) deployment {
 		})
 		volumes = append(volumes, podVolumeFromSpec(v))
 	}
-	return deployment{
+	return volumePatchDoc{
 		APIVersion: "apps/v1",
 		Kind:       "Deployment",
 		Metadata:   objectMeta{Name: d.Metadata.Name},
-		Spec: deploySpec{
-			Template: podTemplate{
-				Spec: podSpec{
-					Containers: []container{{
+		Spec: volumePatchSpec{
+			Template: volumePatchTemplate{
+				Spec: volumePatchPod{
+					Containers: []volumePatchContainer{{
 						Name:         d.Spec.Workload.ContainerName,
 						VolumeMounts: mounts,
 					}},
@@ -400,36 +382,6 @@ func applicationObj(d *spec.Deployable, st spec.Stage) application {
 		app.Spec.SyncPolicy = &syncPolicy{SyncOptions: []string{"CreateNamespace=true"}}
 	}
 	return app
-}
-
-// Pin writes the image override into the stage overlay kustomization.
-func Pin(tree Tree, d *spec.Deployable, stage string, ref image.Ref) error {
-	if _, err := d.Stage(stage); err != nil {
-		return err
-	}
-	p := OverlayKustomizationPath(d, stage)
-	existing := tree[p]
-	var k kustomization
-	if len(existing) > 0 {
-		if err := yamlx.Unmarshal(existing, &k); err != nil {
-			return fmt.Errorf("parse %s: %w", p, err)
-		}
-	}
-	img := kustomizeImage{
-		Name:   d.Spec.Image.Repository,
-		NewTag: ref.Tag,
-		Digest: ref.Digest,
-	}
-	if ref.Repository != "" && ref.Repository != d.Spec.Image.Repository {
-		img.NewName = ref.Repository
-	}
-	k.Images = upsertImage(k.Images, img)
-	b, err := yamlx.MarshalGenerated(k)
-	if err != nil {
-		return err
-	}
-	tree[p] = b
-	return nil
 }
 
 func upsertImage(images []kustomizeImage, img kustomizeImage) []kustomizeImage {

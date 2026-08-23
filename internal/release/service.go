@@ -148,7 +148,7 @@ func (s *Service) Diff(name, stage, imageRef string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	before, err := s.workingTree(d)
+	before, err := s.overlayTree(d)
 	if err != nil {
 		return "", err
 	}
@@ -163,7 +163,7 @@ func (s *Service) Diff(name, stage, imageRef string) (string, error) {
 }
 
 func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string, edit func(render.Tree) error, syncStage string) (Mutation, error) {
-	before, err := s.workingTree(d)
+	before, err := s.overlayTree(d)
 	if err != nil {
 		return Mutation{}, err
 	}
@@ -185,12 +185,8 @@ func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string
 	if s.OpsRepo == "" {
 		return Mutation{}, fmt.Errorf("DEPLOYBOT_OPS_REPO is required to apply")
 	}
-	generated, err := render.Render(d)
-	if err != nil {
-		return Mutation{}, err
-	}
 	toWrite := render.Tree{}
-	for p := range generated {
+	for _, p := range mut.Files {
 		toWrite[p] = after[p]
 	}
 	res, err := gitwrite.Write(s.OpsRepo, toWrite, message, s.author())
@@ -211,18 +207,40 @@ func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string
 }
 
 func (s *Service) workingTree(d *spec.Deployable) (render.Tree, error) {
+	return s.overlayTree(d)
+}
+
+// overlayTree is the stage overlay kustomizations only. Pin/promote must not
+// rewrite workload YAML or shared Argo project kustomizations.
+func (s *Service) overlayTree(d *spec.Deployable) (render.Tree, error) {
+	paths := make([]string, 0, len(d.Spec.Stages))
+	for _, st := range d.Spec.Stages {
+		paths = append(paths, render.OverlayKustomizationPath(d, st.Name))
+	}
+	out := render.Tree{}
+	if s.OpsRepo != "" {
+		existing, err := gitwrite.ReadPaths(s.OpsRepo, paths)
+		if err != nil {
+			return nil, err
+		}
+		for p, b := range existing {
+			out[p] = b
+		}
+	}
+	if len(out) == len(paths) {
+		return out, nil
+	}
 	generated, err := render.Render(d)
 	if err != nil {
 		return nil, err
 	}
-	if s.OpsRepo == "" {
-		return generated, nil
+	for _, p := range paths {
+		if _, ok := out[p]; ok {
+			continue
+		}
+		out[p] = generated[p]
 	}
-	existing, err := gitwrite.ReadPaths(s.OpsRepo, render.SortedPaths(generated))
-	if err != nil {
-		return nil, err
-	}
-	return render.MergeTrees(existing, generated)
+	return out, nil
 }
 
 func (s *Service) author() gitwrite.Author {
