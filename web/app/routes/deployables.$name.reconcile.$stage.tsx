@@ -1,4 +1,5 @@
 import { Alert, Button, Group, Stack, Text } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
 import { Link, useFetcher, useRevalidator } from "react-router";
 
@@ -11,6 +12,7 @@ import {
 } from "~/lib/api.server";
 import { notifyActionError, notifyActionSuccess } from "~/lib/action-feedback";
 import { useFetcherResult } from "~/lib/use-fetcher-result";
+import { ConfirmActionModal } from "~/ui/confirm-action-modal";
 import { DiffPanel } from "~/ui/diff-panel";
 import {
   ArgoSyncCheckbox,
@@ -83,6 +85,7 @@ export default function ReconcileStage({ loaderData, params }: Route.ComponentPr
   const { status, preview, error } = loaderData;
   const revalidator = useRevalidator();
   const fetcher = useFetcher<ActionData>();
+  const [reconcileOpen, reconcileHandlers] = useDisclosure(false);
   const [syncArgo, setSyncArgo] = useState(true);
 
   useFetcherResult(fetcher, (data) => {
@@ -94,6 +97,7 @@ export default function ReconcileStage({ loaderData, params }: Route.ComponentPr
       "Reconcile",
       `Wrote manifests${mutationNote(data.result, { argoAvailable: status?.sync })}`,
     );
+    reconcileHandlers.close();
     void revalidator.revalidate();
   });
 
@@ -118,8 +122,6 @@ export default function ReconcileStage({ loaderData, params }: Route.ComponentPr
   const files = preview.files ?? [];
   const hasChanges = files.length > 0 && Boolean(preview.diff);
   const committing = fetcher.state !== "idle";
-  const canCommit = status.apply && hasChanges && !committing;
-  const willSync = status.apply && status.sync && syncArgo;
   const stageArgoURL = status.stages.find((s) => s.name === params.stage)?.argoURL;
 
   return (
@@ -134,43 +136,19 @@ export default function ReconcileStage({ loaderData, params }: Route.ComponentPr
               Back
             </Button>
             <Button
-              disabled={!canCommit}
-              loading={committing}
+              disabled={!hasChanges}
               onClick={() => {
-                void fetcher.submit(
-                  {
-                    intent: "reconcile",
-                    ...(status.sync ? { sync: syncArgo ? "true" : "false" } : {}),
-                  },
-                  { method: "post" },
-                );
+                setSyncArgo(true);
+                reconcileHandlers.open();
               }}
             >
-              {mutationCommitLabel(status, "reconcile", willSync)}
+              Reconcile
             </Button>
           </Group>
         }
       />
 
       <MutationModeAlert apply={status.apply} push={status.push} />
-
-      {hasChanges ? (
-        <Stack gap="sm">
-          <ArgoSyncCheckbox
-            show={status.apply && status.sync}
-            checked={syncArgo}
-            onChange={setSyncArgo}
-            stage={params.stage}
-            argoURL={stageArgoURL}
-          />
-          <MutationGitHint
-            apply={status.apply}
-            push={status.push}
-            sync={willSync}
-            syncStage={params.stage}
-          />
-        </Stack>
-      ) : null}
 
       {!hasChanges ? (
         <Alert color="gray" title="Already reconciled">
@@ -194,6 +172,46 @@ export default function ReconcileStage({ loaderData, params }: Route.ComponentPr
       ) : null}
 
       <DiffPanel diff={preview.diff ?? ""} title="Reconcile preview" maxHeight="60vh" />
+
+      <ConfirmActionModal
+        opened={reconcileOpen}
+        onClose={reconcileHandlers.close}
+        loading={committing}
+        title={`Reconcile ${status.name}`}
+        confirmLabel={mutationCommitLabel(status, "reconcile", status.sync && syncArgo)}
+        confirmDisabled={!hasChanges}
+        argoURL={stageArgoURL}
+        message={
+          <Stack gap="sm">
+            <Text size="sm">
+              Write generated manifests for <strong>{params.stage}</strong> (
+              {files.length} file{files.length === 1 ? "" : "s"}). Shared workload base is
+              included; other stage overlays are left alone.
+            </Text>
+            <ArgoSyncCheckbox
+              show={status.apply && status.sync}
+              checked={syncArgo}
+              onChange={setSyncArgo}
+              stage={params.stage}
+            />
+            <MutationGitHint
+              apply={status.apply}
+              push={status.push}
+              sync={status.sync && syncArgo}
+              syncStage={params.stage}
+            />
+          </Stack>
+        }
+        onConfirm={() => {
+          void fetcher.submit(
+            {
+              intent: "reconcile",
+              ...(status.sync ? { sync: syncArgo ? "true" : "false" } : {}),
+            },
+            { method: "post" },
+          );
+        }}
+      />
     </Stack>
   );
 }

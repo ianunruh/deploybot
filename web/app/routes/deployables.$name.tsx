@@ -285,7 +285,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         title={`Pin ${status.name}`}
         confirmLabel={mutationCommitLabel(status, "pin", status.sync && pinSync)}
         confirmDisabled={!selectedImage.trim() || imagesLoading}
-        size="lg"
+        argoURL={stages.find((s) => s.name === stageValue)?.argoURL}
         message={
           <Stack gap="sm">
             <Select
@@ -354,7 +354,6 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
               checked={pinSync}
               onChange={setPinSync}
               stage={stageValue}
-              argoURL={stages.find((s) => s.name === stageValue)?.argoURL}
             />
             <MutationGitHint
               apply={status.apply}
@@ -383,6 +382,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         loading={promoteFetcher.state !== "idle"}
         title={`Promote ${status.name}`}
         confirmLabel={mutationCommitLabel(status, "promote", status.sync && promoteSync)}
+        argoURL={toStage?.argoURL}
         message={
           fromStage && toStage ? (
             <Stack gap="sm">
@@ -397,7 +397,6 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
                 checked={promoteSync}
                 onChange={setPromoteSync}
                 stage={toStage.name}
-                argoURL={toStage.argoURL}
               />
               <MutationGitHint
                 apply={status.apply}

@@ -1,4 +1,4 @@
-import { Anchor, Checkbox, Text } from "@mantine/core";
+import { Checkbox, Text } from "@mantine/core";
 
 import type { MutationResult } from "~/lib/api.server";
 
@@ -8,8 +8,7 @@ export function mutationCommitLabel(
   syncArgo: boolean,
 ): string {
   if (!status.apply) return `Preview ${action}`;
-  if (status.push && syncArgo) return "Commit, push, and sync Argo";
-  if (!status.push && syncArgo) return "Commit and sync Argo";
+  if (syncArgo) return "Commit and sync Argo";
   if (status.push) return `Commit and push ${action}`;
   return `Commit ${action}`;
 }
@@ -20,7 +19,7 @@ export function mutationNote(
 ): string {
   if (result?.dryRun) return " (dry-run)";
   let note = "";
-  if (result?.pushed) note += " and pushed";
+  if (result?.pushed && !result?.synced) note += " and pushed";
   if (result?.synced) note += " and synced Argo";
   else if (opts?.argoAvailable) note += " (Argo not synced)";
   return note;
@@ -71,13 +70,11 @@ export function ArgoSyncCheckbox({
   checked,
   onChange,
   stage,
-  argoURL,
 }: {
   show: boolean;
   checked: boolean;
   onChange: (checked: boolean) => void;
   stage?: string;
-  argoURL?: string;
 }) {
   if (!show) return null;
   const where = stage ? ` on ${stage}` : "";
@@ -86,22 +83,7 @@ export function ArgoSyncCheckbox({
       checked={checked}
       onChange={(e) => onChange(e.currentTarget.checked)}
       label={`Sync Argo CD${where} after commit`}
-      description={
-        <>
-          Waits until the app is healthy. Uncheck to review the Argo diff first
-          {argoURL ? (
-            <>
-              {" "}
-              (
-              <Anchor href={argoURL} target="_blank" rel="noreferrer">
-                open Argo
-              </Anchor>
-              )
-            </>
-          ) : null}
-          .
-        </>
-      }
+      description="Waits until the app is healthy. Uncheck to review the Argo diff first."
     />
   );
 }

@@ -10,7 +10,8 @@ export function ConfirmActionModal({
   confirmLabel = "Confirm",
   confirmColor = "accent",
   confirmDisabled,
-  size = "md",
+  size = "lg",
+  argoURL,
   message,
 }: {
   opened: boolean;
@@ -22,24 +23,38 @@ export function ConfirmActionModal({
   confirmColor?: string;
   confirmDisabled?: boolean;
   size?: string;
+  argoURL?: string;
   message: ReactNode;
 }) {
   return (
     <Modal opened={opened} onClose={onClose} title={title} centered size={size}>
       <Stack gap="md">
         {message}
-        <Group justify="flex-end">
-          <Button variant="default" onClick={onClose} disabled={loading}>
-            Cancel
-          </Button>
-          <Button
-            color={confirmColor}
-            loading={loading}
-            disabled={confirmDisabled}
-            onClick={onConfirm}
-          >
-            {confirmLabel}
-          </Button>
+        <Group>
+          {argoURL ? (
+            <Button
+              component="a"
+              href={argoURL}
+              target="_blank"
+              rel="noreferrer"
+              variant="default"
+            >
+              Open Argo
+            </Button>
+          ) : null}
+          <Group gap="sm" ml="auto">
+            <Button variant="default" onClick={onClose} disabled={loading}>
+              Cancel
+            </Button>
+            <Button
+              color={confirmColor}
+              loading={loading}
+              disabled={confirmDisabled}
+              onClick={onConfirm}
+            >
+              {confirmLabel}
+            </Button>
+          </Group>
         </Group>
       </Stack>
     </Modal>
