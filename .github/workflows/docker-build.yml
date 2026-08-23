@@ -52,6 +52,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push ${{ matrix.name }} image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.context }}
@@ -61,3 +62,75 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      - name: Save image ref
+        run: |
+          set -euo pipefail
+          if [[ -z "${DIGEST}" ]]; then
+            echo "build-push-action did not emit a digest" >&2
+            exit 1
+          fi
+          mkdir -p refs
+          sha_tag="main-${GITHUB_SHA:0:7}"
+          echo "${REGISTRY}/${GITHUB_REPOSITORY}${SUFFIX}:${sha_tag}@${DIGEST}" > "refs/${{ matrix.name }}"
+        env:
+          SUFFIX: ${{ matrix.image_suffix }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+
+      - name: Upload image ref
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-ref-${{ matrix.name }}
+          path: refs/${{ matrix.name }}
+          if-no-files-found: error
+          retention-days: 1
+
+  pin-homelab:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DEPLOYBOT_URL: https://deploy-api.k8s.kcloud.io
+    steps:
+      - name: Download image refs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: image-ref-*
+          merge-multiple: true
+          path: refs
+
+      - name: Pin homelab
+        run: |
+          set -euo pipefail
+          aud=$(jq -nr --arg a "$DEPLOYBOT_URL" '$a|@uri')
+          token=$(curl -fsSL \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            -H "Accept: application/json; api-version=2.0" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${aud}" | jq -r .value)
+          if [[ -z "$token" || "$token" == "null" ]]; then
+            echo "failed to mint GitHub OIDC token" >&2
+            exit 1
+          fi
+          pin() {
+            local name="$1" image http_code
+            image=$(cat "refs/$2")
+            echo "pinning ${name} homelab -> ${image}"
+            http_code=$(curl -sS -o /tmp/pin-out -w '%{http_code}' \
+              -X POST \
+              -H "Authorization: Bearer ${token}" \
+              -H "Content-Type: application/json" \
+              --max-time 600 \
+              --data "$(jq -n --arg image "$image" '{stage:"homelab",image:$image}')" \
+              "${DEPLOYBOT_URL}/api/v1/deployables/${name}/pin")
+            cat /tmp/pin-out
+            echo
+            if [[ "$http_code" != "200" ]]; then
+              echo "pin ${name} failed: HTTP ${http_code}" >&2
+              exit 1
+            fi
+          }
+          pin deploybot api
+          pin deploybot-web web
+

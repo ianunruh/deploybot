@@ -1,7 +1,8 @@
 # Thin deployable: generated Deployment + Argo Applications only.
 # Human extras live next to this file under deploybot/ (Service, SA, Argo
-# RBAC, git clone of kcloud-ops, kubeconfig). Secrets stay out of band
-# (gen-secrets.sh).
+# RBAC, git clone of kcloud-ops, kubeconfig). Prod overlay owns the public
+# API HTTPRoute + GitHub Actions OIDC SecurityPolicy. Secrets stay out of
+# band (gen-secrets.sh).
 apiVersion: deploybot.kcloud.io/v1alpha1
 kind: Deployable
 metadata:

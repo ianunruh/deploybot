@@ -1,0 +1,27 @@
+# Prod-only: GitHub Actions pin target. Console keeps using ClusterIP.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: deploybot
+  labels:
+    app.kubernetes.io/managed-by: deploybot
+    app.kubernetes.io/name: deploybot
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: external
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - deploy-api.k8s.kcloud.io
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      timeouts:
+        request: 600s
+      backendRefs:
+        - name: deploybot
+          port: 8080

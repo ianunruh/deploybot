@@ -84,7 +84,7 @@ go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1
 
 ## Images
 
-Push to `main` runs GitHub Actions: `CI` (Go test + golangci-lint, web `pnpm check`) and `Build and Push Docker Images` (same tags as kmc).
+Push to `main` runs GitHub Actions: `CI` (Go test + golangci-lint, web `pnpm check`) and `Build and Push Docker Images` (same tags as kmc), which then pins both images to homelab via prod `https://deploy-api.k8s.kcloud.io` (GitHub OIDC).
 
 | Image | Role |
 |-------|------|

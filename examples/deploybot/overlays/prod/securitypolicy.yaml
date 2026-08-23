@@ -1,0 +1,42 @@
+# GitHub Actions OIDC on the public API route. Console stays on ClusterIP
+# and does not send a JWT. edge-sso is Dex + k8s SA only, so this is a
+# one-off policy.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: deploybot-gha
+  labels:
+    app.kubernetes.io/managed-by: deploybot
+    app.kubernetes.io/name: deploybot
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: deploybot
+  jwt:
+    providers:
+      - name: github-actions
+        issuer: https://token.actions.githubusercontent.com
+        audiences:
+          - https://deploy-api.k8s.kcloud.io
+        remoteJWKS:
+          uri: https://token.actions.githubusercontent.com/.well-known/jwks
+        extractFrom:
+          headers:
+            - name: Authorization
+              valuePrefix: "Bearer "
+  authorization:
+    defaultAction: Deny
+    rules:
+      - name: allow-github-actions
+        action: Allow
+        principal:
+          jwt:
+            provider: github-actions
+            claims:
+              - name: repository
+                values:
+                  - ianunruh/deploybot
+              - name: ref
+                values:
+                  - refs/heads/main
