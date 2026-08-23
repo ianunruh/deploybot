@@ -62,7 +62,7 @@ func runServe(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	eps, err := argo.EndpointsFromConfig(file.Argo)
+	eps, err := argo.EndpointsFromConfig(file.Clusters)
 	if err != nil {
 		return err
 	}
@@ -72,16 +72,17 @@ func runServe(ctx context.Context, args []string) error {
 	hub := image.NewDockerHub()
 	hub.HTTPClient = httpClient
 	svc := &release.Service{
-		Catalog: cat,
-		OpsRepo: s.repo,
-		Apply:   s.apply,
-		Push:    s.push,
-		Sync:    s.sync,
-		Author:  gitwrite.DefaultAuthor(),
-		Argo:    eps,
-		Wait:    5 * time.Minute,
-		Images:  &image.Registry{GitHub: gh, DockerHub: hub},
-		Commits: gh,
+		Catalog:  cat,
+		OpsRepo:  s.repo,
+		Apply:    s.apply,
+		Push:     s.push,
+		Sync:     s.sync,
+		Author:   gitwrite.DefaultAuthor(),
+		Argo:     eps,
+		Clusters: file.Clusters,
+		Wait:     5 * time.Minute,
+		Images:   &image.Registry{GitHub: gh, DockerHub: hub},
+		Commits:  gh,
 	}
 	h := (&api.Server{Release: svc, Catalog: cat}).Handler()
 	srv := &http.Server{Addr: s.addr, Handler: h}

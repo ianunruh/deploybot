@@ -147,15 +147,18 @@ type Router interface {
 // Endpoints maps stage name -> Kubernetes Application client.
 type Endpoints map[string]*KubeClient
 
-func EndpointsFromConfig(stages map[string]config.Argo) (Endpoints, error) {
+func EndpointsFromConfig(clusters map[string]config.Cluster) (Endpoints, error) {
 	out := Endpoints{}
-	for name, st := range stages {
+	for name, cl := range clusters {
 		name = strings.ToLower(strings.TrimSpace(name))
 		if name == "" {
 			continue
 		}
-		ui := strings.TrimRight(st.URL, "/")
-		k, err := kubeClientFor(st, name, ui)
+		if cl.Argo == (config.Argo{}) {
+			continue
+		}
+		ui := strings.TrimRight(cl.Argo.URL, "/")
+		k, err := kubeClientFor(cl.Argo, name, ui)
 		if err != nil {
 			return nil, err
 		}

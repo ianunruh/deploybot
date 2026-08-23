@@ -107,9 +107,9 @@ func TestEndpointsFromConfig(t *testing.T) {
 	t.Setenv("DEPLOYBOT_ARGO_URL_HOMELAB", "")
 	t.Setenv("DEPLOYBOT_ARGO_URL_PROD", "")
 
-	eps, err := EndpointsFromConfig(map[string]config.Argo{
-		"homelab": {URL: "https://argocd.k8s.kcloud.zone"},
-		"prod":    {URL: "https://argocd.k8s.kcloud.io", KubeContext: "prod-sjc1", Namespace: "argocd"},
+	eps, err := EndpointsFromConfig(map[string]config.Cluster{
+		"homelab": {Argo: config.Argo{URL: "https://argocd.k8s.kcloud.zone"}},
+		"prod":    {Argo: config.Argo{URL: "https://argocd.k8s.kcloud.io", KubeContext: "prod-sjc1", Namespace: "argocd"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -127,9 +127,9 @@ func TestEndpointsFromConfig(t *testing.T) {
 	}
 
 	t.Setenv("DEPLOYBOT_ARGO_URL_HOMELAB", "https://argo.override.zone")
-	eps, err = EndpointsFromConfig(map[string]config.Argo{
-		"homelab": {URL: "https://argocd.k8s.kcloud.zone"},
-		"prod":    {URL: "https://argocd.k8s.kcloud.io", KubeContext: "prod-sjc1"},
+	eps, err = EndpointsFromConfig(map[string]config.Cluster{
+		"homelab": {Argo: config.Argo{URL: "https://argocd.k8s.kcloud.zone"}},
+		"prod":    {Argo: config.Argo{URL: "https://argocd.k8s.kcloud.io", KubeContext: "prod-sjc1"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -142,8 +142,21 @@ func TestEndpointsFromConfig(t *testing.T) {
 
 func TestEndpointsSkipsMissingKubeconfig(t *testing.T) {
 	t.Setenv("KUBECONFIG", filepath.Join(t.TempDir(), "missing"))
-	eps, err := EndpointsFromConfig(map[string]config.Argo{
-		"homelab": {URL: "https://argocd.k8s.kcloud.zone"},
+	eps, err := EndpointsFromConfig(map[string]config.Cluster{
+		"homelab": {Argo: config.Argo{URL: "https://argocd.k8s.kcloud.zone"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if eps.ForStage("homelab") != nil {
+		t.Fatalf("got %+v", eps.ForStage("homelab"))
+	}
+}
+
+func TestEndpointsSkipsClusterWithoutArgo(t *testing.T) {
+	t.Setenv("KUBECONFIG", writeKubeconfig(t, testKubeconfig))
+	eps, err := EndpointsFromConfig(map[string]config.Cluster{
+		"homelab": {Headlamp: config.Headlamp{URL: "https://headlamp.k8s.kcloud.zone"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -155,8 +168,8 @@ func TestEndpointsSkipsMissingKubeconfig(t *testing.T) {
 
 func TestEndpointsUnknownKubeContext(t *testing.T) {
 	t.Setenv("KUBECONFIG", writeKubeconfig(t, testKubeconfig))
-	_, err := EndpointsFromConfig(map[string]config.Argo{
-		"prod": {URL: "https://argocd.k8s.kcloud.io", KubeContext: "nope"},
+	_, err := EndpointsFromConfig(map[string]config.Cluster{
+		"prod": {Argo: config.Argo{URL: "https://argocd.k8s.kcloud.io", KubeContext: "nope"}},
 	})
 	if err == nil {
 		t.Fatal("expected error")

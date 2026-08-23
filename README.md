@@ -22,7 +22,7 @@ Original intent and non-goals: [docs/goals.md](docs/goals.md).
 | `internal/` | Go: spec, render, pin, git write, Argo, HTTP API |
 | `web/` | React Router 8 + Mantine console |
 | `examples/` | Deployable specs and overlay patches |
-| `deploybot.yaml` | Process config (Argo UI URLs, kube contexts). GitHub tokens stay in env |
+| `deploybot.yaml` | Process config (per-cluster Argo / Headlamp / Grafana URLs, kube contexts). GitHub tokens stay in env |
 | `Dockerfile` | API image: `ghcr.io/ianunruh/deploybot` |
 | `web/Dockerfile` | Console image: `ghcr.io/ianunruh/deploybot-web` |
 
@@ -52,22 +52,36 @@ branch; it never force-pushes. `--sync` talks to Argo. Default is dry-run. For
 `serve`, set `DEPLOYBOT_APPLY=1`, `DEPLOYBOT_PUSH=1`, and `DEPLOYBOT_SYNC=1`.
 
 Process config is YAML (`deploybot.yaml` or `--config` / `DEPLOYBOT_CONFIG`).
-Flags override env, env overrides the file. Argo CD origins live in the file:
+Flags override env, env overrides the file. Clusters live in the file:
 
 ```yaml
-argo:
+clusters:
   homelab:
-    url: https://argocd.k8s.kcloud.zone
+    argo:
+      url: https://argocd.k8s.kcloud.zone
+    headlamp:
+      url: https://headlamp.k8s.kcloud.zone
+    grafana:
+      url: https://grafana.k8s.kcloud.zone
+      logs: true
   prod:
-    url: https://argocd.k8s.kcloud.io
-    kubeContext: prod-sjc1
+    argo:
+      url: https://argocd.k8s.kcloud.io
+      kubeContext: prod-sjc1
+    headlamp:
+      url: https://headlamp.k8s.kcloud.io
+    grafana:
+      url: https://grafana.k8s.kcloud.io
 ```
 
-`url` is the Argo CD UI. Status and sync talk to Application CRs through
-kubeconfig (`KUBECONFIG` or `~/.kube/config`) — there is no Argo API token.
-`kubeContext` defaults to the stage name; `namespace` defaults to `argocd`.
-Optional `kubeconfig:` points at a specific file.
-`DEPLOYBOT_ARGO_URL_<STAGE>` overrides a stage UI URL.
+Cluster names match promotion stages. `argo.url` is the Argo CD UI. Status
+and sync talk to Application CRs through kubeconfig (`KUBECONFIG` or
+`~/.kube/config`) — there is no Argo API token. `kubeContext` defaults to the
+cluster name; `namespace` defaults to `argocd`. Optional `kubeconfig:` points
+at a specific file. `DEPLOYBOT_ARGO_URL_<CLUSTER>` overrides a cluster UI URL.
+Headlamp and Grafana `url` values are UI origins; observability links append
+paths and query params. Grafana `logs: true` adds the Loki namespace
+drilldown (homelab only today).
 
 The pin picker lists published tags (newest first). `ghcr.io/…` uses the
 GitHub Packages API; `docker.io/…` (including `lscr.io/…` and unprefixed

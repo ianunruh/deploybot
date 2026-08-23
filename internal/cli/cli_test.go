@@ -78,7 +78,7 @@ func TestRunConfigArgoYAML(t *testing.T) {
 	isolateEnv(t)
 	dir := t.TempDir()
 	cfg := filepath.Join(dir, "deploybot.yaml")
-	body := []byte("argo:\n  homelab:\n    url: https://argocd.k8s.kcloud.zone\n")
+	body := []byte("clusters:\n  homelab:\n    argo:\n      url: https://argocd.k8s.kcloud.zone\n")
 	if err := os.WriteFile(cfg, body, 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -29,7 +29,9 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 		if len(stages) == 0 {
 			for _, st := range d.Spec.Stages {
 				ss := release.StageStatus{Name: st.Name, Hostname: st.Hostname}
-				ss.HeadlampURL, ss.GrafanaURL, ss.LogsURL = release.ObservabilityURLs(st.Name, d.Spec.Namespace)
+				if s.Release != nil {
+					ss.HeadlampURL, ss.GrafanaURL, ss.LogsURL = s.Release.Observability(st.Name, d.Spec.Namespace)
+				}
 				stages = append(stages, ss)
 			}
 		}

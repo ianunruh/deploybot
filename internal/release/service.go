@@ -1,11 +1,13 @@
 package release
 
 import (
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/ianunruh/deploybot/internal/argo"
 	"github.com/ianunruh/deploybot/internal/catalog"
+	"github.com/ianunruh/deploybot/internal/config"
 	"github.com/ianunruh/deploybot/internal/gitwrite"
 	"github.com/ianunruh/deploybot/internal/image"
 )
@@ -18,6 +20,7 @@ type Service struct {
 	Sync      bool
 	Author    gitwrite.Author
 	Argo      argo.Router
+	Clusters  map[string]config.Cluster
 	Wait      time.Duration
 	FlowEvery time.Duration
 	Images    image.Lister
@@ -58,4 +61,21 @@ func (s *Service) author() gitwrite.Author {
 		return s.Author
 	}
 	return gitwrite.DefaultAuthor()
+}
+
+// Cluster returns process-config options for a promotion stage. Stage names
+// match cluster keys (homelab, prod). Missing names yield a zero Cluster.
+func (s *Service) Cluster(name string) config.Cluster {
+	if s == nil || s.Clusters == nil {
+		return config.Cluster{}
+	}
+	return s.Clusters[strings.ToLower(strings.TrimSpace(name))]
+}
+
+// Observability is Headlamp / Grafana / logs URLs for a stage namespace.
+func (s *Service) Observability(stage, namespace string) (headlamp, grafana, logs string) {
+	if s == nil {
+		return "", "", ""
+	}
+	return ObservabilityURLs(s.Cluster(stage), namespace)
 }

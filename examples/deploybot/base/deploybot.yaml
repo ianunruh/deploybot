@@ -1,8 +1,19 @@
 # In-cluster process config. Secrets stay in env / Secret deploybot-env.
 # kubeconfig is mounted next to this file at /config/kubeconfig.
-argo:
+clusters:
   homelab:
-    url: https://argocd.k8s.kcloud.zone
+    argo:
+      url: https://argocd.k8s.kcloud.zone
+    headlamp:
+      url: https://headlamp.k8s.kcloud.zone
+    grafana:
+      url: https://grafana.k8s.kcloud.zone
+      logs: true
   prod:
-    url: https://argocd.k8s.kcloud.io
-    kubeContext: prod-sjc1
+    argo:
+      url: https://argocd.k8s.kcloud.io
+      kubeContext: prod-sjc1
+    headlamp:
+      url: https://headlamp.k8s.kcloud.io
+    grafana:
+      url: https://grafana.k8s.kcloud.io

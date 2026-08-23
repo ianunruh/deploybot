@@ -91,7 +91,7 @@ func serviceFromFlags(fs *flag.FlagSet, flags mutFlags) (*release.Service, strin
 	if s.push && !s.apply {
 		return nil, "", fmt.Errorf("--push requires --apply")
 	}
-	eps, err := argo.EndpointsFromConfig(file.Argo)
+	eps, err := argo.EndpointsFromConfig(file.Clusters)
 	if err != nil {
 		return nil, "", err
 	}
@@ -104,14 +104,15 @@ func serviceFromFlags(fs *flag.FlagSet, flags mutFlags) (*release.Service, strin
 		return nil, "", err
 	}
 	return &release.Service{
-		Catalog: cat,
-		OpsRepo: s.repo,
-		Apply:   s.apply,
-		Push:    s.push,
-		Sync:    s.sync,
-		Author:  gitwrite.DefaultAuthor(),
-		Argo:    eps,
-		Wait:    5 * time.Minute,
+		Catalog:  cat,
+		OpsRepo:  s.repo,
+		Apply:    s.apply,
+		Push:     s.push,
+		Sync:     s.sync,
+		Author:   gitwrite.DefaultAuthor(),
+		Argo:     eps,
+		Clusters: file.Clusters,
+		Wait:     5 * time.Minute,
 	}, d.Metadata.Name, nil
 }
 

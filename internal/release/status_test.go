@@ -21,9 +21,10 @@ func TestStatusLinksAndArgoURL(t *testing.T) {
 	prod.UIBase = "https://argocd.k8s.kcloud.io"
 	prod.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced", DeployedAt: &prodAt})
 	svc := &Service{
-		Catalog: loadExamples(t),
-		Argo:    stageRouter{"homelab": homelab, "prod": prod},
-		Sync:    true,
+		Catalog:  loadExamples(t),
+		Argo:     stageRouter{"homelab": homelab, "prod": prod},
+		Clusters: testClusters(),
+		Sync:     true,
 	}
 	st, err := svc.Status(t.Context(), "kmc")
 	if err != nil {

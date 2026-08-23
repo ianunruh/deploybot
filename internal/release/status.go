@@ -123,7 +123,7 @@ func (s *Service) buildStatus(ctx context.Context, d *spec.Deployable, tree rend
 			Sync:     "unknown",
 			Health:   "unknown",
 		}
-		ss.HeadlampURL, ss.GrafanaURL, ss.LogsURL = ObservabilityURLs(st.Name, d.Spec.Namespace)
+		ss.HeadlampURL, ss.GrafanaURL, ss.LogsURL = s.Observability(st.Name, d.Spec.Namespace)
 		if img, err := render.CurrentImage(tree, d, st.Name); err == nil {
 			ss.Image = img.Compact()
 			refs[i] = img

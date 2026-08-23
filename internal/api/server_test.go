@@ -13,9 +13,23 @@ import (
 
 	"github.com/ianunruh/deploybot/internal/argo"
 	"github.com/ianunruh/deploybot/internal/catalog"
+	"github.com/ianunruh/deploybot/internal/config"
 	"github.com/ianunruh/deploybot/internal/image"
 	"github.com/ianunruh/deploybot/internal/release"
 )
+
+func testClusters() map[string]config.Cluster {
+	return map[string]config.Cluster{
+		"homelab": {
+			Headlamp: config.Headlamp{URL: "https://headlamp.k8s.kcloud.zone"},
+			Grafana:  config.Grafana{URL: "https://grafana.k8s.kcloud.zone", Logs: true},
+		},
+		"prod": {
+			Headlamp: config.Headlamp{URL: "https://headlamp.k8s.kcloud.io"},
+			Grafana:  config.Grafana{URL: "https://grafana.k8s.kcloud.io"},
+		},
+	}
+}
 
 func TestListAndGet(t *testing.T) {
 	t.Parallel()
@@ -27,7 +41,7 @@ func TestListAndGet(t *testing.T) {
 	}
 	s := &Server{
 		Catalog: cat,
-		Release: &release.Service{Catalog: cat},
+		Release: &release.Service{Catalog: cat, Clusters: testClusters()},
 	}
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)

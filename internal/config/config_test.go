@@ -8,18 +8,29 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestLoadArgoStages(t *testing.T) {
+func TestLoadClusters(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "deploybot.yaml")
 	body := []byte(`
-argo:
+clusters:
   homelab:
-    url: https://argocd.k8s.kcloud.zone/
+    argo:
+      url: https://argocd.k8s.kcloud.zone/
+    headlamp:
+      url: https://headlamp.k8s.kcloud.zone/
+    grafana:
+      url: https://grafana.k8s.kcloud.zone
+      logs: true
   prod:
-    url: https://argocd.k8s.kcloud.io
-    kubeContext: prod-sjc1
-    namespace: argocd
+    argo:
+      url: https://argocd.k8s.kcloud.io
+      kubeContext: prod-sjc1
+      namespace: argocd
+    headlamp:
+      url: https://headlamp.k8s.kcloud.io
+    grafana:
+      url: https://grafana.k8s.kcloud.io
 `)
 	if err := os.WriteFile(path, body, 0o644); err != nil {
 		t.Fatal(err)
@@ -28,24 +39,32 @@ argo:
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]Argo{
-		"homelab": {URL: "https://argocd.k8s.kcloud.zone"},
+	want := map[string]Cluster{
+		"homelab": {
+			Argo:     Argo{URL: "https://argocd.k8s.kcloud.zone"},
+			Headlamp: Headlamp{URL: "https://headlamp.k8s.kcloud.zone"},
+			Grafana:  Grafana{URL: "https://grafana.k8s.kcloud.zone", Logs: true},
+		},
 		"prod": {
-			URL:         "https://argocd.k8s.kcloud.io",
-			KubeContext: "prod-sjc1",
-			Namespace:   "argocd",
+			Argo: Argo{
+				URL:         "https://argocd.k8s.kcloud.io",
+				KubeContext: "prod-sjc1",
+				Namespace:   "argocd",
+			},
+			Headlamp: Headlamp{URL: "https://headlamp.k8s.kcloud.io"},
+			Grafana:  Grafana{URL: "https://grafana.k8s.kcloud.io"},
 		},
 	}
-	if diff := cmp.Diff(want, f.Argo); diff != "" {
+	if diff := cmp.Diff(want, f.Clusters); diff != "" {
 		t.Fatal(diff)
 	}
 }
 
-func TestLoadRejectsEmptyStage(t *testing.T) {
+func TestLoadRejectsEmptyCluster(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "deploybot.yaml")
-	if err := os.WriteFile(path, []byte("argo:\n  \"\":\n    url: https://x\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("clusters:\n  \"\":\n    argo:\n      url: https://x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Load(path); err == nil {
@@ -95,6 +114,9 @@ func TestResolvePathDefaultFile(t *testing.T) {
 	f, path, err := Open("")
 	if err != nil || path != DefaultPath || f.Addr != "127.0.0.1:9" {
 		t.Fatalf("open %+v %q %v", f, path, err)
+	}
+	if f.Clusters == nil {
+		t.Fatal("clusters map should be initialized")
 	}
 }
 

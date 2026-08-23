@@ -14,10 +14,24 @@ import (
 
 	"github.com/ianunruh/deploybot/internal/argo"
 	"github.com/ianunruh/deploybot/internal/catalog"
+	botcfg "github.com/ianunruh/deploybot/internal/config"
 	"github.com/ianunruh/deploybot/internal/gitwrite"
 	"github.com/ianunruh/deploybot/internal/render"
 	"github.com/ianunruh/deploybot/internal/spec"
 )
+
+func testClusters() map[string]botcfg.Cluster {
+	return map[string]botcfg.Cluster{
+		"homelab": {
+			Headlamp: botcfg.Headlamp{URL: "https://headlamp.k8s.kcloud.zone"},
+			Grafana:  botcfg.Grafana{URL: "https://grafana.k8s.kcloud.zone", Logs: true},
+		},
+		"prod": {
+			Headlamp: botcfg.Headlamp{URL: "https://headlamp.k8s.kcloud.io"},
+			Grafana:  botcfg.Grafana{URL: "https://grafana.k8s.kcloud.io"},
+		},
+	}
+}
 
 type stageRouter map[string]argo.Client
 
