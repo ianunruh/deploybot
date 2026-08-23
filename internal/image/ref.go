@@ -51,6 +51,48 @@ func (r Ref) String() string {
 	return s
 }
 
+// LogName is the commit-subject form: repo:tag, omitting the full digest.
+func (r Ref) LogName() string {
+	s := r.Repository
+	if r.Tag != "" {
+		return s + ":" + r.Tag
+	}
+	if r.Digest != "" {
+		return s + "@" + r.ShortDigest()
+	}
+	return s
+}
+
+// Compact is the UI form: tag and a truncated digest, without the repository.
+func (r Ref) Compact() string {
+	s := r.Tag
+	if s == "" {
+		s = r.Repository
+	}
+	if r.Digest == "" {
+		return s
+	}
+	if s == "" {
+		return r.ShortDigest()
+	}
+	return s + "@" + r.ShortDigest()
+}
+
+func (r Ref) ShortDigest() string {
+	d := r.Digest
+	if d == "" {
+		return ""
+	}
+	hex, hadSHA := strings.CutPrefix(d, "sha256:")
+	if len(hex) > 12 {
+		hex = hex[:12]
+	}
+	if hadSHA {
+		return "sha256:" + hex
+	}
+	return hex
+}
+
 func (r Ref) IsZero() bool {
 	return r.Repository == "" && r.Tag == "" && r.Digest == ""
 }

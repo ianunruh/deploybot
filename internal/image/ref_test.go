@@ -56,3 +56,21 @@ func TestParseEmpty(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestCompactAndLogName(t *testing.T) {
+	t.Parallel()
+	ref := MustParse("ghcr.io/ianunruh/kmc:main-b8e5098@sha256:a9514f5cd4b23e9f989f0c5348d47cc502727779f146007a8aae225fb7a06367")
+	if got := ref.Compact(); got != "main-b8e5098@sha256:a9514f5cd4b2" {
+		t.Fatalf("Compact %q", got)
+	}
+	if got := ref.LogName(); got != "ghcr.io/ianunruh/kmc:main-b8e5098" {
+		t.Fatalf("LogName %q", got)
+	}
+	digestOnly := MustParse("ghcr.io/ianunruh/kmc@sha256:a9514f5cd4b23e9f989f0c5348d47cc502727779f146007a8aae225fb7a06367")
+	if got := digestOnly.Compact(); got != "ghcr.io/ianunruh/kmc@sha256:a9514f5cd4b2" {
+		t.Fatalf("digest Compact %q", got)
+	}
+	if got := digestOnly.LogName(); got != "ghcr.io/ianunruh/kmc@sha256:a9514f5cd4b2" {
+		t.Fatalf("digest LogName %q", got)
+	}
+}

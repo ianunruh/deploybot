@@ -75,7 +75,7 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 			Health:   "unknown",
 		}
 		if img, err := render.CurrentImage(tree, d, st.Name); err == nil {
-			ss.Image = img.String()
+			ss.Image = img.Compact()
 		}
 		if s.Argo != nil {
 			if c := s.Argo.ForStage(st.Name); c != nil {
@@ -140,7 +140,7 @@ func (s *Service) Pin(ctx context.Context, name, stage, imageRef string) (Mutati
 	if err != nil {
 		return Mutation{}, err
 	}
-	return s.mutate(ctx, d, fmt.Sprintf("pin %s %s to %s", name, stage, ref.String()), tree, func(tree render.Tree) error {
+	return s.mutate(ctx, d, fmt.Sprintf("pin %s %s to %s", name, stage, ref.LogName()), tree, func(tree render.Tree) error {
 		return render.Pin(tree, d, stage, ref)
 	}, []string{stage})
 }
@@ -169,7 +169,7 @@ func (s *Service) Promote(ctx context.Context, name, from, to string) (Mutation,
 	if err != nil {
 		return Mutation{}, fmt.Errorf("source stage %s: %w", from, err)
 	}
-	return s.mutate(ctx, d, fmt.Sprintf("promote %s %s -> %s (%s)", name, from, to, img.String()), tree, func(tree render.Tree) error {
+	return s.mutate(ctx, d, fmt.Sprintf("promote %s %s -> %s (%s)", name, from, to, img.LogName()), tree, func(tree render.Tree) error {
 		return render.Pin(tree, d, to, img)
 	}, []string{to})
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/ianunruh/deploybot/internal/argo"
@@ -55,6 +56,17 @@ func TestPinDryRunThenApplyAndPromote(t *testing.T) {
 	if len(pin.Files) != 1 || pin.Files[0] != "k8s/kmc/overlays/homelab/kustomization.yaml" {
 		t.Fatalf("pin should only write the homelab overlay, got %v", pin.Files)
 	}
+	repo, err := git.PlainOpen(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pinCommit, err := repo.CommitObject(plumbing.NewHash(pin.Commit))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pinCommit.Message != "pin kmc homelab to ghcr.io/ianunruh/kmc:main-dead" {
+		t.Fatalf("pin commit %q", pinCommit.Message)
+	}
 
 	tree, err := gitwrite.OpenTree(dir)
 	if err != nil {
@@ -78,6 +90,13 @@ func TestPinDryRunThenApplyAndPromote(t *testing.T) {
 	}
 	if prom.Commit == "" {
 		t.Fatal("missing promote commit")
+	}
+	promCommit, err := repo.CommitObject(plumbing.NewHash(prom.Commit))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if promCommit.Message != "promote kmc homelab -> prod (ghcr.io/ianunruh/kmc:main-dead)" {
+		t.Fatalf("promote commit %q", promCommit.Message)
 	}
 	tree, err = gitwrite.OpenTree(dir)
 	if err != nil {

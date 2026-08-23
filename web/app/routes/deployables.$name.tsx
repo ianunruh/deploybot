@@ -211,10 +211,8 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
                 {st.hostname}
               </Text>
             </Table.Td>
-            <Table.Td>
-              <Text size="xs" ff="monospace" lineClamp={2}>
-                {st.image || "—"}
-              </Text>
+            <Table.Td maw={220} style={{ maxWidth: 220 }}>
+              <CompactImage value={st.image} empty="—" multiline />
             </Table.Td>
             <Table.Td>
               <StatusBadge status={st.sync} />
@@ -337,8 +335,9 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
           fromStage && toStage ? (
             <Text size="sm">
               Copy the pinned image from <strong>{fromStage.name}</strong> (
-              {fromStage.image || "unpinned"}) to <strong>{toStage.name}</strong>. Homelab
-              must be healthy when Argo is configured.
+              <CompactImage value={fromStage.image} empty="unpinned" />) to{" "}
+              <strong>{toStage.name}</strong>. Homelab must be healthy when Argo is
+              configured.
             </Text>
           ) : (
             <Text size="sm">Need at least two stages to promote.</Text>
@@ -352,6 +351,44 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
           );
         }}
       />
+    </Stack>
+  );
+}
+
+function CompactImage({
+  value,
+  empty = "—",
+  multiline = false,
+}: {
+  value?: string;
+  empty?: string;
+  multiline?: boolean;
+}) {
+  if (!value) {
+    return (
+      <Text size="xs" c="dimmed" span>
+        {empty}
+      </Text>
+    );
+  }
+  const at = value.indexOf("@");
+  const tag = at >= 0 ? value.slice(0, at) : value;
+  const digest = at >= 0 ? value.slice(at + 1) : "";
+  if (!multiline || !digest) {
+    return (
+      <Text size="xs" ff="monospace" span title={value}>
+        {tag}
+      </Text>
+    );
+  }
+  return (
+    <Stack gap={0} title={value}>
+      <Text size="xs" ff="monospace">
+        {tag}
+      </Text>
+      <Text size="xs" c="dimmed" ff="monospace">
+        {digest}
+      </Text>
     </Stack>
   );
 }
