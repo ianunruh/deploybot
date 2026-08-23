@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-const usage = `deploybot — small-scale release control plane
+const usage = `deploybot — Easy staged deploys across Kubernetes clusters
 
 Usage:
   deploybot render [--out dir] <spec>

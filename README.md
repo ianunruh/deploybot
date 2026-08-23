@@ -1,20 +1,41 @@
 # deploybot
 
-Small-scale release control plane: a deployable spec in git becomes a
-Deployment and Argo Application (plus Service / HTTPRoute when the app is
-routed), then you pin an image digest and promote homelab → prod.
+**Easy staged deploys across Kubernetes clusters.**
 
-Customers today: kmc console (`examples/kmc.yaml`), kmc-controller
-(`examples/kmc-controller.yaml`), deploybot itself (`examples/deploybot.yaml`
-+ `examples/deploybot-web.yaml`), and Play apps (`examples/sonarr.yaml`,
-`radarr`, `bazarr`, `jackett`, `tautulli`, `ombi`, `flaresolverr`, `nzbget`,
-`transmission`, `plex-exporter`, `plex`, `teamspeak`). Deploybot is self-hosted
-in homelab and prod.
-Deploybot generates the skeleton and the image pin. ConfigMaps, secrets, CRDs,
-RBAC, and extra pod fields (env, volumes, args, securityContext, CIDRs) stay
-as extra files / overlay patches.
+A Deployable spec in git becomes a Kubernetes workload and Argo CD
+Application (plus Service / HTTPRoute when the app is routed). From there
+you pin an image digest and promote it across stages — typically
+homelab → prod. Git remains the source of truth: deploybot commits the
+pin, optionally pushes, and asks Argo to sync. It does not `kubectl apply`
+your app.
 
-Original intent and non-goals: [docs/goals.md](docs/goals.md).
+## What you get
+
+- **Specs that stay small.** One YAML file names the image, workload,
+  optional HTTPRoute, and stages. ConfigMaps, secrets, CRDs, RBAC, and
+  extra pod fields (env, volumes, args, securityContext, CIDRs) stay as
+  extra files / overlay patches.
+- **Generated skeleton.** Deployment or StatefulSet, Service, HTTPRoute,
+  overlay `images:`, and an Argo Application per stage. `reconcile`
+  rewrites generated paths and merges kustomizations so those extras
+  survive.
+- **Digest pins.** Pick a published tag from GHCR or Docker Hub (newest
+  first). The pin is a kustomize `images:` entry on the stage overlay —
+  pin and promote never rewrite workload YAML.
+- **Staged promotion.** Copy a pin from one stage to the next. Gates for
+  Argo health, bake time, and human approval. GitHub Actions can pin
+  homelab through the API; promote to prod is a console action.
+- **Console and CLI.** Catalog of deployables, per-app release flow,
+  pin / promote with diffs, release history, and links out to Argo,
+  Headlamp, and Grafana. The CLI is the same loop; dry-run unless
+  `--apply`, nothing is pushed unless `--push`, and it never force-pushes.
+- **GitOps, not a second source of truth.** Deploybot writes git and
+  talks to Application CRs. Argo applies the cluster.
+
+It runs itself in homelab and prod, plus the kmc console and controller
+and Play apps (Sonarr, Radarr, Plex, Transmission, …). Specs are in
+[`examples/`](examples/). Original intent and non-goals:
+[docs/goals.md](docs/goals.md).
 
 ## Layout
 
@@ -35,7 +56,9 @@ just check
 just dev          # API :8080 + console :5173
 ```
 
-CLI (dry-run unless `--apply`; nothing is pushed unless `--push`):
+### CLI
+
+Dry-run unless `--apply`; nothing is pushed unless `--push`:
 
 ```bash
 just build
@@ -51,6 +74,8 @@ just build
 `--apply` commits locally. `--push` (requires `--apply`) pushes the current
 branch; it never force-pushes. `--sync` talks to Argo. Default is dry-run. For
 `serve`, set `DEPLOYBOT_APPLY=1`, `DEPLOYBOT_PUSH=1`, and `DEPLOYBOT_SYNC=1`.
+
+### Config
 
 Process config is YAML (`deploybot.yaml` or `--config` / `DEPLOYBOT_CONFIG`).
 Flags override env, env overrides the file. Clusters live in the file:
@@ -84,6 +109,8 @@ Headlamp and Grafana `url` values are UI origins; observability links append
 paths and query params. Grafana `logs: true` adds the Loki namespace
 drilldown (homelab only today).
 
+### Registry and git auth
+
 The pin picker lists published tags (newest first). `ghcr.io/…` uses the
 GitHub Packages API; `docker.io/…` (including `lscr.io/…` and unprefixed
 Hub names, rewritten to `docker.io`) uses the Docker Hub tags API. GitHub
@@ -96,6 +123,8 @@ Docker Hub listing is unauthenticated for public images; set
 HTTPS git push uses `DEPLOYBOT_GIT_TOKEN`, then the same GitHub tokens as
 the pin picker. SSH remotes use the ssh-agent (or `~/.ssh/id_ed25519` /
 `id_rsa`).
+
+### Lint
 
 Lint Go with golangci-lint v2.13+ built with Go 1.27 (Homebrew 2.10 is too old
 for this toolchain):
