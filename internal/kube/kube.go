@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/ianunruh/deploybot/internal/logx"
 )
 
 const (
@@ -301,7 +303,7 @@ func (c *REST) doOnce(ctx context.Context, method, path, contentType string, bod
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: defaultTimeout}
 	}
-	resp, err := httpClient.Do(req)
+	resp, err := logx.Do("kube", httpClient, req)
 	if err != nil {
 		return err
 	}

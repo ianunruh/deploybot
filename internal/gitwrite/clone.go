@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/go-git/go-git/v5"
+
+	"github.com/ianunruh/deploybot/internal/logx"
 )
 
 // Ensure clones url into dir, or pulls if dir is already a git repo.
@@ -34,14 +37,16 @@ func Clone(ctx context.Context, url, dir string) error {
 	if err != nil {
 		return err
 	}
+	start := time.Now()
 	_, err = git.PlainCloneContext(ctx, dir, false, &git.CloneOptions{
 		URL:  url,
 		Auth: auth,
 	})
 	if err != nil {
-		return fmt.Errorf("clone %s: %w", url, err)
+		err = fmt.Errorf("clone %s: %w", url, err)
 	}
-	return nil
+	logx.Done(ctx, "git clone", start, err, "url", logx.RedactURL(url), "dir", dir)
+	return err
 }
 
 // Pull fast-forwards from the default remote. No remotes and already-up-to-date
@@ -81,12 +86,16 @@ func Pull(ctx context.Context, repoDir string) error {
 	if err != nil {
 		return err
 	}
+	start := time.Now()
 	err = wt.PullContext(ctx, &git.PullOptions{
 		RemoteName: remoteName,
 		Auth:       auth,
 	})
 	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
-		return fmt.Errorf("pull %s: %w", remoteName, err)
+		err = fmt.Errorf("pull %s: %w", remoteName, err)
+	} else {
+		err = nil
 	}
-	return nil
+	logx.Done(ctx, "git pull", start, err, "remote", remoteName, "dir", repoDir)
+	return err
 }

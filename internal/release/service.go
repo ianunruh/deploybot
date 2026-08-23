@@ -34,7 +34,7 @@ type Service struct {
 	update    *updateState
 	apps      *appsCache
 	appsTTL   time.Duration
-	cacheOnce sync.Once
+	cacheOnce *sync.Once
 }
 
 type overlayCache struct {
@@ -59,9 +59,17 @@ func (s *Service) WithSync(enabled bool) *Service {
 	if s == nil || !s.Sync || enabled {
 		return s
 	}
+	s.cachesOnce()
 	cp := *s
 	cp.Sync = false
 	return &cp
+}
+
+func (s *Service) cachesOnce() *sync.Once {
+	if s.cacheOnce == nil {
+		s.cacheOnce = new(sync.Once)
+	}
+	return s.cacheOnce
 }
 
 func (s *Service) author() gitwrite.Author {

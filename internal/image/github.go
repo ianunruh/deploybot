@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ianunruh/deploybot/internal/logx"
 )
 
 const (
@@ -64,7 +66,9 @@ func ghAuthToken() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "gh", "auth", "token")
+	start := time.Now()
 	out, err := cmd.Output()
+	logx.Done(ctx, "gh auth token", start, err)
 	if err != nil {
 		return ""
 	}
@@ -322,7 +326,7 @@ func (g *GitHub) getJSON(ctx context.Context, path string, dest any) (string, er
 	if g.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+g.Token)
 	}
-	resp, err := g.client().Do(req)
+	resp, err := logx.Do("github", g.client(), req)
 	if err != nil {
 		return "", err
 	}

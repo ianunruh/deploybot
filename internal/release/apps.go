@@ -47,7 +47,7 @@ func (s *Service) initCaches() {
 	if s == nil {
 		return
 	}
-	s.cacheOnce.Do(func() {
+	s.cachesOnce().Do(func() {
 		if s.apps == nil {
 			s.apps = newAppsCache(s.appsTTL)
 		}

@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/ianunruh/deploybot/internal/logx"
 )
 
 const (
@@ -174,7 +176,7 @@ func (h *DockerHub) getJSON(ctx context.Context, path string, dest any) error {
 	if h.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+h.Token)
 	}
-	resp, err := h.client().Do(req)
+	resp, err := logx.Do("dockerhub", h.client(), req)
 	if err != nil {
 		return err
 	}
