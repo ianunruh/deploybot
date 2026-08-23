@@ -56,6 +56,13 @@ func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string
 		mut.Ref = pushed.Ref()
 	}
 	if s.Sync {
+		if len(syncStages) > 0 {
+			defer func() {
+				for _, st := range syncStages {
+					s.dropArgo(st)
+				}
+			}()
+		}
 		for _, st := range syncStages {
 			if err := s.syncStage(ctx, d, st); err != nil {
 				return mut, err

@@ -100,6 +100,63 @@ func TestKubeClientGetAndSync(t *testing.T) {
 	}
 }
 
+func TestKubeClientList(t *testing.T) {
+	t.Parallel()
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /apis/argoproj.io/v1alpha1/namespaces/argocd/applications", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/apis/argoproj.io/v1alpha1/namespaces/argocd/applications" {
+			t.Errorf("path %q", r.URL.Path)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{
+					"metadata": map[string]any{"name": "kmc"},
+					"status": map[string]any{
+						"health":  map[string]any{"status": "Healthy"},
+						"sync":    map[string]any{"status": "Synced", "revision": "abc"},
+						"history": []map[string]any{{"deployedAt": "2026-08-23T15:04:00Z"}},
+					},
+				},
+				{
+					"metadata": map[string]any{"name": "play-sonarr"},
+					"status": map[string]any{
+						"health": map[string]any{"status": "Progressing"},
+						"sync":   map[string]any{"status": "OutOfSync"},
+					},
+				},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	c := &KubeClient{
+		REST:      &kube.REST{BaseURL: srv.URL, HTTP: srv.Client(), Auth: kube.Bearer("kube-tok")},
+		Namespace: "argocd",
+	}
+	got, err := c.List(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("%+v", got)
+	}
+	by := map[string]Status{}
+	for _, st := range got {
+		by[st.Name] = st
+	}
+	if !by["kmc"].Healthy() || by["kmc"].Revision != "abc" {
+		t.Fatalf("kmc %+v", by["kmc"])
+	}
+	if by["play-sonarr"].Health != "Progressing" || by["play-sonarr"].Sync != "OutOfSync" {
+		t.Fatalf("sonarr %+v", by["play-sonarr"])
+	}
+	want := time.Date(2026, 8, 23, 15, 4, 0, 0, time.UTC)
+	if by["kmc"].DeployedAt == nil || !by["kmc"].DeployedAt.Equal(want) {
+		t.Fatalf("deployedAt %+v", by["kmc"].DeployedAt)
+	}
+}
+
 func TestEndpointsFromConfig(t *testing.T) {
 	cfg := writeKubeconfig(t, testKubeconfig)
 	t.Setenv("KUBECONFIG", cfg)

@@ -103,9 +103,7 @@ func (s *Service) overlayChanges(ctx context.Context, d *spec.Deployable, limit 
 	if err != nil {
 		return s.computeOverlayChanges(ctx, d, limit)
 	}
-	if s.overlays == nil {
-		s.overlays = &overlayCache{events: map[string][]Event{}}
-	}
+	s.initCaches()
 	c := s.overlays
 	c.mu.Lock()
 	defer c.mu.Unlock()

@@ -2,6 +2,7 @@ package release
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -135,9 +136,7 @@ func (s *Service) buildStatus(ctx context.Context, d *spec.Deployable, tree rend
 				ss.ArgoURL = argo.AppURL(c, d.Spec.Argo.Name)
 				out.Stages[i] = ss
 				wg.Go(func() {
-					gctx, cancel := context.WithTimeout(ctx, statusArgoTimeout)
-					defer cancel()
-					got, err := c.Get(gctx, d.Spec.Argo.Name)
+					got, err := s.stageArgo(ctx, st.Name, d.Spec.Argo.Name)
 					if err != nil {
 						out.Stages[i].Message = err.Error()
 						return
@@ -172,6 +171,21 @@ func (s *Service) buildStatus(ctx context.Context, d *spec.Deployable, tree rend
 		out.Update = &st
 	}
 	return out
+}
+
+func (s *Service) stageArgo(ctx context.Context, stage, app string) (argo.Status, error) {
+	if s == nil || s.Argo == nil {
+		return argo.Status{}, fmt.Errorf("no Argo endpoint for stage %s", stage)
+	}
+	c := s.Argo.ForStage(stage)
+	if c == nil {
+		return argo.Status{}, fmt.Errorf("no Argo endpoint for stage %s", stage)
+	}
+	gctx, cancel := context.WithTimeout(ctx, statusArgoTimeout)
+	defer cancel()
+	return s.argoApps().lookup(gctx, stage, app, func(ctx context.Context) (map[string]argo.Status, error) {
+		return listApps(ctx, c)
+	})
 }
 
 func newestDeployedAt(stages []StageStatus) *time.Time {

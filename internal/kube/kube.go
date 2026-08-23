@@ -23,9 +23,11 @@ import (
 )
 
 const (
-	MergePatch     = "application/merge-patch+json"
-	defaultTimeout = 20 * time.Second
-	maxErrBody     = 2048
+	MergePatch          = "application/merge-patch+json"
+	defaultTimeout      = 20 * time.Second
+	maxIdleConns        = 32
+	maxIdleConnsPerHost = 8
+	maxErrBody          = 2048
 )
 
 var (
@@ -175,11 +177,19 @@ func httpClientFor(cluster cluster, user user) (*http.Client, error) {
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
-	tr := &http.Transport{Proxy: http.ProxyFromEnvironment, TLSClientConfig: tlsConfig}
+	if len(tlsConfig.NextProtos) == 0 {
+		tlsConfig.NextProtos = []string{"h2", "http/1.1"}
+	}
+	var tr *http.Transport
 	if base, ok := http.DefaultTransport.(*http.Transport); ok {
 		tr = base.Clone()
-		tr.TLSClientConfig = tlsConfig
+	} else {
+		tr = &http.Transport{Proxy: http.ProxyFromEnvironment}
 	}
+	tr.TLSClientConfig = tlsConfig
+	tr.ForceAttemptHTTP2 = true
+	tr.MaxIdleConns = maxIdleConns
+	tr.MaxIdleConnsPerHost = maxIdleConnsPerHost
 	return &http.Client{Timeout: defaultTimeout, Transport: tr}, nil
 }
 

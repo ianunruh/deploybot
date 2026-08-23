@@ -19,12 +19,19 @@ type KubeClient struct {
 	UIBaseURL string
 }
 
-func (c *KubeClient) appPath(app string) string {
-	ns := c.Namespace
-	if ns == "" {
-		ns = defaultNamespace
+func (c *KubeClient) ns() string {
+	if c != nil && c.Namespace != "" {
+		return c.Namespace
 	}
-	return "/apis/argoproj.io/v1alpha1/namespaces/" + url.PathEscape(ns) + "/applications/" + url.PathEscape(app)
+	return defaultNamespace
+}
+
+func (c *KubeClient) appsPath() string {
+	return "/apis/argoproj.io/v1alpha1/namespaces/" + url.PathEscape(c.ns()) + "/applications"
+}
+
+func (c *KubeClient) appPath(app string) string {
+	return c.appsPath() + "/" + url.PathEscape(app)
 }
 
 func (c *KubeClient) Get(ctx context.Context, app string) (Status, error) {
@@ -33,6 +40,18 @@ func (c *KubeClient) Get(ctx context.Context, app string) (Status, error) {
 		return Status{}, fmt.Errorf("argo kube get %s: %w", app, err)
 	}
 	return statusFrom(raw), nil
+}
+
+func (c *KubeClient) List(ctx context.Context) ([]Status, error) {
+	var raw argoAppList
+	if err := c.REST.Get(ctx, c.appsPath(), &raw); err != nil {
+		return nil, fmt.Errorf("argo kube list: %w", err)
+	}
+	out := make([]Status, 0, len(raw.Items))
+	for _, item := range raw.Items {
+		out = append(out, statusFrom(item))
+	}
+	return out, nil
 }
 
 func (c *KubeClient) Sync(ctx context.Context, app string, prune bool) error {

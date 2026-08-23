@@ -80,22 +80,7 @@ const (
 )
 
 func (s *Service) updates() *updateState {
-	if s.update == nil {
-		s.update = &updateState{
-			ttl:      defaultListingTTL,
-			listings: map[string]cachedListing{},
-			lastAuto: map[string]time.Time{},
-		}
-	}
-	if s.update.listings == nil {
-		s.update.listings = map[string]cachedListing{}
-	}
-	if s.update.lastAuto == nil {
-		s.update.lastAuto = map[string]time.Time{}
-	}
-	if s.update.ttl <= 0 {
-		s.update.ttl = defaultListingTTL
-	}
+	s.initCaches()
 	return s.update
 }
 

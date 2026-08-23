@@ -35,6 +35,7 @@ func (s Status) Degraded() bool {
 
 type Client interface {
 	Get(ctx context.Context, app string) (Status, error)
+	List(ctx context.Context) ([]Status, error)
 	Sync(ctx context.Context, app string, prune bool) error
 }
 
@@ -58,6 +59,10 @@ func AppURL(c Client, app string) string {
 		return l.AppURL(app)
 	}
 	return ""
+}
+
+type argoAppList struct {
+	Items []argoApp `json:"items"`
 }
 
 type argoApp struct {

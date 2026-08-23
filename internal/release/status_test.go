@@ -108,6 +108,48 @@ func TestLatestWaitingApproval(t *testing.T) {
 	}
 }
 
+func TestLatestListsOncePerStage(t *testing.T) {
+	t.Parallel()
+	homelab := argo.NewFake()
+	homelab.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
+	homelab.Set("play-sonarr", argo.Status{Health: "Healthy", Sync: "Synced"})
+	prod := argo.NewFake()
+	prod.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
+	svc := &Service{
+		Catalog: loadExamples(t),
+		Argo:    stageRouter{"homelab": homelab, "prod": prod},
+		appsTTL: time.Minute,
+	}
+	latest := svc.Latest(t.Context())
+	if latest["kmc"].Stages[0].Health != "Healthy" {
+		t.Fatalf("kmc %+v", latest["kmc"])
+	}
+	if latest["sonarr"].Stages[0].Health != "Healthy" {
+		t.Fatalf("sonarr %+v", latest["sonarr"])
+	}
+	hGet, hList := homelab.Calls()
+	pGet, pList := prod.Calls()
+	if hGet != 0 || pGet != 0 {
+		t.Fatalf("status should list, not get: homelab get %d prod get %d", hGet, pGet)
+	}
+	if hList != 1 || pList != 1 {
+		t.Fatalf("lists homelab %d prod %d", hList, pList)
+	}
+	_ = svc.Latest(t.Context())
+	_, hList = homelab.Calls()
+	_, pList = prod.Calls()
+	if hList != 1 || pList != 1 {
+		t.Fatalf("ttl should skip list: homelab %d prod %d", hList, pList)
+	}
+	svc.dropArgo("homelab")
+	_ = svc.Latest(t.Context())
+	_, hList = homelab.Calls()
+	_, pList = prod.Calls()
+	if hList != 2 || pList != 1 {
+		t.Fatalf("drop homelab: homelab %d prod %d", hList, pList)
+	}
+}
+
 func TestListImages(t *testing.T) {
 	t.Parallel()
 	cat := loadExamples(t)

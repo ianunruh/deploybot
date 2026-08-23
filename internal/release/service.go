@@ -29,9 +29,12 @@ type Service struct {
 	Commits     image.CommitLookup
 
 	// Lock serializes git mutations (HTTP pin, auto-promote, auto-pin).
-	Lock     *sync.Mutex
-	overlays *overlayCache
-	update   *updateState
+	Lock      *sync.Mutex
+	overlays  *overlayCache
+	update    *updateState
+	apps      *appsCache
+	appsTTL   time.Duration
+	cacheOnce sync.Once
 }
 
 type overlayCache struct {

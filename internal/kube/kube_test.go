@@ -130,6 +130,28 @@ users:
 	if rest.BaseURL != "https://k8s.example:6443" {
 		t.Fatalf("server %q", rest.BaseURL)
 	}
+	tr, ok := rest.HTTP.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("transport %T", rest.HTTP.Transport)
+	}
+	if !tr.ForceAttemptHTTP2 {
+		t.Fatal("expected HTTP/2")
+	}
+	if tr.TLSClientConfig == nil || len(tr.TLSClientConfig.NextProtos) == 0 {
+		t.Fatal("expected h2 NextProtos")
+	}
+	foundH2 := false
+	for _, p := range tr.TLSClientConfig.NextProtos {
+		if p == "h2" {
+			foundH2 = true
+		}
+	}
+	if !foundH2 {
+		t.Fatalf("NextProtos %v", tr.TLSClientConfig.NextProtos)
+	}
+	if tr.MaxIdleConnsPerHost != maxIdleConnsPerHost {
+		t.Fatalf("idle per host %d", tr.MaxIdleConnsPerHost)
+	}
 	tok, err := rest.Auth.Token(t.Context())
 	if err != nil || tok != "file-tok" {
 		t.Fatalf("token %q %v", tok, err)
