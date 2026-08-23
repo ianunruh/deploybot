@@ -6,8 +6,9 @@ routed), then you pin an image digest and promote homelab → prod.
 
 Customers today: kmc console (`examples/kmc.yaml`), kmc-controller
 (`examples/kmc-controller.yaml`), deploybot itself (`examples/deploybot.yaml`
-+ `examples/deploybot-web.yaml`), and sonarr as the first Play spec
-(`examples/sonarr.yaml`). Deploybot is self-hosted in homelab and prod.
++ `examples/deploybot-web.yaml`), and Play linuxserver apps (`examples/sonarr.yaml`,
+`radarr`, `bazarr`, `jackett`, `tautulli`, `ombi`). Deploybot is self-hosted
+in homelab and prod.
 Deploybot generates the skeleton and the image pin. ConfigMaps, secrets, CRDs,
 RBAC, and extra pod fields (env, volumes, args, securityContext, CIDRs) stay
 as extra files / overlay patches.

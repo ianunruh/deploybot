@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: radarr
+spec:
+  template:
+    spec:
+      containers:
+        - name: radarr
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+          volumeMounts:
+            - name: data
+              mountPath: /config
+            - name: media-extra
+              mountPath: /media/extra
+            - name: media-nas
+              mountPath: /media/nas
+      volumes:
+        - name: media-extra
+          persistentVolumeClaim:
+            claimName: plex-media-extra
+        - name: media-nas
+          persistentVolumeClaim:
+            claimName: plex-media-nas
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 50Gi

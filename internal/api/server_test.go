@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"testing"
 	"time"
 
@@ -59,11 +60,15 @@ func TestListAndGet(t *testing.T) {
 	for _, d := range list.Deployables {
 		names = append(names, d.Name)
 	}
-	if len(names) != 5 || names[0] != "deploybot" || names[1] != "deploybot-web" || names[2] != "kmc" || names[3] != "kmc-controller" || names[4] != "sonarr" {
-		t.Fatalf("%+v", list)
+	want := []string{
+		"bazarr", "deploybot", "deploybot-web", "jackett", "kmc",
+		"kmc-controller", "ombi", "radarr", "sonarr", "tautulli",
 	}
-	kmc := list.Deployables[2]
-	ctrl := list.Deployables[3]
+	if !slices.Equal(names, want) {
+		t.Fatalf("catalog names %v", names)
+	}
+	kmc := list.Deployables[4]
+	ctrl := list.Deployables[5]
 	if kmc.RepoURL != "https://github.com/ianunruh/kmc" {
 		t.Fatalf("kmc repo %q", kmc.RepoURL)
 	}
@@ -73,8 +78,8 @@ func TestListAndGet(t *testing.T) {
 	if ctrl.RepoURL != "https://github.com/ianunruh/kmc" {
 		t.Fatalf("controller repo %q", ctrl.RepoURL)
 	}
-	if list.Deployables[0].RepoURL != "https://github.com/ianunruh/deploybot" {
-		t.Fatalf("deploybot repo %q", list.Deployables[0].RepoURL)
+	if list.Deployables[1].RepoURL != "https://github.com/ianunruh/deploybot" {
+		t.Fatalf("deploybot repo %q", list.Deployables[1].RepoURL)
 	}
 	if len(kmc.StageLinks) != 2 {
 		t.Fatalf("kmc stageLinks %+v", kmc.StageLinks)

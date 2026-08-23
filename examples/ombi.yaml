@@ -1,0 +1,50 @@
+# Routed play deployable: generated StatefulSet, Service, HTTPRoute, and Argo
+# Applications only. Human overlays live next to this file under ombi/
+# (PUID/PGID, config VCT).
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: ombi
+spec:
+  namespace: play
+  links:
+    repoURL: https://github.com/linuxserver/docker-ombi
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/play/ombi
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+    name: play-ombi
+  image:
+    repository: docker.io/linuxserver/ombi
+    tag: 4.43.5
+  workload:
+    kind: StatefulSet
+    containerName: ombi
+    containerPort: 3579
+    portName: http
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+  route:
+    port: 3579
+    gatewayNamespace: envoy-gateway-system
+  stages:
+    - name: homelab
+      hostname: ombi.kcloud.zone
+      gateway:
+        name: internal
+        sectionName: https-public
+    - name: prod
+      hostname: ombi.kcloud.io
+      gateway:
+        name: external
+        sectionName: https-public
+      promote:
+        after:
+          - approval

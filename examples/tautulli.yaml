@@ -1,0 +1,50 @@
+# Routed play deployable: generated StatefulSet, Service, HTTPRoute, and Argo
+# Applications only. Human overlays live next to this file under tautulli/
+# (PUID/PGID, config VCT).
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: tautulli
+spec:
+  namespace: play
+  links:
+    repoURL: https://github.com/linuxserver/docker-tautulli
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/play/tautulli
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+    name: play-tautulli
+  image:
+    repository: docker.io/linuxserver/tautulli
+    tag: v2.15.2-ls194
+  workload:
+    kind: StatefulSet
+    containerName: tautulli
+    containerPort: 8181
+    portName: http
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+  route:
+    port: 8181
+    gatewayNamespace: envoy-gateway-system
+  stages:
+    - name: homelab
+      hostname: tautulli.k8s.kcloud.zone
+      gateway:
+        name: internal
+        sectionName: https
+    - name: prod
+      hostname: tautulli.k8s.kcloud.io
+      gateway:
+        name: internal
+        sectionName: https
+      promote:
+        after:
+          - approval

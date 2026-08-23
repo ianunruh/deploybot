@@ -1,0 +1,50 @@
+# Routed play deployable: generated StatefulSet, Service, HTTPRoute, and Argo
+# Applications only. Human overlays live next to this file under bazarr/
+# (PUID/PGID, config VCT, media PVC mounts).
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: bazarr
+spec:
+  namespace: play
+  links:
+    repoURL: https://github.com/linuxserver/docker-bazarr
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/play/bazarr
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+    name: play-bazarr
+  image:
+    repository: docker.io/linuxserver/bazarr
+    tag: v1.5.2-ls307
+  workload:
+    kind: StatefulSet
+    containerName: bazarr
+    containerPort: 6767
+    portName: http
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+  route:
+    port: 6767
+    gatewayNamespace: envoy-gateway-system
+  stages:
+    - name: homelab
+      hostname: bazarr.k8s.kcloud.zone
+      gateway:
+        name: internal
+        sectionName: https
+    - name: prod
+      hostname: bazarr.k8s.kcloud.io
+      gateway:
+        name: internal
+        sectionName: https
+      promote:
+        after:
+          - approval

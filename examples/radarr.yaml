@@ -1,0 +1,50 @@
+# Routed play deployable: generated StatefulSet, Service, HTTPRoute, and Argo
+# Applications only. Human overlays live next to this file under radarr/
+# (PUID/PGID, config VCT, media PVC mounts).
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: radarr
+spec:
+  namespace: play
+  links:
+    repoURL: https://github.com/linuxserver/docker-radarr
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/play/radarr
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+    name: play-radarr
+  image:
+    repository: docker.io/linuxserver/radarr
+    tag: 5.26.2.10099-ls276
+  workload:
+    kind: StatefulSet
+    containerName: radarr
+    containerPort: 7878
+    portName: http
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+  route:
+    port: 7878
+    gatewayNamespace: envoy-gateway-system
+  stages:
+    - name: homelab
+      hostname: radarr.k8s.kcloud.zone
+      gateway:
+        name: internal
+        sectionName: https
+    - name: prod
+      hostname: radarr.kcloud.io
+      gateway:
+        name: external
+        sectionName: https-public
+      promote:
+        after:
+          - approval
