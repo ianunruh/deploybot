@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ianunruh/deploybot/internal/image"
 	"github.com/ianunruh/deploybot/internal/render"
 )
 
-func (s *Service) Promote(ctx context.Context, name, from, to string) (Mutation, error) {
+func (s *Service) Promote(ctx context.Context, name, from, to, imageRef string) (Mutation, error) {
 	d, err := s.Catalog.Get(name)
 	if err != nil {
 		return Mutation{}, err
@@ -30,9 +31,17 @@ func (s *Service) Promote(ctx context.Context, name, from, to string) (Mutation,
 	if err != nil {
 		return Mutation{}, err
 	}
-	img, err := render.CurrentImage(tree, d, from)
-	if err != nil {
-		return Mutation{}, fmt.Errorf("source stage %s: %w", from, err)
+	var img image.Ref
+	if imageRef != "" {
+		img, err = image.Parse(imageRef)
+		if err != nil {
+			return Mutation{}, err
+		}
+	} else {
+		img, err = render.CurrentImage(tree, d, from)
+		if err != nil {
+			return Mutation{}, fmt.Errorf("source stage %s: %w", from, err)
+		}
 	}
 	return s.mutate(ctx, d, fmt.Sprintf("promote %s %s -> %s (%s)", name, from, to, img.LogName()), tree, func(tree render.Tree) error {
 		return render.Pin(tree, d, to, img)

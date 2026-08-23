@@ -97,6 +97,26 @@ func (r Ref) IsZero() bool {
 	return r.Repository == "" && r.Tag == "" && r.Digest == ""
 }
 
+// ReleaseKey groups pins of the same image. Digest wins; otherwise the full ref.
+func (r Ref) ReleaseKey() string {
+	if r.Digest != "" {
+		return r.Digest
+	}
+	return r.String()
+}
+
+// SameRelease is true when both refs are the same digest, or the same full ref
+// when a digest is missing.
+func (r Ref) SameRelease(o Ref) bool {
+	if r.IsZero() || o.IsZero() {
+		return r.IsZero() && o.IsZero()
+	}
+	if r.Digest != "" && o.Digest != "" {
+		return r.Digest == o.Digest
+	}
+	return r.String() == o.String()
+}
+
 func splitRepoTag(s string) (string, string) {
 	i := strings.LastIndex(s, ":")
 	if i < 0 {

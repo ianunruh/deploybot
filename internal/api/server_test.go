@@ -234,6 +234,50 @@ func TestListImages(t *testing.T) {
 	}
 }
 
+func TestHistoryEmpty(t *testing.T) {
+	t.Parallel()
+	_, file, _, _ := runtime.Caller(0)
+	specs := filepath.Join(filepath.Dir(file), "..", "..", "examples")
+	cat, err := catalog.Load(specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{
+		Catalog: cat,
+		Release: &release.Service{Catalog: cat},
+	}
+	srv := httptest.NewServer(s.Handler())
+	t.Cleanup(srv.Close)
+
+	res, err := http.Get(srv.URL + "/api/v1/deployables/kmc/history")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		t.Fatal(res.Status)
+	}
+	var h release.History
+	if err := json.NewDecoder(res.Body).Decode(&h); err != nil {
+		t.Fatal(err)
+	}
+	if h.Events == nil || h.Releases == nil {
+		t.Fatalf("expected empty slices, got %+v", h)
+	}
+	if len(h.Events) != 0 || len(h.Releases) != 0 {
+		t.Fatalf("%+v", h)
+	}
+
+	missing, err := http.Get(srv.URL + "/api/v1/deployables/nope/history")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = missing.Body.Close() }()
+	if missing.StatusCode != http.StatusNotFound {
+		t.Fatalf("status %s", missing.Status)
+	}
+}
+
 type fakeImages struct {
 	list release.ImageList
 	err  error

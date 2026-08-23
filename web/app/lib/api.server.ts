@@ -57,10 +57,29 @@ export type StageStatus = {
   revision?: string;
   message?: string;
   deployedAt?: string;
+  pinnedAt?: string;
   argoURL?: string;
   headlampURL?: string;
   grafanaURL?: string;
   logsURL?: string;
+};
+
+export type FlowHop = {
+  from: string;
+  to: string;
+  state: string;
+  gate?: string;
+  remaining?: string;
+  bakeUntil?: string;
+  sourceImage?: string;
+  destImage?: string;
+};
+
+export type Flow = {
+  image?: string;
+  digest?: string;
+  tag?: string;
+  hops: FlowHop[];
 };
 
 export type DeployableStatus = {
@@ -70,9 +89,40 @@ export type DeployableStatus = {
   repoURL?: string;
   projectURL?: string;
   stages: StageStatus[];
+  flow?: Flow;
   apply: boolean;
   push: boolean;
   sync: boolean;
+};
+
+export type ReleaseStageHit = {
+  at: string;
+  kind: string;
+  commit?: string;
+  commitURL?: string;
+};
+
+export type Release = {
+  image: string;
+  digest?: string;
+  tag?: string;
+  current?: boolean;
+  stages: Record<string, ReleaseStageHit>;
+};
+
+export type DeployableHistory = {
+  events: Array<{
+    at: string;
+    kind: string;
+    stage: string;
+    image: string;
+    digest?: string;
+    tag?: string;
+    commit: string;
+    commitURL?: string;
+    author?: string;
+  }>;
+  releases: Release[];
 };
 
 export type MutationResult = {
@@ -92,6 +142,12 @@ export function listDeployables() {
 
 export function getDeployable(name: string) {
   return apiFetch<DeployableStatus>(`/api/v1/deployables/${encodeURIComponent(name)}`);
+}
+
+export function getDeployableHistory(name: string) {
+  return apiFetch<DeployableHistory>(
+    `/api/v1/deployables/${encodeURIComponent(name)}/history`,
+  );
 }
 
 export type ImageVersion = {
@@ -142,7 +198,7 @@ export function promoteDeployable(
   name: string,
   from: string,
   to: string,
-  opts?: { sync?: boolean },
+  opts?: { sync?: boolean; image?: string },
 ) {
   return apiFetch<MutationResult>(
     `/api/v1/deployables/${encodeURIComponent(name)}/promote`,
@@ -151,6 +207,7 @@ export function promoteDeployable(
       body: JSON.stringify({
         from,
         to,
+        ...(opts?.image ? { image: opts.image } : {}),
         ...(opts?.sync != null ? { sync: opts.sync } : {}),
       }),
     },

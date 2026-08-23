@@ -64,6 +64,35 @@ a {
   max-width: 100%;
 }
 
+.db-flow {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.db-flow-node {
+  flex: 0 0 auto;
+}
+
+.db-flow-edge {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 auto;
+  min-width: 9rem;
+  height: 1.5rem;
+  margin-top: 0.1rem;
+  padding: 0 0.75rem;
+}
+
+.db-flow-edge-rule {
+  flex: 1 1 auto;
+  height: 1px;
+  background: #2c333d;
+}
+
 .db-yaml {
   font-size: 12px;
   line-height: 1.5;

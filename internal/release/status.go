@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ianunruh/deploybot/internal/argo"
+	"github.com/ianunruh/deploybot/internal/image"
 	"github.com/ianunruh/deploybot/internal/render"
 )
 
@@ -20,6 +21,7 @@ type StageStatus struct {
 	Revision    string     `json:"revision,omitempty"`
 	Message     string     `json:"message,omitempty"`
 	DeployedAt  *time.Time `json:"deployedAt,omitempty"`
+	PinnedAt    *time.Time `json:"pinnedAt,omitempty"`
 	ArgoURL     string     `json:"argoURL,omitempty"`
 	HeadlampURL string     `json:"headlampURL,omitempty"`
 	GrafanaURL  string     `json:"grafanaURL,omitempty"`
@@ -33,6 +35,7 @@ type Status struct {
 	RepoURL    string        `json:"repoURL,omitempty"`
 	ProjectURL string        `json:"projectURL,omitempty"`
 	Stages     []StageStatus `json:"stages"`
+	Flow       Flow          `json:"flow"`
 	Apply      bool          `json:"apply"`
 	Push       bool          `json:"push"`
 	Sync       bool          `json:"sync"`
@@ -58,6 +61,11 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 		Sync:       s.Sync,
 	}
 	out.Stages = make([]StageStatus, len(d.Spec.Stages))
+	refs := make([]image.Ref, len(d.Spec.Stages))
+	events, err := s.overlayChanges(ctx, d, defaultHistoryLimit)
+	if err != nil {
+		events = nil
+	}
 	var wg sync.WaitGroup
 	for i, st := range d.Spec.Stages {
 		ss := StageStatus{
@@ -69,14 +77,14 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 		ss.HeadlampURL, ss.GrafanaURL, ss.LogsURL = ObservabilityURLs(st.Name, d.Spec.Namespace)
 		if img, err := render.CurrentImage(tree, d, st.Name); err == nil {
 			ss.Image = img.Compact()
+			refs[i] = img
+			ss.PinnedAt = pinTime(events, st.Name, img)
 		}
 		if s.Argo != nil {
 			if c := s.Argo.ForStage(st.Name); c != nil {
 				ss.ArgoURL = argo.AppURL(c, d.Spec.Argo.Name)
 				out.Stages[i] = ss
-				wg.Add(1)
-				go func(i int, c argo.Client) {
-					defer wg.Done()
+				wg.Go(func() {
 					gctx, cancel := context.WithTimeout(ctx, statusArgoTimeout)
 					defer cancel()
 					got, err := c.Get(gctx, d.Spec.Argo.Name)
@@ -89,13 +97,25 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 					out.Stages[i].Revision = got.Revision
 					out.Stages[i].Message = got.Message
 					out.Stages[i].DeployedAt = got.DeployedAt
-				}(i, c)
+				})
 				continue
 			}
 		}
 		out.Stages[i] = ss
 	}
 	wg.Wait()
+	snaps := make([]stageSnap, len(d.Spec.Stages))
+	for i, st := range d.Spec.Stages {
+		snaps[i] = stageSnap{
+			name:     st.Name,
+			ref:      refs[i],
+			health:   out.Stages[i].Health,
+			pinnedAt: out.Stages[i].PinnedAt,
+			policy:   st.Promote,
+			hasArgo:  s.Argo != nil && s.Argo.ForStage(st.Name) != nil,
+		}
+	}
+	out.Flow = buildFlow(snaps, time.Now().UTC())
 	return out, nil
 }
 
@@ -116,9 +136,7 @@ func (s *Service) LatestDeployedAt(ctx context.Context) map[string]*time.Time {
 			if c == nil {
 				continue
 			}
-			wg.Add(1)
-			go func(name, app string, c argo.Client) {
-				defer wg.Done()
+			wg.Go(func() {
 				gctx, cancel := context.WithTimeout(ctx, statusArgoTimeout)
 				defer cancel()
 				got, err := c.Get(gctx, app)
@@ -130,7 +148,7 @@ func (s *Service) LatestDeployedAt(ctx context.Context) map[string]*time.Time {
 				if prev := out[name]; prev == nil || got.DeployedAt.After(*prev) {
 					out[name] = got.DeployedAt
 				}
-			}(name, app, c)
+			})
 		}
 	}
 	wg.Wait()

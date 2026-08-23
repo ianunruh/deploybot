@@ -50,6 +50,26 @@ func TestParse(t *testing.T) {
 	}
 }
 
+func TestSameRelease(t *testing.T) {
+	t.Parallel()
+	a := MustParse("ghcr.io/ianunruh/kmc:main-abc@sha256:deadbeef")
+	b := MustParse("ghcr.io/ianunruh/kmc:main-def@sha256:deadbeef")
+	if !a.SameRelease(b) {
+		t.Fatal("same digest should match")
+	}
+	if a.ReleaseKey() != "sha256:deadbeef" {
+		t.Fatalf("key %q", a.ReleaseKey())
+	}
+	c := MustParse("ghcr.io/ianunruh/kmc:main")
+	d := MustParse("ghcr.io/ianunruh/kmc:main")
+	if !c.SameRelease(d) {
+		t.Fatal("same tag ref should match")
+	}
+	if c.SameRelease(a) {
+		t.Fatal("tag-only should not match a digest ref")
+	}
+}
+
 func TestParseEmpty(t *testing.T) {
 	t.Parallel()
 	if _, err := Parse("  "); err == nil {

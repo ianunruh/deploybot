@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/ianunruh/deploybot/internal/release"
@@ -60,6 +61,24 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, st)
+}
+
+func (s *Server) history(w http.ResponseWriter, r *http.Request) {
+	limit := 0
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "limit must be a non-negative integer"})
+			return
+		}
+		limit = n
+	}
+	h, err := s.Release.History(r.Context(), r.PathValue("name"), limit)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, h)
 }
 
 func (s *Server) images(w http.ResponseWriter, r *http.Request) {

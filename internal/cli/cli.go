@@ -11,7 +11,7 @@ const usage = `deploybot — small-scale release control plane
 Usage:
   deploybot render [--out dir] <spec>
   deploybot pin --spec <file> --stage <name> --image <ref> [--config file] [--repo dir] [--apply] [--push] [--sync]
-  deploybot promote --spec <file> --from <stage> --to <stage> [--config file] [--repo dir] [--apply] [--push] [--sync]
+  deploybot promote --spec <file> --from <stage> --to <stage> [--image <ref>] [--config file] [--repo dir] [--apply] [--push] [--sync]
   deploybot reconcile --spec <file> [--stage name]... [--config file] [--repo dir] [--apply] [--push] [--sync]
   deploybot serve [--config file] [--addr host:port] [--specs dir] [--repo dir] [--apply] [--push] [--sync]
   deploybot version

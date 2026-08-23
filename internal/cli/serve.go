@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/ianunruh/deploybot/internal/api"
@@ -28,7 +29,7 @@ func runServe(ctx context.Context, args []string) error {
 	repo := fs.String("repo", "", "local ops git repo")
 	apply := fs.Bool("apply", false, "commit mutations to the ops repo")
 	push := fs.Bool("push", false, "push the current branch after commit (requires --apply; never force-pushes)")
-	sync := fs.Bool("sync", false, "sync Argo after commit")
+	syncArgo := fs.Bool("sync", false, "sync Argo after commit")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -43,7 +44,7 @@ func runServe(ctx context.Context, args []string) error {
 		repo:  pickString(got["repo"], *repo, "DEPLOYBOT_OPS_REPO", file.OpsRepo),
 		apply: pickBool(got["apply"], *apply, "DEPLOYBOT_APPLY", file.Apply),
 		push:  pickBool(got["push"], *push, "DEPLOYBOT_PUSH", file.Push),
-		sync:  pickBool(got["sync"], *sync, "DEPLOYBOT_SYNC", file.Sync),
+		sync:  pickBool(got["sync"], *syncArgo, "DEPLOYBOT_SYNC", file.Sync),
 	}
 	if s.push && !s.apply {
 		return fmt.Errorf("--push requires --apply")
@@ -79,14 +80,20 @@ func runServe(ctx context.Context, args []string) error {
 	}
 	h := (&api.Server{Release: svc, Catalog: cat}).Handler()
 	srv := &http.Server{Addr: s.addr, Handler: h}
-	go func() {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var wg sync.WaitGroup
+	wg.Go(func() { svc.WatchFlows(ctx) })
+	wg.Go(func() {
 		<-ctx.Done()
-		shCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+		shCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stop()
 		_ = srv.Shutdown(shCtx)
-	}()
+	})
 	slog.Info("api listening", "addr", s.addr, "specs", s.specs, "config", path, "apply", s.apply, "push", s.push, "sync", s.sync, "github", tokenSrc)
 	err = srv.ListenAndServe()
+	cancel()
+	wg.Wait()
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}

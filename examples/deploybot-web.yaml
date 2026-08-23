@@ -61,3 +61,6 @@ spec:
       gateway:
         name: internal
         sectionName: https
+      promote:
+        after:
+          - approval

@@ -1,6 +1,7 @@
 package release
 
 import (
+	"sync"
 	"time"
 
 	"github.com/ianunruh/deploybot/internal/argo"
@@ -10,15 +11,24 @@ import (
 )
 
 type Service struct {
-	Catalog *catalog.Catalog
-	OpsRepo string
-	Apply   bool
-	Push    bool
-	Sync    bool
-	Author  gitwrite.Author
-	Argo    argo.Router
-	Wait    time.Duration
-	Images  image.Lister
+	Catalog   *catalog.Catalog
+	OpsRepo   string
+	Apply     bool
+	Push      bool
+	Sync      bool
+	Author    gitwrite.Author
+	Argo      argo.Router
+	Wait      time.Duration
+	FlowEvery time.Duration
+	Images    image.Lister
+
+	overlays *overlayCache
+}
+
+type overlayCache struct {
+	mu     sync.Mutex
+	head   string
+	events map[string][]Event
 }
 
 type Mutation struct {

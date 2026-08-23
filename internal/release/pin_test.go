@@ -79,7 +79,7 @@ func TestPinDryRunThenApplyAndPromote(t *testing.T) {
 		t.Fatalf("image %+v", img)
 	}
 
-	prom, err := apply.Promote(t.Context(), "kmc", "homelab", "prod")
+	prom, err := apply.Promote(t.Context(), "kmc", "homelab", "prod", "ghcr.io/ianunruh/kmc:main-dead@sha256:abc")
 	if err != nil {
 		t.Fatal(err)
 	}

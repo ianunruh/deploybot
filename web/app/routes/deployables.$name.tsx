@@ -7,16 +7,21 @@ import type { Route } from "./+types/deployables.$name";
 import type { ImagesLoaderData } from "./deployables.$name.images";
 import {
   getDeployable,
+  getDeployableHistory,
   pinDeployable,
   promoteDeployable,
+  type DeployableHistory,
   type ImageVersion,
   type MutationResult,
 } from "~/lib/api.server";
 import { notifyActionError, notifyActionSuccess } from "~/lib/action-feedback";
 import { formatAbsolute } from "~/lib/time";
 import { useFetcherResult } from "~/lib/use-fetcher-result";
+import { CompactImage, shortDigest } from "~/ui/compact-image";
 import { ConfirmActionModal } from "~/ui/confirm-action-modal";
 import { DiffPanel } from "~/ui/diff-panel";
+import { ReleaseFlow } from "~/ui/release-flow";
+import { ReleaseHistory } from "~/ui/release-history";
 import {
   DeployableLinkLabels,
   HostnameLink,
@@ -41,15 +46,26 @@ export function meta({ params }: Route.MetaArgs) {
 export async function loader({ params }: Route.LoaderArgs) {
   const name = params.name;
   if (!name) throw new Response("Missing name", { status: 400 });
-  try {
-    const status = await getDeployable(name);
-    return { status, error: null as string | null };
-  } catch (err) {
-    return {
-      status: null,
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
+  const [statusResult, historyResult] = await Promise.allSettled([
+    getDeployable(name),
+    getDeployableHistory(name),
+  ]);
+  return {
+    status: statusResult.status === "fulfilled" ? statusResult.value : null,
+    error:
+      statusResult.status === "rejected"
+        ? statusResult.reason instanceof Error
+          ? statusResult.reason.message
+          : String(statusResult.reason)
+        : null,
+    history: historyResult.status === "fulfilled" ? historyResult.value : null,
+    historyError:
+      historyResult.status === "rejected"
+        ? historyResult.reason instanceof Error
+          ? historyResult.reason.message
+          : String(historyResult.reason)
+        : null,
+  };
 }
 
 type ActionData =
@@ -84,7 +100,10 @@ export async function action({ request, params }: Route.ActionArgs) {
             name,
             String(form.get("from") ?? ""),
             String(form.get("to") ?? ""),
-            { sync: formFlag(form, "sync") },
+            {
+              sync: formFlag(form, "sync"),
+              image: String(form.get("image") ?? "") || undefined,
+            },
           ),
         } satisfies ActionData;
       default:
@@ -101,7 +120,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 const deployablesCrumb = { label: "Deployables", to: "/" };
 
 export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
-  const { status, error } = loaderData;
+  const { status, error, history, historyError } = loaderData;
   const revalidator = useRevalidator();
   const pinFetcher = useFetcher<ActionData>();
   const promoteFetcher = useFetcher<ActionData>();
@@ -227,6 +246,8 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
 
       <MutationModeAlert apply={status.apply} push={status.push} />
 
+      <ReleaseFlow stages={stages} flow={status.flow} />
+
       <ResourceTable
         headers={[
           "Stage",
@@ -286,6 +307,12 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
           </Table.Tr>
         ))}
       </ResourceTable>
+
+      <ReleaseHistory
+        stages={stages.map((st) => st.name)}
+        releases={history?.releases ?? []}
+        error={historyError}
+      />
 
       {previewDiff ? <DiffPanel diff={previewDiff} title="Last mutation diff" /> : null}
 
@@ -425,11 +452,15 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         }
         onConfirm={() => {
           if (!fromStage || !toStage) return;
+          const hop = status.flow?.hops.find(
+            (h) => h.from === fromStage.name && h.to === toStage.name,
+          );
           void promoteFetcher.submit(
             {
               intent: "promote",
               from: fromStage.name,
               to: toStage.name,
+              ...(hop?.sourceImage ? { image: hop.sourceImage } : {}),
               ...(status.sync ? { sync: promoteSync ? "true" : "false" } : {}),
             },
             { method: "post" },
@@ -474,23 +505,6 @@ function MutationModeAlert({ apply, push }: { apply: boolean; push: boolean }) {
   return null;
 }
 
-function CompactImage({ value, empty = "—" }: { value?: string; empty?: string }) {
-  if (!value) {
-    return (
-      <Text size="xs" c="dimmed" span>
-        {empty}
-      </Text>
-    );
-  }
-  const at = value.indexOf("@");
-  const tag = at >= 0 ? value.slice(0, at) : value;
-  return (
-    <Text className="db-clip-text" size="xs" ff="monospace" title={value} span>
-      {tag}
-    </Text>
-  );
-}
-
 function ImageOption({ img, label }: { img?: ImageVersion; label: string }) {
   return (
     <Group justify="space-between" gap="sm" wrap="nowrap" w="100%">
@@ -509,10 +523,4 @@ function ImageOption({ img, label }: { img?: ImageVersion; label: string }) {
       ) : null}
     </Group>
   );
-}
-
-function shortDigest(digest?: string): string {
-  if (!digest) return "";
-  const hex = digest.replace(/^sha256:/, "");
-  return hex ? `sha256:${hex.slice(0, 12)}` : digest;
 }

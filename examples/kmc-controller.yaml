@@ -47,3 +47,6 @@ spec:
   stages:
     - name: homelab
     - name: prod
+      promote:
+        after:
+          - approval

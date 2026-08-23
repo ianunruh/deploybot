@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -124,10 +125,65 @@ type Route struct {
 	GatewayNamespace string `yaml:"gatewayNamespace,omitempty"`
 }
 
+const (
+	AfterHealthy  = "healthy"
+	AfterBake     = "bake"
+	AfterApproval = "approval"
+)
+
 type Stage struct {
-	Name     string     `yaml:"name"`
-	Hostname string     `yaml:"hostname"`
-	Gateway  GatewayRef `yaml:"gateway"`
+	Name     string         `yaml:"name"`
+	Hostname string         `yaml:"hostname"`
+	Gateway  GatewayRef     `yaml:"gateway"`
+	Promote  *PromotePolicy `yaml:"promote,omitempty"`
+}
+
+// PromotePolicy is how a digest enters this stage from an earlier one.
+// Omit it to keep promote a console action with no auto-advance.
+type PromotePolicy struct {
+	From  string   `yaml:"from,omitempty"`
+	After []string `yaml:"after"`
+	Bake  Duration `yaml:"bake,omitempty"`
+}
+
+func (p PromotePolicy) Has(gate string) bool {
+	for _, x := range p.After {
+		if x == gate {
+			return true
+		}
+	}
+	return false
+}
+
+// AutoPromote is true when the reconciler should copy the source digest here
+// once gates pass. Approval is always a human click.
+func (p PromotePolicy) AutoPromote() bool {
+	return !p.Has(AfterApproval)
+}
+
+// Duration is a Go duration string in YAML (30m, 1h).
+type Duration time.Duration
+
+func (d Duration) Duration() time.Duration { return time.Duration(d) }
+
+func (d *Duration) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind != yaml.ScalarNode {
+		return fmt.Errorf("duration must be a string")
+	}
+	v := strings.TrimSpace(n.Value)
+	if v == "" {
+		*d = 0
+		return nil
+	}
+	parsed, err := time.ParseDuration(v)
+	if err != nil {
+		return fmt.Errorf("invalid duration %q", v)
+	}
+	if parsed < 0 {
+		return fmt.Errorf("duration must be positive")
+	}
+	*d = Duration(parsed)
+	return nil
 }
 
 type GatewayRef struct {
@@ -228,13 +284,16 @@ func (d *Deployable) Validate() error {
 		errs = append(errs, "spec.stages must have at least one stage")
 	}
 	seen := make(map[string]struct{}, len(d.Spec.Stages))
-	for _, st := range d.Spec.Stages {
+	for i, st := range d.Spec.Stages {
 		if st.Name == "" {
 			errs = append(errs, "stage name is required")
 			continue
 		}
 		if _, ok := seen[st.Name]; ok {
 			errs = append(errs, fmt.Sprintf("duplicate stage %q", st.Name))
+		}
+		if err := validatePromote(st, i, seen); err != "" {
+			errs = append(errs, err)
 		}
 		seen[st.Name] = struct{}{}
 		if !hasRoute {
@@ -272,6 +331,73 @@ func (d *Deployable) StageNames() []string {
 
 func (d *Deployable) BaseStage() Stage {
 	return d.Spec.Stages[0]
+}
+
+func validatePromote(st Stage, index int, earlier map[string]struct{}) string {
+	p := st.Promote
+	if p == nil {
+		return ""
+	}
+	if index == 0 {
+		return fmt.Sprintf("stage %s: promote is not allowed on the first stage", st.Name)
+	}
+	if len(p.After) == 0 {
+		return fmt.Sprintf("stage %s: promote.after is required", st.Name)
+	}
+	seenGate := map[string]struct{}{}
+	for _, g := range p.After {
+		if g == "" {
+			return fmt.Sprintf("stage %s: promote.after entry is empty", st.Name)
+		}
+		switch g {
+		case AfterHealthy, AfterBake, AfterApproval:
+		default:
+			return fmt.Sprintf("stage %s: unknown promote.after %q (healthy, bake, approval)", st.Name, g)
+		}
+		if _, ok := seenGate[g]; ok {
+			return fmt.Sprintf("stage %s: duplicate promote.after %q", st.Name, g)
+		}
+		seenGate[g] = struct{}{}
+	}
+	if p.Has(AfterBake) && p.Bake.Duration() <= 0 {
+		return fmt.Sprintf("stage %s: promote.bake is required when after includes bake", st.Name)
+	}
+	if p.Bake.Duration() > 0 && !p.Has(AfterBake) {
+		return fmt.Sprintf("stage %s: promote.bake is set but after does not include bake", st.Name)
+	}
+	if p.From == "" {
+		return ""
+	}
+	if p.From == st.Name {
+		return fmt.Sprintf("stage %s: promote.from cannot be itself", st.Name)
+	}
+	if _, ok := earlier[p.From]; !ok {
+		return fmt.Sprintf("stage %s: promote.from %q must be an earlier stage", st.Name, p.From)
+	}
+	return ""
+}
+
+// SourceStage is the overlay a promote into dest copies from.
+func (d *Deployable) SourceStage(dest string) (string, error) {
+	names := d.StageNames()
+	idx := -1
+	for i, n := range names {
+		if n == dest {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return "", fmt.Errorf("unknown stage %q", dest)
+	}
+	st := d.Spec.Stages[idx]
+	if st.Promote != nil && st.Promote.From != "" {
+		return st.Promote.From, nil
+	}
+	if idx == 0 {
+		return "", fmt.Errorf("no source stage for %q", dest)
+	}
+	return names[idx-1], nil
 }
 
 // HasRoute is true when the spec describes an HTTPRoute (timeout, port,

@@ -60,6 +60,12 @@ func TestStatusLinksAndArgoURL(t *testing.T) {
 	if st.Stages[1].DeployedAt == nil || !st.Stages[1].DeployedAt.Equal(prodAt) {
 		t.Fatalf("prod deployedAt %+v", st.Stages[1].DeployedAt)
 	}
+	if len(st.Flow.Hops) != 1 || st.Flow.Hops[0].From != "homelab" || st.Flow.Hops[0].To != "prod" {
+		t.Fatalf("flow %+v", st.Flow)
+	}
+	if st.Flow.Hops[0].State != HopCaughtUp {
+		t.Fatalf("unpinned stages should be caught up, got %q", st.Flow.Hops[0].State)
+	}
 
 	latest := svc.LatestDeployedAt(t.Context())
 	if latest["kmc"] == nil || !latest["kmc"].Equal(prodAt) {

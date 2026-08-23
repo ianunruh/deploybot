@@ -64,3 +64,6 @@ spec:
       gateway:
         name: external
         sectionName: https-public
+      promote:
+        after:
+          - approval

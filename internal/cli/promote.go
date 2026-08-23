@@ -11,6 +11,7 @@ func runPromote(ctx context.Context, args []string) error {
 	flags := mutationFlags(fs)
 	from := fs.String("from", "", "source stage")
 	to := fs.String("to", "", "destination stage")
+	imageRef := fs.String("image", "", "image to pin on destination (default: current source pin)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -21,7 +22,7 @@ func runPromote(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	mut, err := svc.Promote(ctx, name, *from, *to)
+	mut, err := svc.Promote(ctx, name, *from, *to, *imageRef)
 	if err != nil {
 		return err
 	}

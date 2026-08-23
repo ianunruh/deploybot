@@ -18,6 +18,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/deployables", s.list)
 	mux.HandleFunc("GET /api/v1/deployables/{name}", s.get)
 	mux.HandleFunc("GET /api/v1/deployables/{name}/images", s.images)
+	mux.HandleFunc("GET /api/v1/deployables/{name}/history", s.history)
 	mux.HandleFunc("GET /api/v1/deployables/{name}/diff", s.diff)
 	mux.HandleFunc("GET /api/v1/deployables/{name}/reconcile", s.reconcileDiff)
 	mux.HandleFunc("POST /api/v1/deployables/{name}/pin", s.pin)
