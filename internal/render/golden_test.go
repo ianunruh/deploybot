@@ -229,6 +229,92 @@ patches:
 	}
 }
 
+func TestMergeKeepsKMCHumanFiles(t *testing.T) {
+	t.Parallel()
+	d := loadExample(t, "kmc")
+	generated, err := Render(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	existing := Tree{
+		"k8s/kmc/base/kustomization.yaml": []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+  - service.yaml
+  - httproute.yaml
+patches:
+  - path: patch-web.yaml
+configMapGenerator:
+  - name: kmc-env
+    envs:
+      - config.env
+  - name: kmc-clusters
+    files:
+      - clusters.yaml
+`),
+		"k8s/kmc/base/patch-web.yaml": []byte("kind: Deployment\n"),
+		"k8s/kmc/base/clusters.yaml":  []byte("clusters: []\n"),
+		"k8s/kmc/overlays/prod/kustomization.yaml": []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - path: patch-cluster-tokens.yaml
+configMapGenerator:
+  - name: kmc-env
+    behavior: replace
+    envs:
+      - config.env
+`),
+		"k8s/kmc/overlays/prod/patch-cluster-tokens.yaml": []byte("kind: Deployment\n"),
+	}
+	merged, err := MergeTrees(existing, generated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var base kustomization
+	if err := yamlx.Unmarshal(merged["k8s/kmc/base/kustomization.yaml"], &base); err != nil {
+		t.Fatal(err)
+	}
+	if !containsAll(base.Resources, "deployment.yaml", "service.yaml", "httproute.yaml") {
+		t.Fatalf("base resources %+v", base.Resources)
+	}
+	if len(base.Patches) != 1 || base.Patches[0].Path != "patch-web.yaml" {
+		t.Fatalf("base patches %+v", base.Patches)
+	}
+	if len(base.ConfigMapGenerator) != 2 {
+		t.Fatalf("lost configMapGenerator: %+v", base.ConfigMapGenerator)
+	}
+	var overlay kustomization
+	if err := yamlx.Unmarshal(merged[OverlayKustomizationPath(d, "prod")], &overlay); err != nil {
+		t.Fatal(err)
+	}
+	if !containsAll(patchPaths(overlay.Patches), "patch-httproute.yaml", "patch-cluster-tokens.yaml") {
+		t.Fatalf("prod patches %+v", overlay.Patches)
+	}
+	if strings.Contains(string(merged[OverlayKustomizationPath(d, "prod")]), "patch-volumes.yaml") {
+		t.Fatalf("merge must not invent patch-volumes.yaml:\n%s", merged[OverlayKustomizationPath(d, "prod")])
+	}
+	for _, p := range []string{
+		"k8s/kmc/base/patch-web.yaml",
+		"k8s/kmc/base/clusters.yaml",
+		"k8s/kmc/overlays/prod/patch-cluster-tokens.yaml",
+	} {
+		if string(merged[p]) != string(existing[p]) {
+			t.Fatalf("lost extra file %s", p)
+		}
+	}
+}
+
+func patchPaths(patches []kustomizePatch) []string {
+	out := make([]string, len(patches))
+	for i, p := range patches {
+		out[i] = p.Path
+	}
+	return out
+}
+
 func TestMergeKeepsConfigMapGenerator(t *testing.T) {
 	t.Parallel()
 	d := loadExample(t, "kmc")

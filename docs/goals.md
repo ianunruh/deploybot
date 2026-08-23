@@ -37,9 +37,9 @@ API, not a replacement for them.
   different product.
 - **Do not grow the spec into a Deployment schema.** Generate the skeleton
   (Deployment, optional Service/HTTPRoute, overlay `images:`, Argo app).
-  App-specific fields (args, securityContext, extra ports, CRDs, RBAC, PVCs)
-  stay as extra files and overlay patches. Sync rewrites generated paths and
-  merges kustomizations so those extras survive.
+  App-specific fields (env, volumes, args, securityContext, extra ports,
+  CRDs, RBAC, PVCs) stay as extra files and overlay patches. Sync rewrites
+  generated paths and merges kustomizations so those extras survive.
 
 ## Stack
 
@@ -53,8 +53,9 @@ API, not a replacement for them.
 
 **kmc console** (`examples/kmc.yaml`): Deployment, Service, HTTPRoute, Argo
 Application, homelab → prod, pin by digest/`main-<sha>`. Cut over in
-`kcloud-ops`. Still human-owned: `clusters.yaml`, env ConfigMaps,
-`gen-secrets.sh`, impersonator SA/RBAC.
+`kcloud-ops`. `patch-web.yaml` (envFrom, env, clusters volume) and prod
+`patch-cluster-tokens.yaml` are overlay-owned, plus `clusters.yaml`, env
+ConfigMaps, `gen-secrets.sh`, impersonator SA/RBAC.
 
 **kmc-controller** (`examples/kmc-controller.yaml`): no route. Generated
 Deployment + Argo apps only. CRDs and RBAC copied from

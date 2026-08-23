@@ -1,3 +1,7 @@
+# Routed deployable: generated Deployment, Service, HTTPRoute, and Argo
+# Applications only. Human overlays live next to this file under kmc/ (env,
+# clusters volume). Prod cluster-token mount is overlay-owned. ConfigMaps,
+# secrets, and clusters.yaml stay in the ops repo; sync keeps those extra files.
 apiVersion: deploybot.kcloud.io/v1alpha1
 kind: Deployable
 metadata:
@@ -23,19 +27,6 @@ spec:
     containerName: web
     containerPort: 3000
     portName: http
-    envFrom:
-      configMaps:
-        - kmc-env
-      secrets:
-        - kmc-env
-    env:
-      - name: KMC_CLUSTERS_CONFIG
-        value: /app/config/clusters.yaml
-    volumes:
-      - name: clusters
-        configMap: kmc-clusters
-        mountPath: /app/config
-        readOnly: true
     probes:
       path: /login
       port: http
@@ -70,9 +61,3 @@ spec:
       gateway:
         name: external
         sectionName: https-public
-      volumes:
-        - name: cluster-tokens
-          secret: kmc-cluster-tokens
-          mountPath: /var/run/secrets/kmc/clusters
-          readOnly: true
-          optional: true

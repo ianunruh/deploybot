@@ -63,30 +63,8 @@ type Workload struct {
 	ContainerName      string               `yaml:"containerName,omitempty"`
 	ContainerPort      int                  `yaml:"containerPort"`
 	PortName           string               `yaml:"portName,omitempty"`
-	EnvFrom            EnvFrom              `yaml:"envFrom,omitempty"`
-	Env                []EnvVar             `yaml:"env,omitempty"`
-	Volumes            []Volume             `yaml:"volumes,omitempty"`
 	Probes             Probes               `yaml:"probes,omitempty"`
 	Resources          ResourceRequirements `yaml:"resources,omitempty"`
-}
-
-type EnvFrom struct {
-	ConfigMaps []string `yaml:"configMaps,omitempty"`
-	Secrets    []string `yaml:"secrets,omitempty"`
-}
-
-type EnvVar struct {
-	Name  string `yaml:"name"`
-	Value string `yaml:"value"`
-}
-
-type Volume struct {
-	Name      string `yaml:"name"`
-	MountPath string `yaml:"mountPath"`
-	ReadOnly  bool   `yaml:"readOnly,omitempty"`
-	ConfigMap string `yaml:"configMap,omitempty"`
-	Secret    string `yaml:"secret,omitempty"`
-	Optional  bool   `yaml:"optional,omitempty"`
 }
 
 type Probes struct {
@@ -129,7 +107,6 @@ type Stage struct {
 	Name     string     `yaml:"name"`
 	Hostname string     `yaml:"hostname"`
 	Gateway  GatewayRef `yaml:"gateway"`
-	Volumes  []Volume   `yaml:"volumes,omitempty"`
 }
 
 type GatewayRef struct {

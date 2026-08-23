@@ -90,14 +90,6 @@ func writeWorkload(out Tree, d *spec.Deployable) error {
 				},
 			})
 		}
-		if len(st.Volumes) > 0 {
-			volYAML, err := yamlx.MarshalGenerated(volumePatch(d, st.Volumes))
-			if err != nil {
-				return err
-			}
-			out[path.Join(overlay, "patch-volumes.yaml")] = volYAML
-			patches = append(patches, kustomizePatch{Path: "patch-volumes.yaml"})
-		}
 		okust, err := yamlx.MarshalGenerated(kustomization{
 			APIVersion: "kustomize.config.k8s.io/v1beta1",
 			Kind:       "Kustomization",
@@ -198,24 +190,6 @@ func deploymentObj(d *spec.Deployable) deployment {
 			ContainerPort: w.ContainerPort,
 		}}
 	}
-	for _, name := range w.EnvFrom.ConfigMaps {
-		c.EnvFrom = append(c.EnvFrom, envFromSource{ConfigMapRef: &localObjectRef{Name: name}})
-	}
-	for _, name := range w.EnvFrom.Secrets {
-		c.EnvFrom = append(c.EnvFrom, envFromSource{SecretRef: &localObjectRef{Name: name}})
-	}
-	for _, e := range w.Env {
-		c.Env = append(c.Env, envVar{Name: e.Name, Value: e.Value})
-	}
-	var volumes []podVolume
-	for _, v := range w.Volumes {
-		c.VolumeMounts = append(c.VolumeMounts, volumeMount{
-			Name:      v.Name,
-			MountPath: v.MountPath,
-			ReadOnly:  v.ReadOnly,
-		})
-		volumes = append(volumes, podVolumeFromSpec(v))
-	}
 	probePort := w.Probes.Port
 	c.StartupProbe = buildProbe(w.Probes.Path, probePort, w.Probes.Startup)
 	c.LivenessProbe = buildProbe(w.Probes.Path, probePort, w.Probes.Liveness)
@@ -246,22 +220,10 @@ func deploymentObj(d *spec.Deployable) deployment {
 					ServiceAccountName: w.ServiceAccountName,
 					ImagePullSecrets:   pullSecrets,
 					Containers:         []container{c},
-					Volumes:            volumes,
 				},
 			},
 		},
 	}
-}
-
-func podVolumeFromSpec(v spec.Volume) podVolume {
-	pv := podVolume{Name: v.Name}
-	switch {
-	case v.ConfigMap != "":
-		pv.ConfigMap = &configMapVol{Name: v.ConfigMap}
-	case v.Secret != "":
-		pv.Secret = &secretVol{SecretName: v.Secret, Optional: v.Optional}
-	}
-	return pv
 }
 
 func buildProbe(path, port string, override spec.HTTPProbe) *probe {
@@ -361,35 +323,6 @@ func routePatches(base, st spec.Stage) []jsonPatchOp {
 		ops = append(ops, jsonPatchOp{Op: "replace", Path: "/spec/hostnames/0", Value: st.Hostname})
 	}
 	return ops
-}
-
-func volumePatch(d *spec.Deployable, vols []spec.Volume) volumePatchDoc {
-	var mounts []volumeMount
-	var volumes []podVolume
-	for _, v := range vols {
-		mounts = append(mounts, volumeMount{
-			Name:      v.Name,
-			MountPath: v.MountPath,
-			ReadOnly:  v.ReadOnly,
-		})
-		volumes = append(volumes, podVolumeFromSpec(v))
-	}
-	return volumePatchDoc{
-		APIVersion: "apps/v1",
-		Kind:       "Deployment",
-		Metadata:   objectMeta{Name: d.Metadata.Name},
-		Spec: volumePatchSpec{
-			Template: volumePatchTemplate{
-				Spec: volumePatchPod{
-					Containers: []volumePatchContainer{{
-						Name:         d.Spec.Workload.ContainerName,
-						VolumeMounts: mounts,
-					}},
-					Volumes: volumes,
-				},
-			},
-		},
-	}
 }
 
 func applicationObj(d *spec.Deployable, st spec.Stage) application {

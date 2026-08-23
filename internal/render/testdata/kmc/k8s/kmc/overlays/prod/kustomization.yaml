@@ -10,4 +10,3 @@ patches:
       version: v1
       kind: HTTPRoute
       name: kmc
-  - path: patch-volumes.yaml

@@ -24,21 +24,9 @@ spec:
         - name: web
           image: ghcr.io/ianunruh/kmc:main
           imagePullPolicy: IfNotPresent
-          envFrom:
-            - configMapRef:
-                name: kmc-env
-            - secretRef:
-                name: kmc-env
-          env:
-            - name: KMC_CLUSTERS_CONFIG
-              value: /app/config/clusters.yaml
           ports:
             - name: http
               containerPort: 3000
-          volumeMounts:
-            - name: clusters
-              mountPath: /app/config
-              readOnly: true
           startupProbe:
             httpGet:
               path: /login
@@ -64,7 +52,3 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
-      volumes:
-        - name: clusters
-          configMap:
-            name: kmc-clusters

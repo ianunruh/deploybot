@@ -6,8 +6,8 @@ routed), then you pin an image digest and promote homelab → prod.
 
 Customers today: kmc console (`examples/kmc.yaml`) and kmc-controller
 (`examples/kmc-controller.yaml`). Deploybot generates the skeleton and the
-image pin. ConfigMaps, secrets, CRDs, RBAC, and extra pod fields (args,
-securityContext, CIDRs) stay as extra files / overlay patches.
+image pin. ConfigMaps, secrets, CRDs, RBAC, and extra pod fields (env,
+volumes, args, securityContext, CIDRs) stay as extra files / overlay patches.
 
 Original intent and non-goals: [docs/goals.md](docs/goals.md).
 

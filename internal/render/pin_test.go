@@ -41,22 +41,24 @@ patches:
 	}
 }
 
-func TestVolumePatchOmitsReplicasAndImage(t *testing.T) {
+func TestKMCOmitsPodWiring(t *testing.T) {
 	t.Parallel()
 	d := loadExample(t, "kmc")
 	tree, err := Render(d)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := tree["k8s/kmc/overlays/prod/patch-volumes.yaml"]
-	s := string(b)
-	if strings.Contains(s, "replicas:") {
-		t.Fatalf("volume patch must not set replicas:\n%s", s)
+	if _, ok := tree["k8s/kmc/overlays/prod/patch-volumes.yaml"]; ok {
+		t.Fatal("render must not emit patch-volumes.yaml")
 	}
-	if strings.Contains(s, "image:") {
-		t.Fatalf("volume patch must not set image:\n%s", s)
+	dep := string(tree["k8s/kmc/base/deployment.yaml"])
+	for _, refuse := range []string{"envFrom:", "KMC_CLUSTERS_CONFIG", "volumeMounts:", "kmc-clusters", "cluster-tokens"} {
+		if strings.Contains(dep, refuse) {
+			t.Fatalf("generated deployment must not include %q:\n%s", refuse, dep)
+		}
 	}
-	if !strings.Contains(s, "cluster-tokens") {
-		t.Fatalf("missing volume:\n%s", s)
+	prodKust := string(tree["k8s/kmc/overlays/prod/kustomization.yaml"])
+	if strings.Contains(prodKust, "patch-volumes.yaml") {
+		t.Fatalf("prod overlay must not list volume patch:\n%s", prodKust)
 	}
 }

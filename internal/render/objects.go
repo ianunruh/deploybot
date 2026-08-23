@@ -23,32 +23,6 @@ type deploySpec struct {
 	Template podTemplate `yaml:"template"`
 }
 
-// volumePatchDoc is a strategic-merge patch: only mount fields, never replicas/image.
-type volumePatchDoc struct {
-	APIVersion string          `yaml:"apiVersion"`
-	Kind       string          `yaml:"kind"`
-	Metadata   objectMeta      `yaml:"metadata"`
-	Spec       volumePatchSpec `yaml:"spec"`
-}
-
-type volumePatchSpec struct {
-	Template volumePatchTemplate `yaml:"template"`
-}
-
-type volumePatchTemplate struct {
-	Spec volumePatchPod `yaml:"spec"`
-}
-
-type volumePatchPod struct {
-	Containers []volumePatchContainer `yaml:"containers"`
-	Volumes    []podVolume            `yaml:"volumes"`
-}
-
-type volumePatchContainer struct {
-	Name         string        `yaml:"name"`
-	VolumeMounts []volumeMount `yaml:"volumeMounts"`
-}
-
 type labelSel struct {
 	MatchLabels map[string]string `yaml:"matchLabels"`
 }
@@ -62,7 +36,6 @@ type podSpec struct {
 	ServiceAccountName string           `yaml:"serviceAccountName,omitempty"`
 	ImagePullSecrets   []localObjectRef `yaml:"imagePullSecrets,omitempty"`
 	Containers         []container      `yaml:"containers"`
-	Volumes            []podVolume      `yaml:"volumes,omitempty"`
 }
 
 type localObjectRef struct {
@@ -73,50 +46,16 @@ type container struct {
 	Name            string          `yaml:"name"`
 	Image           string          `yaml:"image"`
 	ImagePullPolicy string          `yaml:"imagePullPolicy,omitempty"`
-	EnvFrom         []envFromSource `yaml:"envFrom,omitempty"`
-	Env             []envVar        `yaml:"env,omitempty"`
 	Ports           []containerPort `yaml:"ports,omitempty"`
-	VolumeMounts    []volumeMount   `yaml:"volumeMounts,omitempty"`
 	StartupProbe    *probe          `yaml:"startupProbe,omitempty"`
 	LivenessProbe   *probe          `yaml:"livenessProbe,omitempty"`
 	ReadinessProbe  *probe          `yaml:"readinessProbe,omitempty"`
 	Resources       *resources      `yaml:"resources,omitempty"`
 }
 
-type envFromSource struct {
-	ConfigMapRef *localObjectRef `yaml:"configMapRef,omitempty"`
-	SecretRef    *localObjectRef `yaml:"secretRef,omitempty"`
-}
-
-type envVar struct {
-	Name  string `yaml:"name"`
-	Value string `yaml:"value"`
-}
-
 type containerPort struct {
 	Name          string `yaml:"name,omitempty"`
 	ContainerPort int    `yaml:"containerPort"`
-}
-
-type volumeMount struct {
-	Name      string `yaml:"name"`
-	MountPath string `yaml:"mountPath"`
-	ReadOnly  bool   `yaml:"readOnly,omitempty"`
-}
-
-type podVolume struct {
-	Name      string        `yaml:"name"`
-	ConfigMap *configMapVol `yaml:"configMap,omitempty"`
-	Secret    *secretVol    `yaml:"secret,omitempty"`
-}
-
-type configMapVol struct {
-	Name string `yaml:"name"`
-}
-
-type secretVol struct {
-	SecretName string `yaml:"secretName"`
-	Optional   bool   `yaml:"optional,omitempty"`
 }
 
 type probe struct {

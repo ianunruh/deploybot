@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kmc
+spec:
+  template:
+    spec:
+      containers:
+        - name: web
+          envFrom:
+            - configMapRef:
+                name: kmc-env
+            - secretRef:
+                name: kmc-env
+          env:
+            - name: KMC_CLUSTERS_CONFIG
+              value: /app/config/clusters.yaml
+          volumeMounts:
+            - name: clusters
+              mountPath: /app/config
+              readOnly: true
+      volumes:
+        - name: clusters
+          configMap:
+            name: kmc-clusters
