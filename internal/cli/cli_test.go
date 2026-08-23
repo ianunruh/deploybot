@@ -13,6 +13,7 @@ func isolateEnv(t *testing.T) {
 	t.Setenv("DEPLOYBOT_PUSH", "")
 	t.Setenv("DEPLOYBOT_SYNC", "")
 	t.Setenv("DEPLOYBOT_OPS_REPO", "")
+	t.Setenv("DEPLOYBOT_OPS_REPO_URL", "")
 	t.Setenv("DEPLOYBOT_ADDR", "")
 	t.Setenv("DEPLOYBOT_SPECS_DIR", "")
 	t.Setenv("DEPLOYBOT_ARGO_URL", "")

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/ianunruh/deploybot/internal/api"
@@ -45,6 +47,15 @@ func runServe(ctx context.Context, args []string) error {
 	}
 	if s.push && !s.apply {
 		return fmt.Errorf("--push requires --apply")
+	}
+	repoURL := pickString(false, "", "DEPLOYBOT_OPS_REPO_URL", file.OpsRepoURL)
+	if repoURL != "" {
+		if s.repo == "" {
+			s.repo = filepath.Join(os.TempDir(), "deploybot-ops")
+		}
+		if err := gitwrite.Ensure(ctx, repoURL, s.repo); err != nil {
+			return err
+		}
 	}
 	cat, err := catalog.Load(s.specs)
 	if err != nil {

@@ -65,13 +65,23 @@ func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string
 	return mut, nil
 }
 
-func (s *Service) workingTree(d *spec.Deployable) (render.Tree, error) {
-	return s.overlayTree(d)
+func (s *Service) workingTree(ctx context.Context, d *spec.Deployable) (render.Tree, error) {
+	return s.overlayTree(ctx, d)
+}
+
+func (s *Service) syncRepo(ctx context.Context) error {
+	if s.OpsRepo == "" {
+		return nil
+	}
+	return gitwrite.Pull(ctx, s.OpsRepo)
 }
 
 // overlayTree is the stage overlay kustomizations only. Pin/promote must not
 // rewrite workload YAML or shared Argo project kustomizations.
-func (s *Service) overlayTree(d *spec.Deployable) (render.Tree, error) {
+func (s *Service) overlayTree(ctx context.Context, d *spec.Deployable) (render.Tree, error) {
+	if err := s.syncRepo(ctx); err != nil {
+		return nil, err
+	}
 	paths := make([]string, 0, len(d.Spec.Stages))
 	for _, st := range d.Spec.Stages {
 		paths = append(paths, render.OverlayKustomizationPath(d, st.Name))

@@ -38,7 +38,7 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
-	tree, err := s.workingTree(d)
+	tree, err := s.workingTree(ctx, d)
 	if err != nil {
 		return Status{}, err
 	}

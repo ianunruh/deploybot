@@ -11,11 +11,10 @@ COPY main.go ./
 COPY internal/ internal/
 
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /deploybot .
-RUN mkdir /specs
 
 FROM gcr.io/distroless/static:nonroot
 COPY --from=build /deploybot /deploybot
-COPY --from=build /specs /specs
+COPY examples/*.yaml /specs/
 USER nonroot:nonroot
 EXPOSE 8080
 ENV DEPLOYBOT_ADDR=:8080

@@ -23,7 +23,7 @@ func (s *Service) Promote(ctx context.Context, name, from, to string) (Mutation,
 			return Mutation{}, fmt.Errorf("health gate %s: %w", from, err)
 		}
 	}
-	tree, err := s.workingTree(d)
+	tree, err := s.workingTree(ctx, d)
 	if err != nil {
 		return Mutation{}, err
 	}

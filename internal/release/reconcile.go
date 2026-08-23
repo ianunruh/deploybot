@@ -19,9 +19,12 @@ type reconcilePlan struct {
 	msg    string
 }
 
-func (s *Service) planReconcile(name string, stages []string) (reconcilePlan, error) {
+func (s *Service) planReconcile(ctx context.Context, name string, stages []string) (reconcilePlan, error) {
 	d, err := s.Catalog.Get(name)
 	if err != nil {
+		return reconcilePlan{}, err
+	}
+	if err := s.syncRepo(ctx); err != nil {
 		return reconcilePlan{}, err
 	}
 	stages, err = resolveStages(d, stages)
@@ -54,8 +57,8 @@ func (s *Service) planReconcile(name string, stages []string) (reconcilePlan, er
 	return reconcilePlan{d: d, stages: stages, before: before, after: after, msg: msg}, nil
 }
 
-func (s *Service) DiffReconcile(name string, stages []string) (Mutation, error) {
-	plan, err := s.planReconcile(name, stages)
+func (s *Service) DiffReconcile(ctx context.Context, name string, stages []string) (Mutation, error) {
+	plan, err := s.planReconcile(ctx, name, stages)
 	if err != nil {
 		return Mutation{}, err
 	}
@@ -67,7 +70,7 @@ func (s *Service) DiffReconcile(name string, stages []string) (Mutation, error) 
 }
 
 func (s *Service) Reconcile(ctx context.Context, name string, stages []string) (Mutation, error) {
-	plan, err := s.planReconcile(name, stages)
+	plan, err := s.planReconcile(ctx, name, stages)
 	if err != nil {
 		return Mutation{}, err
 	}

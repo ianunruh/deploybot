@@ -12,13 +12,14 @@ const DefaultPath = "deploybot.yaml"
 
 // File is process config: structured non-secrets. Git and GitHub tokens stay in env.
 type File struct {
-	Addr     string          `yaml:"addr,omitempty"`
-	SpecsDir string          `yaml:"specsDir,omitempty"`
-	OpsRepo  string          `yaml:"opsRepo,omitempty"`
-	Apply    *bool           `yaml:"apply,omitempty"`
-	Push     *bool           `yaml:"push,omitempty"`
-	Sync     *bool           `yaml:"sync,omitempty"`
-	Argo     map[string]Argo `yaml:"argo,omitempty"`
+	Addr       string          `yaml:"addr,omitempty"`
+	SpecsDir   string          `yaml:"specsDir,omitempty"`
+	OpsRepo    string          `yaml:"opsRepo,omitempty"`
+	OpsRepoURL string          `yaml:"opsRepoURL,omitempty"`
+	Apply      *bool           `yaml:"apply,omitempty"`
+	Push       *bool           `yaml:"push,omitempty"`
+	Sync       *bool           `yaml:"sync,omitempty"`
+	Argo       map[string]Argo `yaml:"argo,omitempty"`
 }
 
 // Argo is a per-stage Argo CD origin. URL is the UI. Application CRs are

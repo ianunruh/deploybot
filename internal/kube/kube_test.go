@@ -134,6 +134,13 @@ users:
 	if err != nil || tok != "file-tok" {
 		t.Fatalf("token %q %v", tok, err)
 	}
+	if err := os.WriteFile(tokenPath, []byte("rotated-tok\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tok, err = rest.Auth.Token(t.Context())
+	if err != nil || tok != "rotated-tok" {
+		t.Fatalf("reread token %q %v", tok, err)
+	}
 	_, err = LoadREST(cfg, "nope")
 	if !errors.Is(err, ErrNoContext) {
 		t.Fatalf("missing context %v", err)

@@ -21,7 +21,7 @@ func (s *Service) Pin(ctx context.Context, name, stage, imageRef string) (Mutati
 	if err != nil {
 		return Mutation{}, err
 	}
-	tree, err := s.overlayTree(d)
+	tree, err := s.overlayTree(ctx, d)
 	if err != nil {
 		return Mutation{}, err
 	}
@@ -30,7 +30,7 @@ func (s *Service) Pin(ctx context.Context, name, stage, imageRef string) (Mutati
 	}, []string{stage})
 }
 
-func (s *Service) Diff(name, stage, imageRef string) (string, error) {
+func (s *Service) Diff(ctx context.Context, name, stage, imageRef string) (string, error) {
 	d, err := s.Catalog.Get(name)
 	if err != nil {
 		return "", err
@@ -39,7 +39,7 @@ func (s *Service) Diff(name, stage, imageRef string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	before, err := s.overlayTree(d)
+	before, err := s.overlayTree(ctx, d)
 	if err != nil {
 		return "", err
 	}

@@ -66,7 +66,7 @@ func (s *Server) images(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) diff(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	d, err := s.Release.Diff(r.PathValue("name"), q.Get("stage"), q.Get("image"))
+	d, err := s.Release.Diff(r.Context(), r.PathValue("name"), q.Get("stage"), q.Get("image"))
 	if err != nil {
 		writeError(w, err)
 		return

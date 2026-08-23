@@ -1,0 +1,63 @@
+# Routed deployable: generated Deployment, Service, HTTPRoute, and Argo
+# Applications. Human overlay patch-web.yaml sets DEPLOYBOT_API_URL.
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: deploybot-web
+spec:
+  namespace: deploybot-system
+  links:
+    repoURL: https://github.com/ianunruh/deploybot
+    projectURL: https://trello.com/b/rPALXxJF/kcloud
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/deploybot-web
+    applicationPath: k8s/apps/projects/sandbox
+  argo:
+    project: sandbox
+    createNamespace: true
+  image:
+    repository: ghcr.io/ianunruh/deploybot-web
+    tag: main
+    pullSecrets:
+      - ghcr-auth
+  workload:
+    kind: Deployment
+    replicas: 1
+    containerName: web
+    containerPort: 3000
+    portName: http
+    probes:
+      path: /
+      port: http
+      startup:
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        failureThreshold: 30
+      liveness:
+        initialDelaySeconds: 10
+        periodSeconds: 15
+      readiness:
+        periodSeconds: 10
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+  route:
+    port: 3000
+    timeout: 3600s
+    gatewayNamespace: envoy-gateway-system
+  stages:
+    - name: homelab
+      hostname: deploy.k8s.kcloud.zone
+      gateway:
+        name: internal
+        sectionName: https
+    - name: prod
+      hostname: deploy.k8s.kcloud.io
+      gateway:
+        name: internal
+        sectionName: https

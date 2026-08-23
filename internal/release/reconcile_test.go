@@ -189,7 +189,7 @@ func TestDiffReconcileDoesNotWrite(t *testing.T) {
 	t.Parallel()
 	dir := initOpsRepo(t)
 	svc := &Service{Catalog: loadExamples(t), OpsRepo: dir, Apply: true}
-	mut, err := svc.DiffReconcile("kmc", []string{"homelab"})
+	mut, err := svc.DiffReconcile(t.Context(), "kmc", []string{"homelab"})
 	if err != nil {
 		t.Fatal(err)
 	}

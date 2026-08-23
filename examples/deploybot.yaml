@@ -1,0 +1,50 @@
+# Thin deployable: generated Deployment + Argo Applications only.
+# Human extras live next to this file under deploybot/ (Service, SA, Argo
+# RBAC, git clone of kcloud-ops, kubeconfig). Secrets stay out of band
+# (gen-secrets.sh).
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: deploybot
+spec:
+  namespace: deploybot-system
+  links:
+    repoURL: https://github.com/ianunruh/deploybot
+    projectURL: https://trello.com/b/rPALXxJF/kcloud
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/deploybot
+    applicationPath: k8s/apps/projects/sandbox
+  argo:
+    project: sandbox
+    createNamespace: true
+  image:
+    repository: ghcr.io/ianunruh/deploybot
+    tag: main
+    pullSecrets:
+      - ghcr-auth
+  workload:
+    containerName: api
+    serviceAccountName: deploybot
+    containerPort: 8080
+    probes:
+      liveness:
+        path: /healthz
+        port: http
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      readiness:
+        path: /healthz
+        port: http
+        initialDelaySeconds: 3
+        periodSeconds: 5
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+  stages:
+    - name: homelab
+    - name: prod

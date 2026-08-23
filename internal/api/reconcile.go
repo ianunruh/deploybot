@@ -11,7 +11,7 @@ func (s *Server) reconcileDiff(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "stage is required"})
 		return
 	}
-	mut, err := s.Release.DiffReconcile(r.PathValue("name"), []string{stage})
+	mut, err := s.Release.DiffReconcile(r.Context(), r.PathValue("name"), []string{stage})
 	if err != nil {
 		writeError(w, err)
 		return

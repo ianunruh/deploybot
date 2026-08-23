@@ -56,6 +56,23 @@ func (b Bearer) Token(context.Context) (string, error) {
 
 func (b Bearer) Invalidate() {}
 
+// fileToken re-reads a projected service-account token on each request.
+type fileToken string
+
+func (f fileToken) Token(context.Context) (string, error) {
+	b, err := os.ReadFile(string(f))
+	if err != nil {
+		return "", fmt.Errorf("kube tokenFile: %w", err)
+	}
+	t := strings.TrimSpace(string(b))
+	if t == "" {
+		return "", fmt.Errorf("kube tokenFile %s: empty", f)
+	}
+	return t, nil
+}
+
+func (f fileToken) Invalidate() {}
+
 // ResolvePath picks a kubeconfig file. explicit wins, then KUBECONFIG (first
 // entry), then ~/.kube/config. Empty means none.
 func ResolvePath(explicit string) string {
@@ -195,13 +212,7 @@ func tokenSourceFor(user user, cluster cluster) (TokenSource, error) {
 		return Bearer(t), nil
 	}
 	if user.TokenFile != "" {
-		b, err := os.ReadFile(user.TokenFile)
-		if err != nil {
-			return nil, fmt.Errorf("kube tokenFile: %w", err)
-		}
-		if t := strings.TrimSpace(string(b)); t != "" {
-			return Bearer(t), nil
-		}
+		return fileToken(user.TokenFile), nil
 	}
 	if user.Exec != nil && user.Exec.Command != "" {
 		return newExecAuth(*user.Exec, cluster), nil

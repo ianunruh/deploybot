@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploybot
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          envFrom:
+            - configMapRef:
+                name: deploybot-env
+            - secretRef:
+                name: deploybot-env
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: ops
+              mountPath: /ops
+            - name: cluster-tokens
+              mountPath: /var/run/secrets/deploybot/clusters
+              readOnly: true
+      volumes:
+        - name: config
+          projected:
+            sources:
+              - configMap:
+                  name: deploybot-config
+              - configMap:
+                  name: deploybot-kubeconfig
+        - name: ops
+          emptyDir: {}
+        - name: cluster-tokens
+          secret:
+            secretName: deploybot-cluster-tokens
+            optional: true
+      terminationGracePeriodSeconds: 10

@@ -57,26 +57,31 @@ func TestListAndGet(t *testing.T) {
 	for _, d := range list.Deployables {
 		names = append(names, d.Name)
 	}
-	if len(names) != 2 || names[0] != "kmc" || names[1] != "kmc-controller" {
+	if len(names) != 4 || names[0] != "deploybot" || names[1] != "deploybot-web" || names[2] != "kmc" || names[3] != "kmc-controller" {
 		t.Fatalf("%+v", list)
 	}
-	if list.Deployables[0].RepoURL != "https://github.com/ianunruh/kmc" {
-		t.Fatalf("kmc repo %q", list.Deployables[0].RepoURL)
+	kmc := list.Deployables[2]
+	ctrl := list.Deployables[3]
+	if kmc.RepoURL != "https://github.com/ianunruh/kmc" {
+		t.Fatalf("kmc repo %q", kmc.RepoURL)
 	}
-	if list.Deployables[0].ProjectURL != "https://trello.com/b/rPALXxJF/kcloud" {
-		t.Fatalf("kmc project %q", list.Deployables[0].ProjectURL)
+	if kmc.ProjectURL != "https://trello.com/b/rPALXxJF/kcloud" {
+		t.Fatalf("kmc project %q", kmc.ProjectURL)
 	}
-	if list.Deployables[1].RepoURL != "https://github.com/ianunruh/kmc" {
-		t.Fatalf("controller repo %q", list.Deployables[1].RepoURL)
+	if ctrl.RepoURL != "https://github.com/ianunruh/kmc" {
+		t.Fatalf("controller repo %q", ctrl.RepoURL)
 	}
-	if len(list.Deployables[0].StageLinks) != 2 {
-		t.Fatalf("kmc stageLinks %+v", list.Deployables[0].StageLinks)
+	if list.Deployables[0].RepoURL != "https://github.com/ianunruh/deploybot" {
+		t.Fatalf("deploybot repo %q", list.Deployables[0].RepoURL)
 	}
-	hl := list.Deployables[0].StageLinks[0]
+	if len(kmc.StageLinks) != 2 {
+		t.Fatalf("kmc stageLinks %+v", kmc.StageLinks)
+	}
+	hl := kmc.StageLinks[0]
 	if hl.Name != "homelab" || hl.HeadlampURL == "" || hl.GrafanaURL == "" || hl.LogsURL == "" {
 		t.Fatalf("kmc homelab links %+v", hl)
 	}
-	pr := list.Deployables[0].StageLinks[1]
+	pr := kmc.StageLinks[1]
 	if pr.Name != "prod" || pr.HeadlampURL == "" || pr.GrafanaURL == "" || pr.LogsURL != "" {
 		t.Fatalf("kmc prod links %+v", pr)
 	}

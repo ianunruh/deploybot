@@ -16,7 +16,7 @@ import (
 
 func TestGoldens(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"kmc", "kmc-controller"} {
+	for _, name := range []string{"kmc", "kmc-controller", "deploybot", "deploybot-web"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			d := loadExample(t, name)

@@ -62,6 +62,13 @@ Deployment + Argo apps only. CRDs and RBAC copied from
 `kmc/deploy/controller`. `patch-manager.yaml` (securityContext, extra ports)
 and per-stage `patch-cidrs.yaml` (cluster CIDR args) are overlay-owned.
 
+**deploybot** (`examples/deploybot.yaml` + `examples/deploybot-web.yaml`):
+self-hosted control plane in `deploybot-system`. API has no route (ClusterIP
+Service + Argo RBAC + git clone of kcloud-ops are overlay-owned). Console is
+routed at `deploy.k8s.kcloud.zone` / `deploy.k8s.kcloud.io` on Gateway
+`internal` / `https`. Specs are baked into the API image. GitHub Actions
+builds both images; the local instance bootstraps the first pin.
+
 GitHub Actions keeps building; deploybot consumes the image. Do not move
 Kaniko or rewrite `docker-build.yml` for this.
 

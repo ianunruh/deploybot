@@ -4,8 +4,9 @@ Small-scale release control plane: a deployable spec in git becomes a
 Deployment and Argo Application (plus Service / HTTPRoute when the app is
 routed), then you pin an image digest and promote homelab → prod.
 
-Customers today: kmc console (`examples/kmc.yaml`) and kmc-controller
-(`examples/kmc-controller.yaml`). Deploybot generates the skeleton and the
+Customers today: kmc console (`examples/kmc.yaml`), kmc-controller
+(`examples/kmc-controller.yaml`), and deploybot itself (`examples/deploybot.yaml`
++ `examples/deploybot-web.yaml`). Deploybot generates the skeleton and the
 image pin. ConfigMaps, secrets, CRDs, RBAC, and extra pod fields (env,
 volumes, args, securityContext, CIDRs) stay as extra files / overlay patches.
 
@@ -87,7 +88,7 @@ Push to `main` runs GitHub Actions: `CI` (Go test + golangci-lint, web `pnpm che
 
 | Image | Role |
 |-------|------|
-| `ghcr.io/ianunruh/deploybot` | Go API (`serve --addr :8080`, `/healthz`). Mount specs at `/specs` or set `DEPLOYBOT_SPECS_DIR`. |
+| `ghcr.io/ianunruh/deploybot` | Go API (`serve --addr :8080`, `/healthz`). Specs are baked at `/specs` (`examples/*.yaml`). Set `DEPLOYBOT_OPS_REPO_URL` to clone the ops repo into `DEPLOYBOT_OPS_REPO` at startup. |
 | `ghcr.io/ianunruh/deploybot-web` | React Router console (`PORT=3000`). Talks to the API via `DEPLOYBOT_API_URL`. |
 
 ```bash
