@@ -33,8 +33,7 @@ API, not a replacement for them.
   promote loop.
 - **Two app flavors, one spec:** source-built (image from CI SHA) and
   third-party (pinned upstream tag, often a StatefulSet). Play (sonarr,
-  jackett, …) is first-class later; it is the simpler workload, not a
-  different product.
+  jackett, …) uses the same spec; `lscr.io` canonicalizes to `docker.io`.
 - **Do not grow the spec into a Deployment schema.** Generate the skeleton
   (Deployment, optional Service/HTTPRoute, overlay `images:`, Argo app).
   App-specific fields (env, volumes, args, securityContext, extra ports,
@@ -80,8 +79,9 @@ Kaniko or rewrite the image build in `docker-build.yml` for this.
 
 ## What this repo already did
 
-Spec + renderer + goldens for kmc, kmc-controller, and deploybot itself.
-Image pin (GHCR picker, newest first), local git write, opt-in git push (no
+Spec + renderer + goldens for kmc, kmc-controller, deploybot itself, and
+sonarr (StatefulSet). Image pin (GHCR or Docker Hub picker, newest first;
+`lscr.io` canonicalizes to `docker.io`), local git write, opt-in git push (no
 force), Argo sync/health/promote, RR console (catalog, stage matrix, pin,
 promote, per-stage reconcile). Deploybot is cut over in homelab and prod;
 push to `main` pins homelab via the prod API (GitHub OIDC).
@@ -99,7 +99,9 @@ per probe without a shared `probes.path`.
 
 ## Explicitly not done yet
 
-- Play / ivy as spec customers.
+- Play cutover in kcloud-ops (sonarr spec + Docker Hub pin picker exist;
+  live `k8s/play/*` still has tags in the workload YAML).
+- ivy as a spec customer.
 - Preview apps, multi-service releases, replacing Actions/Kaniko.
 
 ## Non-goals

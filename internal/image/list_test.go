@@ -2,6 +2,31 @@ package image
 
 import "testing"
 
+func TestCanonicalRepository(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		in, want string
+	}{
+		{"ghcr.io/ianunruh/kmc", "ghcr.io/ianunruh/kmc"},
+		{"https://ghcr.io/ianunruh/kmc", "ghcr.io/ianunruh/kmc"},
+		{"lscr.io/linuxserver/sonarr", "docker.io/linuxserver/sonarr"},
+		{"LSCR.IO/linuxserver/sonarr/", "docker.io/linuxserver/sonarr"},
+		{"linuxserver/sonarr", "docker.io/linuxserver/sonarr"},
+		{"docker.io/linuxserver/sonarr", "docker.io/linuxserver/sonarr"},
+		{"haugene/transmission-openvpn", "docker.io/haugene/transmission-openvpn"},
+		{"nginx", "docker.io/library/nginx"},
+		{"library/nginx", "docker.io/library/nginx"},
+		{"docker.io/library/nginx", "docker.io/library/nginx"},
+		{"index.docker.io/linuxserver/sonarr", "docker.io/linuxserver/sonarr"},
+		{"", ""},
+	}
+	for _, tc := range cases {
+		if got := CanonicalRepository(tc.in); got != tc.want {
+			t.Fatalf("CanonicalRepository(%q)=%q want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestParseGHCR(t *testing.T) {
 	t.Parallel()
 	owner, name, err := parseGHCR("ghcr.io/ianunruh/kmc")

@@ -36,7 +36,7 @@ func OverlayKustomizationPath(d *spec.Deployable, stage string) string {
 }
 
 func ApplicationOverlayPath(d *spec.Deployable, stage string) string {
-	return path.Join(d.Spec.Git.ApplicationPath, "overlays", stage, d.Metadata.Name+".yaml")
+	return path.Join(d.Spec.Git.ApplicationPath, "overlays", stage, d.Spec.Argo.Name+".yaml")
 }
 
 func labels(d *spec.Deployable) map[string]string {

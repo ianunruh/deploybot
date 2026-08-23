@@ -1,0 +1,50 @@
+# Routed play deployable: generated StatefulSet, Service, HTTPRoute, and Argo
+# Applications only. Human overlays live next to this file under sonarr/
+# (PUID/PGID, config VCT, media PVC mounts).
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: sonarr
+spec:
+  namespace: play
+  links:
+    repoURL: https://github.com/linuxserver/docker-sonarr
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/play/sonarr
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+    name: play-sonarr
+  image:
+    repository: docker.io/linuxserver/sonarr
+    tag: 4.0.15.2941-ls285
+  workload:
+    kind: StatefulSet
+    containerName: sonarr
+    containerPort: 8989
+    portName: http
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+  route:
+    port: 8989
+    gatewayNamespace: envoy-gateway-system
+  stages:
+    - name: homelab
+      hostname: sonarr.k8s.kcloud.zone
+      gateway:
+        name: internal
+        sectionName: https
+    - name: prod
+      hostname: sonarr.kcloud.io
+      gateway:
+        name: external
+        sectionName: https-public
+      promote:
+        after:
+          - approval

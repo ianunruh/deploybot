@@ -15,7 +15,7 @@ import (
 
 func TestGoldens(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"kmc", "kmc-controller", "deploybot", "deploybot-web"} {
+	for _, name := range []string{"kmc", "kmc-controller", "deploybot", "deploybot-web", "sonarr"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			d := loadExample(t, name)
@@ -91,6 +91,37 @@ func TestControllerOmitsServiceAndRoute(t *testing.T) {
 	}
 	if !strings.Contains(dep, "port: 8081") {
 		t.Fatalf("generated deployment missing numeric probe port:\n%s", dep)
+	}
+}
+
+func TestSonarrStatefulSetSkeleton(t *testing.T) {
+	t.Parallel()
+	d := loadExample(t, "sonarr")
+	tree, err := Render(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := tree["k8s/play/sonarr/base/deployment.yaml"]; ok {
+		t.Fatal("sonarr should not emit deployment.yaml")
+	}
+	sts := string(tree["k8s/play/sonarr/base/statefulset.yaml"])
+	if !strings.Contains(sts, "kind: StatefulSet") {
+		t.Fatalf("missing StatefulSet:\n%s", sts)
+	}
+	for _, refuse := range []string{"PUID", "volumeMounts:", "volumeClaimTemplates:", "plex-media"} {
+		if strings.Contains(sts, refuse) {
+			t.Fatalf("generated statefulset must not include %q:\n%s", refuse, sts)
+		}
+	}
+	if _, ok := tree["k8s/apps/projects/play/overlays/homelab/sonarr.yaml"]; ok {
+		t.Fatal("argo overlay must use spec.argo.name, not metadata.name")
+	}
+	app := string(tree["k8s/apps/projects/play/overlays/homelab/play-sonarr.yaml"])
+	if !strings.Contains(app, "name: play-sonarr") {
+		t.Fatalf("argo app:\n%s", app)
+	}
+	if !strings.Contains(app, "project: play") {
+		t.Fatalf("argo project:\n%s", app)
 	}
 }
 

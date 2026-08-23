@@ -119,6 +119,72 @@ spec:
     - name: prod
 `
 
+const sonarrYAML = `
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: sonarr
+spec:
+  namespace: play
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/play/sonarr
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+    name: play-sonarr
+  image:
+    repository: lscr.io/linuxserver/sonarr
+    tag: 4.0.15.2941-ls285
+  workload:
+    kind: StatefulSet
+    containerName: sonarr
+    containerPort: 8989
+  route: {}
+  stages:
+    - name: homelab
+      hostname: sonarr.k8s.kcloud.zone
+      gateway:
+        name: internal
+        sectionName: https
+    - name: prod
+      hostname: sonarr.kcloud.io
+      gateway:
+        name: external
+        sectionName: https-public
+`
+
+func TestParseSonarr(t *testing.T) {
+	t.Parallel()
+	d, err := Parse([]byte(sonarrYAML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Spec.Workload.Kind != "StatefulSet" {
+		t.Fatalf("kind %q", d.Spec.Workload.Kind)
+	}
+	if d.Spec.Argo.Name != "play-sonarr" {
+		t.Fatalf("argo name %q", d.Spec.Argo.Name)
+	}
+	if d.Spec.Image.Repository != "docker.io/linuxserver/sonarr" {
+		t.Fatalf("canonical image %q", d.Spec.Image.Repository)
+	}
+	if d.Spec.Workload.ContainerName != "sonarr" {
+		t.Fatalf("container %q", d.Spec.Workload.ContainerName)
+	}
+	if !d.HasRoute() {
+		t.Fatal("expected route")
+	}
+}
+
+func TestRejectsUnknownWorkloadKind(t *testing.T) {
+	t.Parallel()
+	body := strings.ReplaceAll(kmcYAML, "containerPort: 3000", "kind: DaemonSet\n    containerPort: 3000")
+	if _, err := Parse([]byte(body)); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func TestParseControllerOmitsRoute(t *testing.T) {
 	t.Parallel()
 	d, err := Parse([]byte(controllerYAML))

@@ -14,8 +14,9 @@ func writeWorkload(out Tree, d *spec.Deployable) error {
 	if err != nil {
 		return err
 	}
-	resources := []string{"deployment.yaml"}
-	out[path.Join(base, "base/deployment.yaml")] = dep
+	file := workloadFile(d.Spec.Workload.Kind)
+	resources := []string{file}
+	out[path.Join(base, "base", file)] = dep
 	if d.HasRoute() {
 		svc, err := yamlx.MarshalGenerated(serviceObj(d))
 		if err != nil {
@@ -113,7 +114,7 @@ func deploymentObj(d *spec.Deployable) deployment {
 	lbl := labels(d)
 	return deployment{
 		APIVersion: "apps/v1",
-		Kind:       "Deployment",
+		Kind:       w.Kind,
 		Metadata:   objectMeta{Name: d.Metadata.Name, Labels: lbl},
 		Spec: deploySpec{
 			Replicas: w.Replicas,
@@ -167,6 +168,13 @@ func resourceMap(r spec.ResourceList) map[string]string {
 		return nil
 	}
 	return m
+}
+
+func workloadFile(kind string) string {
+	if kind == "StatefulSet" {
+		return "statefulset.yaml"
+	}
+	return "deployment.yaml"
 }
 
 func serviceObj(d *spec.Deployable) service {

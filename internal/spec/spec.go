@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ianunruh/deploybot/internal/image"
 	"gopkg.in/yaml.v3"
 )
 
@@ -218,6 +219,9 @@ func (d *Deployable) Default() {
 	d.Spec.Git.TargetRevision = cmp.Or(d.Spec.Git.TargetRevision, "HEAD")
 	d.Spec.Argo.Name = cmp.Or(d.Spec.Argo.Name, d.Metadata.Name)
 	d.Spec.Argo.DestinationServer = cmp.Or(d.Spec.Argo.DestinationServer, "https://kubernetes.default.svc")
+	if d.Spec.Image.Repository != "" {
+		d.Spec.Image.Repository = image.CanonicalRepository(d.Spec.Image.Repository)
+	}
 	d.Spec.Workload.Kind = cmp.Or(d.Spec.Workload.Kind, "Deployment")
 	if d.Spec.Workload.Replicas == 0 {
 		d.Spec.Workload.Replicas = 1
@@ -273,8 +277,8 @@ func (d *Deployable) Validate() error {
 	if err := httpURLError("spec.links.projectURL", d.Spec.Links.ProjectURL); err != "" {
 		errs = append(errs, err)
 	}
-	if d.Spec.Workload.Kind != "Deployment" {
-		errs = append(errs, "spec.workload.kind must be Deployment")
+	if d.Spec.Workload.Kind != "Deployment" && d.Spec.Workload.Kind != "StatefulSet" {
+		errs = append(errs, "spec.workload.kind must be Deployment or StatefulSet")
 	}
 	hasRoute := d.HasRoute()
 	if hasRoute && d.Spec.Route.Port <= 0 {

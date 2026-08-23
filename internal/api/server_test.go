@@ -59,7 +59,7 @@ func TestListAndGet(t *testing.T) {
 	for _, d := range list.Deployables {
 		names = append(names, d.Name)
 	}
-	if len(names) != 4 || names[0] != "deploybot" || names[1] != "deploybot-web" || names[2] != "kmc" || names[3] != "kmc-controller" {
+	if len(names) != 5 || names[0] != "deploybot" || names[1] != "deploybot-web" || names[2] != "kmc" || names[3] != "kmc-controller" || names[4] != "sonarr" {
 		t.Fatalf("%+v", list)
 	}
 	kmc := list.Deployables[2]

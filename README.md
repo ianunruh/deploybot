@@ -5,8 +5,9 @@ Deployment and Argo Application (plus Service / HTTPRoute when the app is
 routed), then you pin an image digest and promote homelab → prod.
 
 Customers today: kmc console (`examples/kmc.yaml`), kmc-controller
-(`examples/kmc-controller.yaml`), and deploybot itself (`examples/deploybot.yaml`
-+ `examples/deploybot-web.yaml`), which is self-hosted in homelab and prod.
+(`examples/kmc-controller.yaml`), deploybot itself (`examples/deploybot.yaml`
++ `examples/deploybot-web.yaml`), and sonarr as the first Play spec
+(`examples/sonarr.yaml`). Deploybot is self-hosted in homelab and prod.
 Deploybot generates the skeleton and the image pin. ConfigMaps, secrets, CRDs,
 RBAC, and extra pod fields (env, volumes, args, securityContext, CIDRs) stay
 as extra files / overlay patches.
@@ -67,10 +68,14 @@ kubeconfig (`KUBECONFIG` or `~/.kube/config`) — there is no Argo API token.
 Optional `kubeconfig:` points at a specific file.
 `DEPLOYBOT_ARGO_URL_<STAGE>` overrides a stage UI URL.
 
-The pin picker lists GHCR versions (newest first) via the GitHub Packages
-API. Auth is `DEPLOYBOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`, or
+The pin picker lists published tags (newest first). `ghcr.io/…` uses the
+GitHub Packages API; `docker.io/…` (including `lscr.io/…` and unprefixed
+Hub names, rewritten to `docker.io`) uses the Docker Hub tags API. GitHub
+auth is `DEPLOYBOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`, or
 `gh auth token`. The token needs `read:packages` (or `write:packages`).
-Without that scope it falls back to `main-<sha>` tags from git history.
+Without that scope GHCR falls back to `main-<sha>` tags from git history.
+Docker Hub listing is unauthenticated for public images; set
+`DEPLOYBOT_DOCKERHUB_TOKEN` only if Hub rate-limits the API.
 
 HTTPS git push uses `DEPLOYBOT_GIT_TOKEN`, then the same GitHub tokens as
 the pin picker. SSH remotes use the ssh-agent (or `~/.ssh/id_ed25519` /

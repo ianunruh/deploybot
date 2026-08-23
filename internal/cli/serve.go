@@ -67,7 +67,10 @@ func runServe(ctx context.Context, args []string) error {
 		return err
 	}
 	token, tokenSrc := image.ResolveToken()
-	gh := &image.GitHub{Token: token, HTTPClient: &http.Client{Timeout: 20 * time.Second}}
+	httpClient := &http.Client{Timeout: 20 * time.Second}
+	gh := &image.GitHub{Token: token, HTTPClient: httpClient}
+	hub := image.NewDockerHub()
+	hub.HTTPClient = httpClient
 	svc := &release.Service{
 		Catalog: cat,
 		OpsRepo: s.repo,
@@ -77,7 +80,7 @@ func runServe(ctx context.Context, args []string) error {
 		Author:  gitwrite.DefaultAuthor(),
 		Argo:    eps,
 		Wait:    5 * time.Minute,
-		Images:  gh,
+		Images:  &image.Registry{GitHub: gh, DockerHub: hub},
 		Commits: gh,
 	}
 	h := (&api.Server{Release: svc, Catalog: cat}).Handler()

@@ -363,33 +363,19 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
             ) : (
               <TextInput
                 label="Image"
-                placeholder="ghcr.io/ianunruh/kmc@sha256:…"
+                placeholder="repository:tag@sha256:…"
                 value={selectedImage}
                 onChange={(e) => setImage(e.currentTarget.value)}
               />
             )}
-            {imagesLoading ? (
-              <Text size="xs" c="dimmed">
-                Loading published images…
-              </Text>
-            ) : imagesError != null ? (
-              <Text size="xs" c="dimmed">
-                Could not list images ({imagesError}). Paste a ref instead.
-              </Text>
-            ) : imageOptions.length === 0 ? (
-              <Text size="xs" c="dimmed">
-                No tagged GHCR versions. Paste a ref instead.
-              </Text>
-            ) : imagesSource === "commits" ? (
-              <Text size="xs" c="dimmed">
-                Newest git commits first (`main-&lt;sha&gt;` tags). Token needs
-                read:packages for GHCR digests.
-              </Text>
-            ) : (
-              <Text size="xs" c="dimmed">
-                Newest GHCR versions first.
-              </Text>
-            )}
+            <Text size="xs" c="dimmed">
+              {pinImagesHint({
+                loading: imagesLoading,
+                error: imagesError,
+                count: imageOptions.length,
+                source: imagesSource,
+              })}
+            </Text>
             <ArgoSyncCheckbox
               show={status.apply && status.sync}
               checked={pinSync}
@@ -469,6 +455,30 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       />
     </Stack>
   );
+}
+
+function pinImagesHint({
+  loading,
+  error,
+  count,
+  source,
+}: {
+  loading: boolean;
+  error: string | null;
+  count: number;
+  source: string;
+}): string {
+  if (loading) return "Loading published images…";
+  if (error != null) return `Could not list images (${error}). Paste a ref instead.`;
+  if (count === 0) return "No tagged versions. Paste a ref instead.";
+  switch (source) {
+    case "commits":
+      return "Newest git commits first (`main-<sha>` tags). Token needs read:packages for GHCR digests.";
+    case "dockerhub":
+      return "Newest Docker Hub tags first.";
+    default:
+      return "Newest GHCR versions first.";
+  }
 }
 
 function MutationModeAlert({ apply, push }: { apply: boolean; push: boolean }) {
