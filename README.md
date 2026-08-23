@@ -19,6 +19,8 @@ Original intent and non-goals: [docs/goals.md](docs/goals.md).
 | `web/` | React Router 8 + Mantine console |
 | `examples/` | Deployable specs and overlay patches |
 | `deploybot.yaml` | Process config (Argo UI URLs, kube contexts). GitHub tokens stay in env |
+| `Dockerfile` | API image: `ghcr.io/ianunruh/deploybot` |
+| `web/Dockerfile` | Console image: `ghcr.io/ianunruh/deploybot-web` |
 
 ## Develop
 
@@ -77,4 +79,17 @@ for this toolchain):
 
 ```bash
 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1
+```
+
+## Images
+
+Push to `main` runs GitHub Actions: `CI` (Go test + golangci-lint, web `pnpm check`) and `Build and Push Docker Images` (same tags as kmc).
+
+| Image | Role |
+|-------|------|
+| `ghcr.io/ianunruh/deploybot` | Go API (`serve --addr :8080`, `/healthz`). Mount specs at `/specs` or set `DEPLOYBOT_SPECS_DIR`. |
+| `ghcr.io/ianunruh/deploybot-web` | React Router console (`PORT=3000`). Talks to the API via `DEPLOYBOT_API_URL`. |
+
+```bash
+just docker
 ```

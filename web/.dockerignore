@@ -1,0 +1,14 @@
+.DS_Store
+.git
+.github
+.agents
+.react-router
+build
+node_modules
+.env
+.env.*
+**/*.md
+.eslintcache
+*.tsbuildinfo
+Dockerfile
+.dockerignore

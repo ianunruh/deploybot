@@ -1,0 +1,15 @@
+.git
+.github
+.agents
+.grok
+web
+build
+docs
+examples
+**/*_test.go
+**/*.md
+.dockerignore
+.gitignore
+.golangci.yml
+Justfile
+deploybot.yaml

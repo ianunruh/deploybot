@@ -31,6 +31,10 @@ web-install:
 web-dev:
     cd web && pnpm dev
 
+docker:
+    docker build -t ghcr.io/ianunruh/deploybot:local -f Dockerfile .
+    docker build -t ghcr.io/ianunruh/deploybot-web:local -f web/Dockerfile web
+
 serve *args:
     go run . serve {{args}}
 
