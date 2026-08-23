@@ -1,6 +1,6 @@
 # GitHub Actions OIDC on the public API route. Console stays on ClusterIP
 # and does not send a JWT. edge-sso is Dex + k8s SA only, so this is a
-# one-off policy.
+# one-off policy. pin-homelab jobs in deploybot and kmc on main.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
@@ -37,6 +37,7 @@ spec:
               - name: repository
                 values:
                   - ianunruh/deploybot
+                  - ianunruh/kmc
               - name: ref
                 values:
                   - refs/heads/main

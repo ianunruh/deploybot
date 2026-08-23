@@ -53,22 +53,24 @@ API, not a replacement for them.
 
 **kmc console** (`examples/kmc.yaml`): Deployment, Service, HTTPRoute, Argo
 Application, homelab → prod, pin by digest/`main-<sha>`. Cut over in
-`kcloud-ops`. `patch-web.yaml` (envFrom, env, clusters volume) and prod
-`patch-cluster-tokens.yaml` are overlay-owned, plus `clusters.yaml`, env
-ConfigMaps, `gen-secrets.sh`, impersonator SA/RBAC.
+`kcloud-ops`. GitHub Actions pins homelab through the prod API. `patch-web.yaml`
+(envFrom, env, clusters volume) and prod `patch-cluster-tokens.yaml` are
+overlay-owned, plus `clusters.yaml`, env ConfigMaps, `gen-secrets.sh`,
+impersonator SA/RBAC.
 
 **kmc-controller** (`examples/kmc-controller.yaml`): no route. Generated
-Deployment + Argo apps only. CRDs and RBAC copied from
-`kmc/deploy/controller`. `patch-manager.yaml` (securityContext, extra ports)
-and per-stage `patch-cidrs.yaml` (cluster CIDR args) are overlay-owned.
+Deployment + Argo apps only. Same kmc repo CI pins it with the console. CRDs
+and RBAC copied from `kmc/deploy/controller`. `patch-manager.yaml`
+(securityContext, extra ports) and per-stage `patch-cidrs.yaml` (cluster CIDR
+args) are overlay-owned.
 
 **deploybot** (`examples/deploybot.yaml` + `examples/deploybot-web.yaml`):
 self-hosted control plane in `deploybot-system`, live in homelab and prod.
 API is ClusterIP in-cluster (console talks to it directly; Service, SA, Argo
 RBAC, git clone of kcloud-ops, and kubeconfig are overlay-owned). Prod
 exposes the API at `deploy-api.k8s.kcloud.io` on Gateway `external` / `https`
-with a GitHub Actions OIDC SecurityPolicy (allow `ianunruh/deploybot` on
-`refs/heads/main`). Console is routed at `deploy.k8s.kcloud.zone` /
+with a GitHub Actions OIDC SecurityPolicy (allow `ianunruh/deploybot` and
+`ianunruh/kmc` on `refs/heads/main`). Console is routed at `deploy.k8s.kcloud.zone` /
 `deploy.k8s.kcloud.io` on Gateway `internal` / `https`. Specs are baked into
 the API image. GitHub Actions builds both images and pins homelab through
 the prod API; promote to prod is a console action.
