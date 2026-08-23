@@ -60,6 +60,14 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 }
 
+function syncCrumbs(name?: string) {
+  const crumbs = [{ label: "Deployables", to: "/" }];
+  if (name) {
+    crumbs.push({ label: name, to: `/deployables/${name}` });
+  }
+  return crumbs;
+}
+
 export default function SyncStage({ loaderData, params }: Route.ComponentProps) {
   const { status, preview, error } = loaderData;
   const revalidator = useRevalidator();
@@ -78,7 +86,7 @@ export default function SyncStage({ loaderData, params }: Route.ComponentProps) 
   if (error != null || status == null || preview == null) {
     return (
       <Stack gap="lg">
-        <PageHeader title="Sync" />
+        <PageHeader title="Sync" crumbs={syncCrumbs(params.name)} />
         <Alert color="red" title="Could not load">
           {error ?? "unknown error"}
         </Alert>
@@ -102,6 +110,7 @@ export default function SyncStage({ loaderData, params }: Route.ComponentProps) 
     <Stack gap="lg">
       <PageHeader
         title={`Sync ${params.stage}`}
+        crumbs={syncCrumbs(status.name)}
         description={`${status.name} · write generated manifests for this stage`}
         actions={
           <Group gap="sm">

@@ -82,6 +82,8 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 }
 
+const deployablesCrumb = { label: "Deployables", to: "/" };
+
 export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
   const { status, error } = loaderData;
   const revalidator = useRevalidator();
@@ -152,7 +154,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
   if (error != null || status == null) {
     return (
       <Stack gap="lg">
-        <PageHeader title="Deployable" />
+        <PageHeader title="Deployable" crumbs={[deployablesCrumb]} />
         <Alert color="red" title="Could not load">
           {error ?? "unknown error"}
         </Alert>
@@ -164,6 +166,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
     <Stack gap="lg">
       <PageHeader
         title={status.name}
+        crumbs={[deployablesCrumb]}
         description={`${status.namespace} · ${status.imageRepo}`}
         actions={
           <Group gap="sm">
