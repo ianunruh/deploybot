@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: plex
+spec:
+  template:
+    spec:
+      containers:
+        - name: plex
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: VERSION
+              value: docker
+          volumeMounts:
+            - name: data
+              mountPath: /config
+            - name: media-extra
+              mountPath: /media/extra
+            - name: media-nas
+              mountPath: /media/nas
+            - name: tls-cert
+              mountPath: /etc/plex/tls
+              readOnly: true
+            - name: transcode
+              mountPath: /transcode
+      volumes:
+        - name: media-extra
+          persistentVolumeClaim:
+            claimName: plex-media-extra
+        - name: media-nas
+          persistentVolumeClaim:
+            claimName: plex-media-nas
+        - name: tls-cert
+          secret:
+            secretName: plex-server-tls
+        - name: transcode
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 200Gi

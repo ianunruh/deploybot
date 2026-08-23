@@ -1,0 +1,54 @@
+# Routed play deployable: generated StatefulSet, Service, HTTPRoute, and Argo
+# Applications only. Human overlays live next to this file under nzbget/
+# (PUID/PGID, envFrom, config VCT, media/downloads mounts). List
+# patch-httproute-filter.yaml on the base kustomization with an HTTPRoute
+# target so reconcile does not drop Envoy basic-auth. HTTPRouteFilter,
+# pvc-downloads, Infisical, and gen-secrets.sh stay in the ops repo; sync
+# keeps those extra files.
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: nzbget
+spec:
+  namespace: play
+  links:
+    repoURL: https://github.com/linuxserver/docker-nzbget
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/play/nzbget
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+    name: play-nzbget
+  image:
+    repository: docker.io/linuxserver/nzbget
+    tag: v26.2-ls257
+  workload:
+    kind: StatefulSet
+    containerName: nzbget
+    containerPort: 6789
+    portName: http
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+  route:
+    port: 6789
+    gatewayNamespace: envoy-gateway-system
+  stages:
+    - name: homelab
+      hostname: nzbget.k8s.kcloud.zone
+      gateway:
+        name: internal
+        sectionName: https
+    - name: prod
+      hostname: nzbget.kcloud.io
+      gateway:
+        name: external
+        sectionName: https-public
+      promote:
+        after:
+          - approval

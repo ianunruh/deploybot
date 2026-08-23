@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: transmission
+spec:
+  template:
+    spec:
+      containers:
+        - name: transmission
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+          envFrom:
+            - configMapRef:
+                name: transmission
+            - secretRef:
+                name: transmission
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          volumeMounts:
+            - name: data
+              mountPath: /config
+            - name: downloads
+              mountPath: /data
+            - name: media-extra
+              mountPath: /media/extra
+            - name: media-nas
+              mountPath: /media/nas
+      volumes:
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: transmission-downloads
+        - name: media-extra
+          persistentVolumeClaim:
+            claimName: plex-media-extra
+        - name: media-nas
+          persistentVolumeClaim:
+            claimName: plex-media-nas
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 50Gi

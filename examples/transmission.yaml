@@ -1,0 +1,52 @@
+# Routed play deployable: generated StatefulSet, Service, HTTPRoute, and Argo
+# Applications only. Human overlays live next to this file under transmission/
+# (PUID/PGID, envFrom, NET_ADMIN, config VCT, media/downloads mounts).
+# config.env, pvc-downloads, Infisical, and gen-secrets.sh stay in the ops
+# repo; sync keeps those extra files.
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: transmission
+spec:
+  namespace: play
+  links:
+    repoURL: https://github.com/haugene/docker-transmission-openvpn
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/play/transmission
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+    name: play-transmission
+  image:
+    repository: docker.io/haugene/transmission-openvpn
+    tag: 4.3.2
+  workload:
+    kind: StatefulSet
+    containerName: transmission
+    containerPort: 9091
+    portName: http
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 4000m
+        memory: 16Gi
+  route:
+    port: 9091
+    gatewayNamespace: envoy-gateway-system
+  stages:
+    - name: homelab
+      hostname: torrent.k8s.kcloud.zone
+      gateway:
+        name: internal
+        sectionName: https
+    - name: prod
+      hostname: torrent.k8s.kcloud.io
+      gateway:
+        name: internal
+        sectionName: https
+      promote:
+        after:
+          - approval

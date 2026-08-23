@@ -78,15 +78,25 @@ the prod API; promote to prod is a console action.
 GitHub Actions keeps building; deploybot consumes the image. Do not move
 Kaniko or rewrite the image build in `docker-build.yml` for this.
 
+**Play** (`examples/sonarr.yaml`, `radarr`, `bazarr`, `jackett`, `tautulli`,
+`ombi`, `flaresolverr`, `nzbget`, `transmission`, `plex-exporter`, `plex`,
+`teamspeak`): mix of linuxserver StatefulSets, a GHCR Deployment
+(flaresolverr), haugene transmission-openvpn, plex-exporter (no route),
+Plex (LoadBalancer, no HTTPRoute), and teamspeak (namespace `teamspeak`,
+UDP/TCP LoadBalancers). App-specific env, volumes, extra Services, PVCs,
+certs, Infisical, and HTTPRoute filters stay as overlay patches / extra
+files. `lscr.io` and unprefixed Hub names canonicalize to `docker.io`.
+
 ## What this repo already did
 
 Spec + renderer + goldens for kmc, kmc-controller, deploybot itself, and
-Play linuxserver apps (sonarr, radarr, bazarr, jackett, tautulli, ombi;
-StatefulSet). Image pin (GHCR or Docker Hub picker, newest first;
-`lscr.io` canonicalizes to `docker.io`), local git write, opt-in git push (no
-force), Argo sync/health/promote, RR console (catalog, stage matrix, pin,
-promote, per-stage reconcile). Deploybot is cut over in homelab and prod;
-push to `main` pins homelab via the prod API (GitHub OIDC).
+Play apps (sonarr, radarr, bazarr, jackett, tautulli, ombi, flaresolverr,
+nzbget, transmission, plex-exporter, plex, teamspeak). Image pin (GHCR or
+Docker Hub picker, newest first; `lscr.io` canonicalizes to `docker.io`),
+local git write, opt-in git push (no force), Argo sync/health/promote, RR
+console (catalog, stage matrix, pin, promote, per-stage reconcile).
+Deploybot is cut over in homelab and prod; push to `main` pins homelab via
+the prod API (GitHub OIDC).
 
 Pin/promote **only** upsert `images:` on the stage overlay. They must not
 rewrite workload YAML or shared Argo project `kustomization.yaml` files
@@ -101,8 +111,7 @@ per probe without a shared `probes.path`.
 
 ## Explicitly not done yet
 
-- Remaining Play apps in kcloud-ops (flaresolverr, nzbget, transmission,
-  plex, plex-exporter, plexportal, play-common, teamspeak).
+- Remaining Play apps in kcloud-ops (plexportal, play-common).
 - ivy as a spec customer.
 - Preview apps, multi-service releases, replacing Actions/Kaniko.
 

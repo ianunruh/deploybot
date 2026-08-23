@@ -1,0 +1,39 @@
+# Thin deployable: generated StatefulSet + Argo Applications only.
+# Lives in namespace teamspeak (not play). Human overlays live next to this
+# file under teamspeak/ (license env, UDP/TCP ports, config VCT). LoadBalancer
+# Services stay in the ops repo; sync keeps those extra files.
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: teamspeak
+spec:
+  namespace: teamspeak
+  links:
+    repoURL: https://github.com/TeamSpeak-Systems/teamspeak-linux-docker-images
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/teamspeak
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+    name: teamspeak
+    createNamespace: true
+  image:
+    repository: docker.io/library/teamspeak
+    tag: 3.13.7
+  workload:
+    kind: StatefulSet
+    containerName: server
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+  stages:
+    - name: homelab
+    - name: prod
+      promote:
+        after:
+          - approval

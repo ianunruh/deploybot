@@ -1,0 +1,40 @@
+# Thin play deployable: generated Deployment + Argo Applications only.
+# Human overlays live next to this file under plex-exporter/ (PLEX_ADDR,
+# token env). Service, ServiceMonitor, and gen-secrets.sh stay in the ops
+# repo; sync keeps those extra files.
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: plex-exporter
+spec:
+  namespace: play
+  links:
+    repoURL: https://github.com/axsuul/plex-media-server-exporter
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/play/plex-exporter
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+    name: play-plex-exporter
+  image:
+    repository: ghcr.io/axsuul/plex-media-server-exporter
+    tag: 2.1.0
+  workload:
+    kind: Deployment
+    containerName: exporter
+    containerPort: 9594
+    portName: metrics
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi
+  stages:
+    - name: homelab
+    - name: prod
+      promote:
+        after:
+          - approval

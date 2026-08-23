@@ -1,0 +1,49 @@
+# Routed play deployable: generated Deployment, Service, HTTPRoute, and Argo
+# Applications only. No overlay patch — the pod is image + port + resources.
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: flaresolverr
+spec:
+  namespace: play
+  links:
+    repoURL: https://github.com/FlareSolverr/FlareSolverr
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/play/flaresolverr
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+    name: play-flaresolverr
+  image:
+    repository: ghcr.io/flaresolverr/flaresolverr
+    tag: v3.3.25
+  workload:
+    kind: Deployment
+    containerName: flaresolverr
+    containerPort: 8191
+    portName: http
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 8000m
+        memory: 4Gi
+  route:
+    port: 8191
+    gatewayNamespace: envoy-gateway-system
+  stages:
+    - name: homelab
+      hostname: flaresolverr.k8s.kcloud.zone
+      gateway:
+        name: internal
+        sectionName: https
+    - name: prod
+      hostname: flaresolverr.k8s.kcloud.io
+      gateway:
+        name: internal
+        sectionName: https
+      promote:
+        after:
+          - approval

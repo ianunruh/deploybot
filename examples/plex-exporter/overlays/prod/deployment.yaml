@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plex-exporter
+spec:
+  template:
+    spec:
+      containers:
+        - name: exporter
+          env:
+            - name: PLEX_ADDR
+              value: https://plex.kcloud.io:32400

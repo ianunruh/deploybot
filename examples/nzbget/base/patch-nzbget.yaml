@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nzbget
+spec:
+  template:
+    spec:
+      containers:
+        - name: nzbget
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+          envFrom:
+            - secretRef:
+                name: nzbget
+          volumeMounts:
+            - name: data
+              mountPath: /config
+            - name: downloads
+              mountPath: /downloads
+            - name: media-extra
+              mountPath: /media/extra
+            - name: media-nas
+              mountPath: /media/nas
+      volumes:
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: nzbget-downloads
+        - name: media-extra
+          persistentVolumeClaim:
+            claimName: plex-media-extra
+        - name: media-nas
+          persistentVolumeClaim:
+            claimName: plex-media-nas
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 50Gi

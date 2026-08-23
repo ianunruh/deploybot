@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: teamspeak
+spec:
+  template:
+    spec:
+      containers:
+        - name: server
+          env:
+            - name: TS3SERVER_LICENSE
+              value: accept
+          ports:
+            - name: ts-voice
+              containerPort: 9987
+              protocol: UDP
+            - name: ts-serverquery
+              containerPort: 10011
+            - name: ts-filetransfer
+              containerPort: 30033
+          volumeMounts:
+            - name: data
+              mountPath: /var/ts3server
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 20Gi

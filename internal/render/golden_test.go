@@ -18,6 +18,7 @@ func TestGoldens(t *testing.T) {
 	for _, name := range []string{
 		"kmc", "kmc-controller", "deploybot", "deploybot-web",
 		"sonarr", "radarr", "bazarr", "jackett", "tautulli", "ombi",
+		"flaresolverr", "nzbget", "transmission", "plex-exporter", "plex", "teamspeak",
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -99,7 +100,10 @@ func TestControllerOmitsServiceAndRoute(t *testing.T) {
 
 func TestPlayStatefulSetSkeleton(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"sonarr", "radarr", "bazarr", "jackett", "tautulli", "ombi"} {
+	for _, name := range []string{
+		"sonarr", "radarr", "bazarr", "jackett", "tautulli", "ombi",
+		"nzbget", "transmission", "plex",
+	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			d := loadExample(t, name)
@@ -131,6 +135,61 @@ func TestPlayStatefulSetSkeleton(t *testing.T) {
 				t.Fatalf("argo project:\n%s", app)
 			}
 		})
+	}
+}
+
+func TestUnroutedOmitsServiceAndRoute(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, workload, file string
+	}{
+		{"plex-exporter", "k8s/play/plex-exporter", "deployment.yaml"},
+		{"plex", "k8s/play/plex", "statefulset.yaml"},
+		{"teamspeak", "k8s/teamspeak", "statefulset.yaml"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			d := loadExample(t, tc.name)
+			tree, err := Render(d)
+			if err != nil {
+				t.Fatal(err)
+			}
+			base := tc.workload + "/base/"
+			for _, p := range []string{base + "service.yaml", base + "httproute.yaml"} {
+				if _, ok := tree[p]; ok {
+					t.Fatalf("unrouted render emitted %s", p)
+				}
+			}
+			kust := string(tree[base+"kustomization.yaml"])
+			if strings.Contains(kust, "service.yaml") || strings.Contains(kust, "httproute.yaml") {
+				t.Fatalf("base kustomization should only list %s:\n%s", tc.file, kust)
+			}
+			if _, ok := tree[base+tc.file]; !ok {
+				t.Fatalf("missing %s", base+tc.file)
+			}
+		})
+	}
+}
+
+func TestFlaresolverrDeploymentSkeleton(t *testing.T) {
+	t.Parallel()
+	d := loadExample(t, "flaresolverr")
+	tree, err := Render(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := "k8s/play/flaresolverr/base/"
+	if _, ok := tree[base+"statefulset.yaml"]; ok {
+		t.Fatal("flaresolverr should not emit statefulset.yaml")
+	}
+	dep := string(tree[base+"deployment.yaml"])
+	if !strings.Contains(dep, "kind: Deployment") {
+		t.Fatalf("missing Deployment:\n%s", dep)
+	}
+	app := string(tree["k8s/apps/projects/play/overlays/homelab/play-flaresolverr.yaml"])
+	if !strings.Contains(app, "name: play-flaresolverr") {
+		t.Fatalf("argo app:\n%s", app)
 	}
 }
 

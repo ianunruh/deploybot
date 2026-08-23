@@ -1,0 +1,34 @@
+# Thin play deployable: generated StatefulSet + Argo Applications only.
+# No HTTPRoute — Plex is a LoadBalancer on 32400. Human overlays live next
+# to this file under plex/ (PUID/PGID, config VCT, media/tls/transcode
+# mounts). LoadBalancer Service, cert, NAS PVs/PVCs, redirect HTTPRoute, and
+# gen-secrets.sh stay in the ops repo; sync keeps those extra files.
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: plex
+spec:
+  namespace: play
+  links:
+    repoURL: https://github.com/linuxserver/docker-plex
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/play/plex
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+    name: play-plex
+  image:
+    repository: docker.io/linuxserver/plex
+    tag: 1.43.2
+  workload:
+    kind: StatefulSet
+    containerName: plex
+    containerPort: 32400
+    portName: pms
+  stages:
+    - name: homelab
+    - name: prod
+      promote:
+        after:
+          - approval

@@ -1,0 +1,8 @@
+- op: add
+  path: /spec/rules/0/filters
+  value:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: nzbget-basic-auth
