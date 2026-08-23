@@ -243,6 +243,69 @@ func TestSyncWritesManifestsAndPreservesHumanBits(t *testing.T) {
 	}
 }
 
+func TestSyncControllerKeepsHumanPatches(t *testing.T) {
+	t.Parallel()
+	dir := initControllerOpsRepo(t)
+	svc := &Service{
+		Catalog: loadExamples(t),
+		OpsRepo: dir,
+		Apply:   true,
+		Author:  gitwrite.Author{Name: "t", Email: "t@t"},
+	}
+	pin, err := svc.Pin(t.Context(), "kmc-controller", "homelab", "ghcr.io/ianunruh/kmc-controller@sha256:abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pin.Commit == "" {
+		t.Fatal("missing pin commit")
+	}
+	got, err := svc.SyncManifests(t.Context(), "kmc-controller", []string{"homelab"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Commit == "" {
+		t.Fatal("missing sync commit")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "k8s/kmc-controller/base/service.yaml")); !os.IsNotExist(err) {
+		t.Fatal("controller sync wrote a Service")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "k8s/kmc-controller/base/httproute.yaml")); !os.IsNotExist(err) {
+		t.Fatal("controller sync wrote an HTTPRoute")
+	}
+	keep := map[string]string{
+		"k8s/kmc-controller/base/crds/ipaddresses.yaml":        "kind: CustomResourceDefinition\n",
+		"k8s/kmc-controller/base/rbac/service_account.yaml":    "kind: ServiceAccount\n",
+		"k8s/kmc-controller/base/patch-manager.yaml":           "kind: Deployment\n",
+		"k8s/kmc-controller/overlays/homelab/patch-cidrs.yaml": "kind: Deployment\n",
+	}
+	for rel, body := range keep {
+		got, err := os.ReadFile(filepath.Join(dir, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(got) != body {
+			t.Fatalf("%s rewritten: %q", rel, got)
+		}
+	}
+	baseKust, err := os.ReadFile(filepath.Join(dir, "k8s/kmc-controller/base/kustomization.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(baseKust, []byte("crds/ipaddresses.yaml")) || !bytes.Contains(baseKust, []byte("patch-manager.yaml")) {
+		t.Fatalf("lost extra base kustomize bits:\n%s", baseKust)
+	}
+	overlayKust, err := os.ReadFile(filepath.Join(dir, "k8s/kmc-controller/overlays/homelab/kustomization.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(overlayKust, []byte("patch-cidrs.yaml")) {
+		t.Fatalf("lost CIDR patch:\n%s", overlayKust)
+	}
+	if !bytes.Contains(overlayKust, []byte("sha256:abc")) {
+		t.Fatalf("sync dropped pin:\n%s", overlayKust)
+	}
+}
+
 func TestDiffSyncDoesNotWrite(t *testing.T) {
 	t.Parallel()
 	dir := initOpsRepo(t)
@@ -369,6 +432,56 @@ configMapGenerator:
 patches:
   - path: kmc.yaml
 `,
+	}
+	for rel, body := range files {
+		fp := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(fp), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(fp, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := wt.Add(rel); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := wt.Commit("init", &git.CommitOptions{
+		Author: &object.Signature{Name: "t", Email: "t@t", When: time.Now()},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func initControllerOpsRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	repo, err := git.PlainInit(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt, err := repo.Worktree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		"README": "ops\n",
+		"k8s/kmc-controller/base/kustomization.yaml": `resources:
+  - deployment.yaml
+  - crds/ipaddresses.yaml
+  - rbac/service_account.yaml
+patches:
+  - path: patch-manager.yaml
+`,
+		"k8s/kmc-controller/base/crds/ipaddresses.yaml":     "kind: CustomResourceDefinition\n",
+		"k8s/kmc-controller/base/rbac/service_account.yaml": "kind: ServiceAccount\n",
+		"k8s/kmc-controller/base/patch-manager.yaml":        "kind: Deployment\n",
+		"k8s/kmc-controller/overlays/homelab/kustomization.yaml": `resources:
+  - ../../base
+patches:
+  - path: patch-cidrs.yaml
+`,
+		"k8s/kmc-controller/overlays/homelab/patch-cidrs.yaml": "kind: Deployment\n",
 	}
 	for rel, body := range files {
 		fp := filepath.Join(dir, rel)

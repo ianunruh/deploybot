@@ -37,18 +37,25 @@ func writeWorkload(out Tree, d *spec.Deployable) error {
 	if err != nil {
 		return err
 	}
-	svc, err := yamlx.MarshalGenerated(serviceObj(d))
-	if err != nil {
-		return err
-	}
-	rt, err := yamlx.MarshalGenerated(httpRouteObj(d, d.BaseStage()))
-	if err != nil {
-		return err
+	resources := []string{"deployment.yaml"}
+	out[path.Join(base, "base/deployment.yaml")] = dep
+	if d.HasRoute() {
+		svc, err := yamlx.MarshalGenerated(serviceObj(d))
+		if err != nil {
+			return err
+		}
+		rt, err := yamlx.MarshalGenerated(httpRouteObj(d, d.BaseStage()))
+		if err != nil {
+			return err
+		}
+		out[path.Join(base, "base/service.yaml")] = svc
+		out[path.Join(base, "base/httproute.yaml")] = rt
+		resources = append(resources, "service.yaml", "httproute.yaml")
 	}
 	kust, err := yamlx.MarshalGenerated(kustomization{
 		APIVersion: "kustomize.config.k8s.io/v1beta1",
 		Kind:       "Kustomization",
-		Resources:  []string{"deployment.yaml", "service.yaml", "httproute.yaml"},
+		Resources:  resources,
 		Labels: []kustomizeLabel{{
 			IncludeSelectors: true,
 			Pairs: map[string]string{
@@ -60,16 +67,13 @@ func writeWorkload(out Tree, d *spec.Deployable) error {
 	if err != nil {
 		return err
 	}
-	out[path.Join(base, "base/deployment.yaml")] = dep
-	out[path.Join(base, "base/service.yaml")] = svc
-	out[path.Join(base, "base/httproute.yaml")] = rt
 	out[path.Join(base, "base/kustomization.yaml")] = kust
 
 	for i, st := range d.Spec.Stages {
 		overlay := path.Join(base, "overlays", st.Name)
 		res := []string{"../../base"}
 		var patches []kustomizePatch
-		if i > 0 {
+		if d.HasRoute() && i > 0 {
 			ops := routePatches(d.BaseStage(), st)
 			b, err := yamlx.MarshalGenerated(ops)
 			if err != nil {
@@ -187,10 +191,12 @@ func deploymentObj(d *spec.Deployable) deployment {
 		Name:            w.ContainerName,
 		Image:           d.ImageRef(),
 		ImagePullPolicy: "IfNotPresent",
-		Ports: []containerPort{{
+	}
+	if w.ContainerPort > 0 {
+		c.Ports = []containerPort{{
 			Name:          w.PortName,
 			ContainerPort: w.ContainerPort,
-		}},
+		}}
 	}
 	for _, name := range w.EnvFrom.ConfigMaps {
 		c.EnvFrom = append(c.EnvFrom, envFromSource{ConfigMapRef: &localObjectRef{Name: name}})
@@ -211,11 +217,9 @@ func deploymentObj(d *spec.Deployable) deployment {
 		volumes = append(volumes, podVolumeFromSpec(v))
 	}
 	probePort := w.Probes.Port
-	if w.Probes.Path != "" {
-		c.StartupProbe = buildProbe(w.Probes.Path, probePort, w.Probes.Startup)
-		c.LivenessProbe = buildProbe(w.Probes.Path, probePort, w.Probes.Liveness)
-		c.ReadinessProbe = buildProbe(w.Probes.Path, probePort, w.Probes.Readiness)
-	}
+	c.StartupProbe = buildProbe(w.Probes.Path, probePort, w.Probes.Startup)
+	c.LivenessProbe = buildProbe(w.Probes.Path, probePort, w.Probes.Liveness)
+	c.ReadinessProbe = buildProbe(w.Probes.Path, probePort, w.Probes.Readiness)
 	if req := resourceMap(w.Resources.Requests); len(req) > 0 || len(resourceMap(w.Resources.Limits)) > 0 {
 		c.Resources = &resources{
 			Requests: resourceMap(w.Resources.Requests),
@@ -261,16 +265,19 @@ func podVolumeFromSpec(v spec.Volume) podVolume {
 }
 
 func buildProbe(path, port string, override spec.HTTPProbe) *probe {
-	p := &probe{
+	pth := cmpOr(override.Path, path)
+	if pth == "" {
+		return nil
+	}
+	return &probe{
 		HTTPGet: httpGet{
-			Path: cmpOr(override.Path, path),
+			Path: pth,
 			Port: cmpOr(override.Port, port),
 		},
 		InitialDelaySeconds: override.InitialDelaySeconds,
 		PeriodSeconds:       override.PeriodSeconds,
 		FailureThreshold:    override.FailureThreshold,
 	}
-	return p
 }
 
 func cmpOr[T comparable](v, fallback T) T {

@@ -1,0 +1,46 @@
+# Thin deployable: generated Deployment + Argo Applications only.
+# Human overlays live next to this file under kmc-controller/ (securityContext,
+# extra ports, per-stage CIDR args). Copy CRDs and RBAC from
+# kmc/deploy/controller into the ops repo; sync keeps those extra files.
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: kmc-controller
+spec:
+  namespace: kmc-system
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/kmc-controller
+    applicationPath: k8s/apps/projects/sandbox
+  argo:
+    project: sandbox
+    createNamespace: true
+  image:
+    repository: ghcr.io/ianunruh/kmc-controller
+    tag: main
+    pullSecrets:
+      - ghcr-auth
+  workload:
+    containerName: manager
+    serviceAccountName: kmc-controller
+    probes:
+      liveness:
+        path: /healthz
+        port: "8081"
+        initialDelaySeconds: 15
+        periodSeconds: 20
+      readiness:
+        path: /readyz
+        port: "8081"
+        initialDelaySeconds: 5
+        periodSeconds: 10
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+  stages:
+    - name: homelab
+    - name: prod

@@ -43,7 +43,7 @@ patches:
 
 func TestVolumePatchOmitsReplicasAndImage(t *testing.T) {
 	t.Parallel()
-	d := loadKMC(t)
+	d := loadExample(t, "kmc")
 	tree, err := Render(d)
 	if err != nil {
 		t.Fatal(err)

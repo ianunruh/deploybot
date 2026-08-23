@@ -14,31 +14,36 @@ import (
 	"github.com/ianunruh/deploybot/internal/yamlx"
 )
 
-func TestKMCGolden(t *testing.T) {
+func TestGoldens(t *testing.T) {
 	t.Parallel()
-	d := loadKMC(t)
-	tree, err := Render(d)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dir := filepath.Join(testDataDir(t), "kmc")
-	if os.Getenv("UPDATE_GOLDENS") == "1" {
-		if err := writeTree(dir, tree); err != nil {
-			t.Fatal(err)
-		}
-	}
-	want, err := readTree(dir)
-	if err != nil {
-		t.Fatalf("read goldens (run UPDATE_GOLDENS=1 go test): %v", err)
-	}
-	if diff := cmp.Diff(stringMap(want), stringMap(tree)); diff != "" {
-		t.Fatalf("golden mismatch (-want +got):\n%s", diff)
+	for _, name := range []string{"kmc", "kmc-controller"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			d := loadExample(t, name)
+			tree, err := Render(d)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := filepath.Join(testDataDir(t), name)
+			if os.Getenv("UPDATE_GOLDENS") == "1" {
+				if err := writeTree(dir, tree); err != nil {
+					t.Fatal(err)
+				}
+			}
+			want, err := readTree(dir)
+			if err != nil {
+				t.Fatalf("read goldens (run UPDATE_GOLDENS=1 go test): %v", err)
+			}
+			if diff := cmp.Diff(stringMap(want), stringMap(tree)); diff != "" {
+				t.Fatalf("golden mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 
 func TestPinIsOnlyOverlayImageDiff(t *testing.T) {
 	t.Parallel()
-	d := loadKMC(t)
+	d := loadExample(t, "kmc")
 	before, err := Render(d)
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +80,7 @@ func TestPinIsOnlyOverlayImageDiff(t *testing.T) {
 
 func TestFilterStagesOmitsOtherOverlays(t *testing.T) {
 	t.Parallel()
-	d := loadKMC(t)
+	d := loadExample(t, "kmc")
 	tree, err := Render(d)
 	if err != nil {
 		t.Fatal(err)
@@ -118,9 +123,115 @@ func TestFilterStagesOmitsOtherOverlays(t *testing.T) {
 	}
 }
 
+func TestControllerOmitsServiceAndRoute(t *testing.T) {
+	t.Parallel()
+	d := loadExample(t, "kmc-controller")
+	tree, err := Render(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{
+		"k8s/kmc-controller/base/service.yaml",
+		"k8s/kmc-controller/base/httproute.yaml",
+		"k8s/kmc-controller/overlays/prod/patch-httproute.yaml",
+	} {
+		if _, ok := tree[p]; ok {
+			t.Fatalf("controller render emitted %s", p)
+		}
+	}
+	kust := string(tree["k8s/kmc-controller/base/kustomization.yaml"])
+	if strings.Contains(kust, "service.yaml") || strings.Contains(kust, "httproute.yaml") {
+		t.Fatalf("base kustomization should only list deployment.yaml:\n%s", kust)
+	}
+	dep := string(tree["k8s/kmc-controller/base/deployment.yaml"])
+	if strings.Contains(dep, "containerPort") {
+		t.Fatalf("generated deployment should omit ports:\n%s", dep)
+	}
+	if !strings.Contains(dep, "path: /healthz") || !strings.Contains(dep, "path: /readyz") {
+		t.Fatalf("generated deployment missing probes:\n%s", dep)
+	}
+}
+
+func TestMergeKeepsControllerHumanFiles(t *testing.T) {
+	t.Parallel()
+	d := loadExample(t, "kmc-controller")
+	generated, err := Render(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	existing := Tree{
+		"k8s/kmc-controller/base/kustomization.yaml": []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+  - crds/ipaddresses.yaml
+  - rbac/service_account.yaml
+patches:
+  - path: patch-manager.yaml
+`),
+		"k8s/kmc-controller/base/crds/ipaddresses.yaml":     []byte("kind: CustomResourceDefinition\n"),
+		"k8s/kmc-controller/base/rbac/service_account.yaml": []byte("kind: ServiceAccount\n"),
+		"k8s/kmc-controller/base/patch-manager.yaml":        []byte("kind: Deployment\n"),
+		"k8s/kmc-controller/overlays/homelab/kustomization.yaml": []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - path: patch-cidrs.yaml
+`),
+		"k8s/kmc-controller/overlays/homelab/patch-cidrs.yaml": []byte("kind: Deployment\n"),
+	}
+	merged, err := MergeTrees(existing, generated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var base kustomization
+	if err := yamlx.Unmarshal(merged["k8s/kmc-controller/base/kustomization.yaml"], &base); err != nil {
+		t.Fatal(err)
+	}
+	if !containsAll(base.Resources, "deployment.yaml", "crds/ipaddresses.yaml", "rbac/service_account.yaml") {
+		t.Fatalf("base resources %+v", base.Resources)
+	}
+	if len(base.Patches) != 1 || base.Patches[0].Path != "patch-manager.yaml" {
+		t.Fatalf("base patches %+v", base.Patches)
+	}
+	var overlay kustomization
+	if err := yamlx.Unmarshal(merged[OverlayKustomizationPath(d, "homelab")], &overlay); err != nil {
+		t.Fatal(err)
+	}
+	if len(overlay.Patches) != 1 || overlay.Patches[0].Path != "patch-cidrs.yaml" {
+		t.Fatalf("overlay patches %+v", overlay.Patches)
+	}
+	for _, p := range []string{
+		"k8s/kmc-controller/base/crds/ipaddresses.yaml",
+		"k8s/kmc-controller/base/rbac/service_account.yaml",
+		"k8s/kmc-controller/base/patch-manager.yaml",
+		"k8s/kmc-controller/overlays/homelab/patch-cidrs.yaml",
+	} {
+		if string(merged[p]) != string(existing[p]) {
+			t.Fatalf("lost extra file %s", p)
+		}
+	}
+
+	ref := image.MustParse("ghcr.io/ianunruh/kmc-controller:main-abc@sha256:deadbeef")
+	if err := Pin(merged, d, "homelab", ref); err != nil {
+		t.Fatal(err)
+	}
+	if string(merged["k8s/kmc-controller/overlays/homelab/patch-cidrs.yaml"]) != string(existing["k8s/kmc-controller/overlays/homelab/patch-cidrs.yaml"]) {
+		t.Fatal("pin rewrote CIDR overlay")
+	}
+	got, err := CurrentImage(merged, d, "homelab")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != ref {
+		t.Fatalf("current image %+v want %+v", got, ref)
+	}
+}
+
 func TestMergeKeepsConfigMapGenerator(t *testing.T) {
 	t.Parallel()
-	d := loadKMC(t)
+	d := loadExample(t, "kmc")
 	generated, err := Render(d)
 	if err != nil {
 		t.Fatal(err)
@@ -151,13 +262,26 @@ configMapGenerator:
 	}
 }
 
-func loadKMC(t *testing.T) *spec.Deployable {
+func loadExample(t *testing.T, name string) *spec.Deployable {
 	t.Helper()
-	d, err := spec.Load(filepath.Join(repoRoot(t), "examples/kmc.yaml"))
+	d, err := spec.Load(filepath.Join(repoRoot(t), "examples", name+".yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return d
+}
+
+func containsAll(have []string, want ...string) bool {
+	seen := map[string]struct{}{}
+	for _, s := range have {
+		seen[s] = struct{}{}
+	}
+	for _, s := range want {
+		if _, ok := seen[s]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func repoRoot(t *testing.T) string {

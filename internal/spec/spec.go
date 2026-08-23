@@ -169,18 +169,22 @@ func (d *Deployable) Default() {
 		d.Spec.Workload.Replicas = 1
 	}
 	d.Spec.Workload.ContainerName = cmp.Or(d.Spec.Workload.ContainerName, "web")
-	d.Spec.Workload.PortName = cmp.Or(d.Spec.Workload.PortName, "http")
-	if d.Spec.Route.Port == 0 {
-		d.Spec.Route.Port = d.Spec.Workload.ContainerPort
+	if d.Spec.Workload.ContainerPort > 0 {
+		d.Spec.Workload.PortName = cmp.Or(d.Spec.Workload.PortName, "http")
 	}
-	d.Spec.Route.GatewayNamespace = cmp.Or(d.Spec.Route.GatewayNamespace, "envoy-gateway-system")
+	if d.HasRoute() {
+		if d.Spec.Route.Port == 0 {
+			d.Spec.Route.Port = d.Spec.Workload.ContainerPort
+		}
+		d.Spec.Route.GatewayNamespace = cmp.Or(d.Spec.Route.GatewayNamespace, "envoy-gateway-system")
+		for i := range d.Spec.Stages {
+			st := &d.Spec.Stages[i]
+			st.Gateway.Group = cmp.Or(st.Gateway.Group, "gateway.networking.k8s.io")
+			st.Gateway.Kind = cmp.Or(st.Gateway.Kind, "Gateway")
+			st.Gateway.Namespace = cmp.Or(st.Gateway.Namespace, d.Spec.Route.GatewayNamespace)
+		}
+	}
 	d.Spec.Workload.Probes.Port = cmp.Or(d.Spec.Workload.Probes.Port, d.Spec.Workload.PortName)
-	for i := range d.Spec.Stages {
-		st := &d.Spec.Stages[i]
-		st.Gateway.Group = cmp.Or(st.Gateway.Group, "gateway.networking.k8s.io")
-		st.Gateway.Kind = cmp.Or(st.Gateway.Kind, "Gateway")
-		st.Gateway.Namespace = cmp.Or(st.Gateway.Namespace, d.Spec.Route.GatewayNamespace)
-	}
 }
 
 func (d *Deployable) Validate() error {
@@ -212,8 +216,9 @@ func (d *Deployable) Validate() error {
 	if d.Spec.Workload.Kind != "Deployment" {
 		errs = append(errs, "spec.workload.kind must be Deployment")
 	}
-	if d.Spec.Workload.ContainerPort <= 0 {
-		errs = append(errs, "spec.workload.containerPort is required")
+	hasRoute := d.HasRoute()
+	if hasRoute && d.Spec.Route.Port <= 0 {
+		errs = append(errs, "spec.workload.containerPort or spec.route.port is required when a route is configured")
 	}
 	if len(d.Spec.Stages) == 0 {
 		errs = append(errs, "spec.stages must have at least one stage")
@@ -228,6 +233,9 @@ func (d *Deployable) Validate() error {
 			errs = append(errs, fmt.Sprintf("duplicate stage %q", st.Name))
 		}
 		seen[st.Name] = struct{}{}
+		if !hasRoute {
+			continue
+		}
 		if st.Hostname == "" {
 			errs = append(errs, fmt.Sprintf("stage %s: hostname is required", st.Name))
 		}
@@ -260,6 +268,21 @@ func (d *Deployable) StageNames() []string {
 
 func (d *Deployable) BaseStage() Stage {
 	return d.Spec.Stages[0]
+}
+
+// HasRoute is true when the spec describes an HTTPRoute (timeout, port,
+// gateway namespace, or any stage hostname/gateway). Controllers omit this.
+func (d *Deployable) HasRoute() bool {
+	r := d.Spec.Route
+	if r.Port != 0 || r.Timeout != "" || r.GatewayNamespace != "" {
+		return true
+	}
+	for _, st := range d.Spec.Stages {
+		if st.Hostname != "" || st.Gateway.Name != "" || st.Gateway.SectionName != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func (d *Deployable) ImageRef() string {

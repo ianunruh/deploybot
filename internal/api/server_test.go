@@ -46,7 +46,11 @@ func TestListAndGet(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
 		t.Fatal(err)
 	}
-	if len(list.Deployables) != 1 || list.Deployables[0].Name != "kmc" {
+	names := make([]string, 0, len(list.Deployables))
+	for _, d := range list.Deployables {
+		names = append(names, d.Name)
+	}
+	if len(names) != 2 || names[0] != "kmc" || names[1] != "kmc-controller" {
 		t.Fatalf("%+v", list)
 	}
 
