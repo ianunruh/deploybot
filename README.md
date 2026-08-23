@@ -7,6 +7,8 @@ digest and promote homelab → prod.
 The first customer is the kmc console. ConfigMaps, secrets, impersonator RBAC,
 and the kmc controller are not generated.
 
+Original intent and non-goals: [docs/goals.md](docs/goals.md).
+
 ## Layout
 
 | Path | Role |
