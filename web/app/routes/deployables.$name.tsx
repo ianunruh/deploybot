@@ -308,13 +308,13 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         ))}
       </ResourceTable>
 
+      {previewDiff ? <DiffPanel diff={previewDiff} title="Last mutation diff" /> : null}
+
       <ReleaseHistory
         stages={stages.map((st) => st.name)}
         releases={history?.releases ?? []}
         error={historyError}
       />
-
-      {previewDiff ? <DiffPanel diff={previewDiff} title="Last mutation diff" /> : null}
 
       <ConfirmActionModal
         opened={pinOpen}
