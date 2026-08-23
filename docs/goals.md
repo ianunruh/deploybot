@@ -1,8 +1,8 @@
 # Goals
 
 Started at the end of the first build session (2026-08-22) so later work
-does not have to reconstruct this from chat. Updated after kmc console and
-kmc-controller were cut over.
+does not have to reconstruct this from chat. Updated after deploybot itself
+was cut over in homelab and prod (2026-08-23).
 
 ## Why
 
@@ -63,23 +63,26 @@ Deployment + Argo apps only. CRDs and RBAC copied from
 and per-stage `patch-cidrs.yaml` (cluster CIDR args) are overlay-owned.
 
 **deploybot** (`examples/deploybot.yaml` + `examples/deploybot-web.yaml`):
-self-hosted control plane in `deploybot-system`. API is ClusterIP in-cluster
-(console talks to it directly; Service, SA, Argo RBAC, git clone of
-kcloud-ops, and kubeconfig are overlay-owned). Prod exposes the API at
-`deploy-api.k8s.kcloud.io` on Gateway `external` / `https` with GitHub
-Actions OIDC. Console is routed at
-`deploy.k8s.kcloud.zone` / `deploy.k8s.kcloud.io` on Gateway `internal` /
-`https`. Specs are baked into the API image. GitHub Actions builds both
-images and pins homelab through the prod API.
+self-hosted control plane in `deploybot-system`, live in homelab and prod.
+API is ClusterIP in-cluster (console talks to it directly; Service, SA, Argo
+RBAC, git clone of kcloud-ops, and kubeconfig are overlay-owned). Prod
+exposes the API at `deploy-api.k8s.kcloud.io` on Gateway `external` / `https`
+with a GitHub Actions OIDC SecurityPolicy (allow `ianunruh/deploybot` on
+`refs/heads/main`). Console is routed at `deploy.k8s.kcloud.zone` /
+`deploy.k8s.kcloud.io` on Gateway `internal` / `https`. Specs are baked into
+the API image. GitHub Actions builds both images and pins homelab through
+the prod API; promote to prod is a console action.
 
 GitHub Actions keeps building; deploybot consumes the image. Do not move
 Kaniko or rewrite the image build in `docker-build.yml` for this.
 
 ## What this repo already did
 
-Spec + renderer + goldens for both customers, image pin (GHCR picker, newest
-first), local git write, opt-in git push (no force), Argo sync/health/promote,
-RR console (catalog, stage matrix, pin, promote, per-stage reconcile).
+Spec + renderer + goldens for kmc, kmc-controller, and deploybot itself.
+Image pin (GHCR picker, newest first), local git write, opt-in git push (no
+force), Argo sync/health/promote, RR console (catalog, stage matrix, pin,
+promote, per-stage reconcile). Deploybot is cut over in homelab and prod;
+push to `main` pins homelab via the prod API (GitHub OIDC).
 
 Pin/promote **only** upsert `images:` on the stage overlay. They must not
 rewrite workload YAML or shared Argo project `kustomization.yaml` files

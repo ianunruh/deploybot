@@ -6,9 +6,10 @@ routed), then you pin an image digest and promote homelab → prod.
 
 Customers today: kmc console (`examples/kmc.yaml`), kmc-controller
 (`examples/kmc-controller.yaml`), and deploybot itself (`examples/deploybot.yaml`
-+ `examples/deploybot-web.yaml`). Deploybot generates the skeleton and the
-image pin. ConfigMaps, secrets, CRDs, RBAC, and extra pod fields (env,
-volumes, args, securityContext, CIDRs) stay as extra files / overlay patches.
++ `examples/deploybot-web.yaml`), which is self-hosted in homelab and prod.
+Deploybot generates the skeleton and the image pin. ConfigMaps, secrets, CRDs,
+RBAC, and extra pod fields (env, volumes, args, securityContext, CIDRs) stay
+as extra files / overlay patches.
 
 Original intent and non-goals: [docs/goals.md](docs/goals.md).
 
@@ -82,9 +83,21 @@ for this toolchain):
 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1
 ```
 
+## Hosted
+
+Homelab and prod run the same specs in `deploybot-system` (`kcloud-ops`).
+
+| Surface | Homelab | Prod |
+|---------|---------|------|
+| Console | `https://deploy.k8s.kcloud.zone` (internal Envoy) | `https://deploy.k8s.kcloud.io` (internal Envoy) |
+| API | ClusterIP (`http://deploybot:8080`) | `https://deploy-api.k8s.kcloud.io` (external Envoy, GitHub OIDC) |
+
+The console talks to the API in-cluster. GitHub Actions pins homelab through
+the prod API. Promote to prod is a console action.
+
 ## Images
 
-Push to `main` runs GitHub Actions: `CI` (Go test + golangci-lint, web `pnpm check`) and `Build and Push Docker Images` (same tags as kmc), which then pins both images to homelab via prod `https://deploy-api.k8s.kcloud.io` (GitHub OIDC).
+Push to `main` runs GitHub Actions: `CI` (Go test + golangci-lint, web `pnpm check`) and `Build and Push Docker Images` (same tags as kmc). After both images push, `pin-homelab` calls the prod API with GitHub OIDC.
 
 | Image | Role |
 |-------|------|
