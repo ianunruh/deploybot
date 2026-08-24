@@ -39,6 +39,7 @@ import { RelativeTime } from "~/ui/relative-time";
 import { ResourceTable, Table } from "~/ui/resource-table";
 import { StatusBadge, UpdateBadge } from "~/ui/status-badge";
 import { StageReady, WorkloadPods } from "~/ui/workload-pods";
+import { WorkflowRuns } from "~/ui/workflow-runs";
 
 export function meta({ params }: Route.MetaArgs) {
   return [{ title: `${params.name} · deploybot` }];
@@ -337,6 +338,8 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       </ResourceTable>
 
       <WorkloadPods stages={stages} />
+
+      <WorkflowRuns workflows={status.workflows} />
 
       {previewDiff ? <DiffPanel diff={previewDiff} title="Last mutation diff" /> : null}
 

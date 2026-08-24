@@ -61,3 +61,12 @@ func GitHubCommitURL(repoURL, sha string) string {
 	}
 	return "https://github.com/" + owner + "/" + repo + "/commit/" + sha
 }
+
+// GitHubActionsURL is the Actions tab when repoURL is on github.com.
+func GitHubActionsURL(repoURL string) string {
+	owner, repo, ok := ParseGitHubRepo(repoURL)
+	if !ok {
+		return ""
+	}
+	return "https://github.com/" + owner + "/" + repo + "/actions"
+}

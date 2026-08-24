@@ -23,6 +23,20 @@ const STATUS_COLORS: Record<string, string> = {
   PodInitializing: "yellow",
   Terminating: "orange",
   NotReady: "yellow",
+  success: "teal",
+  failure: "red",
+  "in progress": "yellow",
+  queued: "yellow",
+  pending: "yellow",
+  waiting: "yellow",
+  requested: "yellow",
+  cancelled: "gray",
+  skipped: "gray",
+  completed: "gray",
+  "timed out": "red",
+  "action required": "orange",
+  neutral: "gray",
+  stale: "orange",
 };
 
 export function UpdateBadge({ stale, error }: { stale?: boolean; error?: boolean }) {

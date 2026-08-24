@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,8 +21,11 @@ import (
 )
 
 const (
-	githubAPIVersion = "2022-11-28"
-	maxPackagePages  = 2
+	githubAPIVersion    = "2022-11-28"
+	maxPackagePages     = 2
+	defaultWorkflowRuns = 10
+	maxWorkflowRuns     = 30
+	workflowRunsTTL     = 15 * time.Second
 )
 
 // GitHub lists GHCR images through the GitHub Packages API and looks up
@@ -33,11 +37,18 @@ type GitHub struct {
 
 	mu      sync.Mutex
 	commits map[string]cachedCommit
+	runs    map[string]cachedRuns
 }
 
 type cachedCommit struct {
 	commit Commit
 	found  bool
+}
+
+type cachedRuns struct {
+	runs []WorkflowRun
+	err  error
+	at   time.Time
 }
 
 func NewGitHub() *GitHub {
@@ -104,7 +115,7 @@ func (g *GitHub) packageVersions(ctx context.Context, owner, pkg, repository str
 		raw, err = g.listPackagePages(ctx, packagePath("orgs", owner, pkg))
 	}
 	if err != nil {
-		return nil, err
+		return nil, authHint(err, "token needs read:packages to list GHCR versions")
 	}
 	out := make([]Version, 0, len(raw))
 	for _, v := range raw {
@@ -212,16 +223,132 @@ func (g *GitHub) LookupCommit(ctx context.Context, repoURL, sha string) (Commit,
 	return got, nil
 }
 
+// ListWorkflowRuns returns recent Actions runs for a github.com repoURL.
+// In-progress and queued runs are listed first; the rest keep GitHub's
+// newest-first order. Results are cached briefly so the console poll
+// does not hammer GitHub.
+func (g *GitHub) ListWorkflowRuns(ctx context.Context, repoURL string, limit int) ([]WorkflowRun, error) {
+	owner, repo, ok := ParseGitHubRepo(repoURL)
+	if !ok {
+		return nil, fmt.Errorf("not a github.com repo URL")
+	}
+	if limit <= 0 {
+		limit = defaultWorkflowRuns
+	}
+	if limit > maxWorkflowRuns {
+		limit = maxWorkflowRuns
+	}
+	key := workflowCacheKey(owner, repo, limit)
+	if cached, hit := g.cachedRuns(key); hit {
+		return slices.Clone(cached.runs), cached.err
+	}
+	path := fmt.Sprintf("/repos/%s/%s/actions/runs?per_page=%d",
+		url.PathEscape(owner), url.PathEscape(repo), limit)
+	var raw workflowRunsAPI
+	if _, err := g.getJSON(ctx, path, &raw); err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, err
+		}
+		err = authHint(err, "token needs actions:read for private workflow runs")
+		g.storeRuns(key, cachedRuns{err: err, at: time.Now()})
+		return nil, err
+	}
+	out := make([]WorkflowRun, 0, len(raw.WorkflowRuns))
+	for _, run := range raw.WorkflowRuns {
+		out = append(out, workflowFromAPI(run, repoURL))
+	}
+	slices.SortStableFunc(out, cmpWorkflowRun)
+	g.storeRuns(key, cachedRuns{runs: slices.Clone(out), at: time.Now()})
+	return out, nil
+}
+
 func commitFromAPI(raw gitCommit, repoURL, sha string) Commit {
 	out := Commit{SHA: cmp.Or(raw.SHA, sha)}
-	msg := strings.TrimSpace(raw.Commit.Message)
-	if i := strings.IndexByte(msg, '\n'); i >= 0 {
-		msg = strings.TrimSpace(msg[:i])
-	}
-	out.Message = msg
+	out.Message = firstLine(raw.Commit.Message)
 	out.Author = cmp.Or(raw.Commit.Author.Name, raw.Author.Login)
 	out.URL = cmp.Or(raw.HTMLURL, GitHubCommitURL(repoURL, out.SHA))
 	return out
+}
+
+func workflowFromAPI(raw workflowRunAPI, repoURL string) WorkflowRun {
+	title := firstLine(raw.DisplayTitle)
+	if title == "" {
+		title = firstLine(raw.HeadCommit.Message)
+	}
+	out := WorkflowRun{
+		ID:        raw.ID,
+		Name:      raw.Name,
+		Title:     title,
+		Number:    raw.RunNumber,
+		Event:     strings.ReplaceAll(raw.Event, "_", " "),
+		Status:    workflowStatus(raw.Status, raw.Conclusion),
+		Branch:    raw.HeadBranch,
+		SHA:       raw.HeadSHA,
+		Actor:     raw.Actor.Login,
+		URL:       raw.HTMLURL,
+		CommitURL: GitHubCommitURL(repoURL, raw.HeadSHA),
+	}
+	started := raw.RunStartedAt
+	if started.IsZero() {
+		started = raw.CreatedAt
+	}
+	if !started.IsZero() {
+		t := started.UTC()
+		out.StartedAt = &t
+	}
+	return out
+}
+
+func cmpWorkflowRun(a, b WorkflowRun) int {
+	aAct, bAct := isActiveWorkflow(a.Status), isActiveWorkflow(b.Status)
+	switch {
+	case aAct == bAct:
+		return 0
+	case aAct:
+		return -1
+	default:
+		return 1
+	}
+}
+
+func isActiveWorkflow(status string) bool {
+	switch status {
+	case "in progress", "queued", "waiting", "pending", "requested":
+		return true
+	default:
+		return false
+	}
+}
+
+func workflowStatus(status, conclusion string) string {
+	status = strings.ToLower(strings.TrimSpace(status))
+	conclusion = strings.ToLower(strings.TrimSpace(conclusion))
+	if status != "" && status != "completed" {
+		return strings.ReplaceAll(status, "_", " ")
+	}
+	if conclusion != "" {
+		return strings.ReplaceAll(conclusion, "_", " ")
+	}
+	return cmp.Or(strings.ReplaceAll(status, "_", " "), "unknown")
+}
+
+func firstLine(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = strings.TrimSpace(s[:i])
+	}
+	return s
+}
+
+func authHint(err error, hint string) error {
+	var apiErr *apiError
+	if hint == "" || !errors.As(err, &apiErr) {
+		return err
+	}
+	if apiErr.Status != http.StatusForbidden && apiErr.Status != http.StatusUnauthorized {
+		return err
+	}
+	return fmt.Errorf("%w (%s)", err, hint)
 }
 
 func commitCacheKey(owner, repo, sha string) string {
@@ -245,6 +372,32 @@ func (g *GitHub) storeCommit(key string, c cachedCommit) {
 		g.commits = map[string]cachedCommit{}
 	}
 	g.commits[key] = c
+}
+
+func workflowCacheKey(owner, repo string, limit int) string {
+	return strings.ToLower(owner+"/"+repo) + "#" + strconv.Itoa(limit)
+}
+
+func (g *GitHub) cachedRuns(key string) (cachedRuns, bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.runs == nil {
+		return cachedRuns{}, false
+	}
+	c, ok := g.runs[key]
+	if !ok || time.Since(c.at) > workflowRunsTTL {
+		return cachedRuns{}, false
+	}
+	return c, true
+}
+
+func (g *GitHub) storeRuns(key string, c cachedRuns) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.runs == nil {
+		g.runs = map[string]cachedRuns{}
+	}
+	g.runs[key] = c
 }
 
 func sortVersions(out []Version) {
@@ -282,6 +435,31 @@ type gitCommit struct {
 	Author struct {
 		Login string `json:"login"`
 	} `json:"author"`
+}
+
+type workflowRunsAPI struct {
+	WorkflowRuns []workflowRunAPI `json:"workflow_runs"`
+}
+
+type workflowRunAPI struct {
+	ID           int64     `json:"id"`
+	Name         string    `json:"name"`
+	DisplayTitle string    `json:"display_title"`
+	RunNumber    int       `json:"run_number"`
+	Event        string    `json:"event"`
+	Status       string    `json:"status"`
+	Conclusion   string    `json:"conclusion"`
+	HTMLURL      string    `json:"html_url"`
+	HeadBranch   string    `json:"head_branch"`
+	HeadSHA      string    `json:"head_sha"`
+	CreatedAt    time.Time `json:"created_at"`
+	RunStartedAt time.Time `json:"run_started_at"`
+	Actor        struct {
+		Login string `json:"login"`
+	} `json:"actor"`
+	HeadCommit struct {
+		Message string `json:"message"`
+	} `json:"head_commit"`
 }
 
 func versionFromPackage(repository string, v packageVersion) (Version, bool) {
@@ -342,9 +520,6 @@ func (g *GitHub) getJSON(ctx context.Context, path string, dest any) (string, er
 		}
 		if json.Unmarshal(body, &ge) == nil && ge.Message != "" {
 			msg = ge.Message
-		}
-		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
-			msg += " (token needs read:packages to list GHCR versions)"
 		}
 		return "", &apiError{Status: resp.StatusCode, Body: msg}
 	}

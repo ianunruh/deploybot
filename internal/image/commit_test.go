@@ -63,3 +63,18 @@ func TestGitHubCommitURL(t *testing.T) {
 		t.Fatal("empty sha")
 	}
 }
+
+func TestGitHubActionsURL(t *testing.T) {
+	t.Parallel()
+	got := GitHubActionsURL("https://github.com/ianunruh/kmc")
+	want := "https://github.com/ianunruh/kmc/actions"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if GitHubActionsURL("https://gitlab.com/ianunruh/kmc") != "" {
+		t.Fatal("gitlab url")
+	}
+	if GitHubActionsURL("") != "" {
+		t.Fatal("empty")
+	}
+}

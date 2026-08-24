@@ -144,6 +144,27 @@ export type DeployableSummary = {
   update?: UpdateSummary;
 };
 
+export type WorkflowRun = {
+  id: number;
+  name: string;
+  title?: string;
+  number: number;
+  event?: string;
+  status: string;
+  branch?: string;
+  sha?: string;
+  actor?: string;
+  url?: string;
+  commitURL?: string;
+  startedAt?: string;
+};
+
+export type Workflows = {
+  url?: string;
+  runs: WorkflowRun[];
+  error?: string;
+};
+
 export type DeployableStatus = {
   name: string;
   namespace: string;
@@ -156,6 +177,7 @@ export type DeployableStatus = {
   push: boolean;
   sync: boolean;
   update?: UpdateStatus;
+  workflows?: Workflows;
 };
 
 export type ReleaseStageHit = {
