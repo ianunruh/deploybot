@@ -63,7 +63,7 @@ export async function action({ request }: Route.ActionArgs) {
         String(form.get("name") ?? ""),
         String(form.get("stage") ?? ""),
         String(form.get("image") ?? ""),
-        { sync: formFlag(form, "sync") },
+        { sync: formFlag(form, "sync"), wait: formFlag(form, "wait") },
       ),
     } satisfies ActionData;
   } catch (err) {
@@ -228,6 +228,7 @@ export default function Updates({ loaderData }: Route.ComponentProps) {
               stage: selected.stage,
               image: selected.newest.ref,
               ...(sync ? { sync: pinSync ? "true" : "false" } : {}),
+              ...(apply ? { wait: "false" } : {}),
             },
             { method: "post" },
           );

@@ -70,7 +70,7 @@ func (s *Server) updates(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
-	st, err := s.Release.Status(r.Context(), r.PathValue("name"))
+	st, err := s.Release.LiveStatus(r.Context(), r.PathValue("name"))
 	if err != nil {
 		writeError(w, err)
 		return

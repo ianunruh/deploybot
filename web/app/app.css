@@ -155,3 +155,60 @@ a {
     transform: translateX(100%) scaleX(0.35);
   }
 }
+
+.db-theater {
+  border-left: 2px solid var(--mantine-color-accent-6);
+}
+
+.db-theater--done {
+  border-left-color: var(--mantine-color-teal-6);
+}
+
+.db-theater--failed {
+  border-left-color: var(--mantine-color-red-6);
+}
+
+.db-theater-steps {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.db-theater-step {
+  flex: 0 0 auto;
+  min-width: 7.5rem;
+  max-width: 12rem;
+}
+
+.db-theater-step--running .db-clip-text,
+.db-theater-step--running {
+  color: var(--mantine-color-accent-4);
+}
+
+.db-theater-edge {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.15rem;
+  padding: 0 0.5rem;
+}
+
+.db-theater-edge-rule {
+  flex: 1 1 auto;
+  height: 1px;
+  background: #2c333d;
+}
+
+.db-spin {
+  animation: db-spin 0.8s linear infinite;
+}
+
+@keyframes db-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

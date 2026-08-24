@@ -52,7 +52,6 @@ func (f *Fake) Sync(_ context.Context, app string, _ bool) error {
 		return fmt.Errorf("app %s not found", app)
 	}
 	st.Sync = "Synced"
-	st.Health = "Healthy"
 	f.Apps[app] = st
 	f.Synced = append(f.Synced, app)
 	return nil

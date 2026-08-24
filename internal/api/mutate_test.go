@@ -16,17 +16,37 @@ import (
 func TestMutatorSkipSync(t *testing.T) {
 	t.Parallel()
 	s := &Server{Release: &release.Service{Sync: true}}
-	if !s.mutator(nil).Sync {
+	if !s.mutator(nil, nil).Sync {
 		t.Fatal("omitted sync should keep the process default")
 	}
 	on := true
-	if !s.mutator(&on).Sync {
+	if !s.mutator(&on, nil).Sync {
 		t.Fatal("sync true should keep Argo enabled")
 	}
 	off := false
-	got := s.mutator(&off)
+	got := s.mutator(&off, nil)
 	if got.Sync {
 		t.Fatal("sync false should skip Argo")
+	}
+	if got == s.Release {
+		t.Fatal("opt-out should not mutate the process default")
+	}
+}
+
+func TestMutatorSkipWait(t *testing.T) {
+	t.Parallel()
+	s := &Server{Release: &release.Service{Sync: true}}
+	if s.mutator(nil, nil).NoWait {
+		t.Fatal("omitted wait should still poll healthy")
+	}
+	on := true
+	if s.mutator(nil, &on).NoWait {
+		t.Fatal("wait true should still poll healthy")
+	}
+	off := false
+	got := s.mutator(nil, &off)
+	if !got.NoWait {
+		t.Fatal("wait false should skip the healthy poll")
 	}
 	if got == s.Release {
 		t.Fatal("opt-out should not mutate the process default")

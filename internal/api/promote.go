@@ -10,6 +10,7 @@ type promoteRequest struct {
 	To    string `json:"to"`
 	Image string `json:"image"`
 	Sync  *bool  `json:"sync"`
+	Wait  *bool  `json:"wait"`
 }
 
 func (s *Server) promote(w http.ResponseWriter, r *http.Request) {
@@ -18,7 +19,7 @@ func (s *Server) promote(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	mut, err := s.mutator(req.Sync).Promote(r.Context(), r.PathValue("name"), req.From, req.To, req.Image)
+	mut, err := s.mutator(req.Sync, req.Wait).Promote(r.Context(), r.PathValue("name"), req.From, req.To, req.Image)
 	if err != nil {
 		writeError(w, err)
 		return

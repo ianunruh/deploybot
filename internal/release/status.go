@@ -56,9 +56,25 @@ type Live struct {
 }
 
 func (s *Service) Status(ctx context.Context, name string) (Status, error) {
+	return s.status(ctx, name, false)
+}
+
+// LiveStatus is Status with a fresh Argo list for this app's stages. The
+// console detail page uses it so rollouts are not stuck behind the catalog TTL.
+func (s *Service) LiveStatus(ctx context.Context, name string) (Status, error) {
+	return s.status(ctx, name, true)
+}
+
+func (s *Service) status(ctx context.Context, name string, fresh bool) (Status, error) {
 	d, err := s.Catalog.Get(name)
 	if err != nil {
 		return Status{}, err
+	}
+	if fresh {
+		s.initCaches()
+		for _, st := range d.Spec.Stages {
+			s.dropArgo(st.Name)
+		}
 	}
 	tree, err := s.workingTree(ctx, d)
 	if err != nil {

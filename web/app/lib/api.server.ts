@@ -272,7 +272,7 @@ export function pinDeployable(
   name: string,
   stage: string,
   image: string,
-  opts?: { sync?: boolean },
+  opts?: { sync?: boolean; wait?: boolean },
 ) {
   return apiFetch<MutationResult>(`/api/v1/deployables/${encodeURIComponent(name)}/pin`, {
     method: "POST",
@@ -280,6 +280,7 @@ export function pinDeployable(
       stage,
       image,
       ...(opts?.sync != null ? { sync: opts.sync } : {}),
+      ...(opts?.wait != null ? { wait: opts.wait } : {}),
     }),
   });
 }
@@ -288,7 +289,7 @@ export function promoteDeployable(
   name: string,
   from: string,
   to: string,
-  opts?: { sync?: boolean; image?: string },
+  opts?: { sync?: boolean; wait?: boolean; image?: string },
 ) {
   return apiFetch<MutationResult>(
     `/api/v1/deployables/${encodeURIComponent(name)}/promote`,
@@ -299,6 +300,7 @@ export function promoteDeployable(
         to,
         ...(opts?.image ? { image: opts.image } : {}),
         ...(opts?.sync != null ? { sync: opts.sync } : {}),
+        ...(opts?.wait != null ? { wait: opts.wait } : {}),
       }),
     },
   );
@@ -314,7 +316,7 @@ export function previewReconcile(name: string, stage: string) {
 export function reconcileDeployable(
   name: string,
   stage: string,
-  opts?: { sync?: boolean },
+  opts?: { sync?: boolean; wait?: boolean },
 ) {
   return apiFetch<MutationResult>(
     `/api/v1/deployables/${encodeURIComponent(name)}/reconcile`,
@@ -323,6 +325,7 @@ export function reconcileDeployable(
       body: JSON.stringify({
         stage,
         ...(opts?.sync != null ? { sync: opts.sync } : {}),
+        ...(opts?.wait != null ? { wait: opts.wait } : {}),
       }),
     },
   );

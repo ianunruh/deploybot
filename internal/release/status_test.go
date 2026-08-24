@@ -158,6 +158,43 @@ func TestLatestListsOncePerStage(t *testing.T) {
 	}
 }
 
+func TestLiveStatusDropsArgoCache(t *testing.T) {
+	t.Parallel()
+	homelab := argo.NewFake()
+	homelab.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
+	prod := argo.NewFake()
+	prod.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
+	svc := &Service{
+		Catalog: loadExamples(t),
+		Argo:    stageRouter{"homelab": homelab, "prod": prod},
+		appsTTL: time.Minute,
+	}
+	if _, err := svc.Status(t.Context(), "kmc"); err != nil {
+		t.Fatal(err)
+	}
+	_, hList := homelab.Calls()
+	_, pList := prod.Calls()
+	if hList != 1 || pList != 1 {
+		t.Fatalf("first status lists homelab %d prod %d", hList, pList)
+	}
+	if _, err := svc.Status(t.Context(), "kmc"); err != nil {
+		t.Fatal(err)
+	}
+	_, hList = homelab.Calls()
+	_, pList = prod.Calls()
+	if hList != 1 || pList != 1 {
+		t.Fatalf("cached status listed again: homelab %d prod %d", hList, pList)
+	}
+	if _, err := svc.LiveStatus(t.Context(), "kmc"); err != nil {
+		t.Fatal(err)
+	}
+	_, hList = homelab.Calls()
+	_, pList = prod.Calls()
+	if hList != 2 || pList != 2 {
+		t.Fatalf("live status should relist: homelab %d prod %d", hList, pList)
+	}
+}
+
 func TestListImages(t *testing.T) {
 	t.Parallel()
 	cat := loadExamples(t)

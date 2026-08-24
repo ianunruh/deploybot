@@ -63,7 +63,10 @@ export async function action({ request, params }: Route.ActionArgs) {
   try {
     return {
       ok: true,
-      result: await reconcileDeployable(name, stage, { sync: formFlag(form, "sync") }),
+      result: await reconcileDeployable(name, stage, {
+        sync: formFlag(form, "sync"),
+        wait: formFlag(form, "wait"),
+      }),
     } satisfies ActionData;
   } catch (err) {
     return {
@@ -207,6 +210,7 @@ export default function ReconcileStage({ loaderData, params }: Route.ComponentPr
             {
               intent: "reconcile",
               ...(status.sync ? { sync: syncArgo ? "true" : "false" } : {}),
+              ...(status.apply ? { wait: "false" } : {}),
             },
             { method: "post" },
           );

@@ -23,6 +23,7 @@ type Service struct {
 	Argo        argo.Router
 	Clusters    map[string]config.Cluster
 	Wait        time.Duration
+	NoWait      bool
 	FlowEvery   time.Duration
 	UpdateEvery time.Duration
 	Images      image.Lister
@@ -63,6 +64,18 @@ func (s *Service) WithSync(enabled bool) *Service {
 	s.cachesOnce()
 	cp := *s
 	cp.Sync = false
+	return &cp
+}
+
+// WithWait returns a shallow copy that skips the post-sync healthy poll when
+// enabled is false. CLI still waits; the console watches live status instead.
+func (s *Service) WithWait(enabled bool) *Service {
+	if s == nil || enabled {
+		return s
+	}
+	s.cachesOnce()
+	cp := *s
+	cp.NoWait = true
 	return &cp
 }
 

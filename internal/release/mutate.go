@@ -67,8 +67,11 @@ func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string
 			if err := s.syncStage(ctx, d, st); err != nil {
 				return mut, err
 			}
-			if err := s.waitStage(ctx, d, st); err != nil {
-				return mut, err
+			// CLI waits until healthy. The console sets NoWait and watches live status.
+			if !s.NoWait {
+				if err := s.waitStage(ctx, d, st); err != nil {
+					return mut, err
+				}
 			}
 		}
 		mut.Synced = len(syncStages) > 0

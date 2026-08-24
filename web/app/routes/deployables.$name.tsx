@@ -22,6 +22,7 @@ import { ConfirmActionModal } from "~/ui/confirm-action-modal";
 import { DiffPanel } from "~/ui/diff-panel";
 import { ReleaseFlow } from "~/ui/release-flow";
 import { ReleaseHistory } from "~/ui/release-history";
+import { ReleaseTheater, type TheaterSession } from "~/ui/release-theater";
 import {
   DeployableLinkLabels,
   HostnameLink,
@@ -91,7 +92,7 @@ export async function action({ request, params }: Route.ActionArgs) {
             name,
             String(form.get("stage") ?? ""),
             String(form.get("image") ?? ""),
-            { sync: formFlag(form, "sync") },
+            { sync: formFlag(form, "sync"), wait: formFlag(form, "wait") },
           ),
         } satisfies ActionData;
       case "promote":
@@ -104,6 +105,7 @@ export async function action({ request, params }: Route.ActionArgs) {
             String(form.get("to") ?? ""),
             {
               sync: formFlag(form, "sync"),
+              wait: formFlag(form, "wait"),
               image: String(form.get("image") ?? "") || undefined,
             },
           ),
@@ -154,6 +156,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
   const [image, setImage] = useState("");
   const [pinSync, setPinSync] = useState(true);
   const [promoteSync, setPromoteSync] = useState(true);
+  const [theater, setTheater] = useState<TheaterSession | null>(null);
 
   const stages = status?.stages ?? [];
   const defaultStage = stages[0]?.name ?? "";
@@ -162,12 +165,14 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
   const fromStage = stages[0];
   const toStage = stages[1];
 
+  const theaterLive = theater != null && (theater.result == null || theater.sync);
   useEffect(() => {
+    const every = theaterLive ? 2000 : 4000;
     const id = window.setInterval(() => {
       if (revalidator.state === "idle") void revalidator.revalidate();
-    }, 4000);
+    }, every);
     return () => window.clearInterval(id);
-  }, [revalidator]);
+  }, [revalidator, theaterLive]);
 
   useEffect(() => {
     if (!pinOpen || !status?.name) return;
@@ -184,29 +189,45 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
   const selectedImage = image || imageOptions[0]?.ref || "";
 
   useFetcherResult(pinFetcher, (data) => {
+    setTheater((t) => {
+      if (t?.kind !== "pin") return t;
+      return data.ok
+        ? { ...t, result: data.result, error: undefined }
+        : { ...t, error: data.error };
+    });
     if (!data.ok) {
       notifyActionError("Pin failed", data.error);
       return;
     }
-    notifyActionSuccess(
-      "Pin",
-      `Wrote overlay${mutationNote(data.result, { argoAvailable: status?.sync })}`,
-    );
-    pinHandlers.close();
+    if (data.result?.dryRun) {
+      notifyActionSuccess(
+        "Pin",
+        `Wrote overlay${mutationNote(data.result, { argoAvailable: status?.sync })}`,
+      );
+      pinHandlers.close();
+    }
     setImage("");
     void revalidator.revalidate();
   });
 
   useFetcherResult(promoteFetcher, (data) => {
+    setTheater((t) => {
+      if (t?.kind !== "promote") return t;
+      return data.ok
+        ? { ...t, result: data.result, error: undefined }
+        : { ...t, error: data.error };
+    });
     if (!data.ok) {
       notifyActionError("Promote failed", data.error);
       return;
     }
-    notifyActionSuccess(
-      "Promote",
-      `Copied pin${mutationNote(data.result, { argoAvailable: status?.sync })}`,
-    );
-    promoteHandlers.close();
+    if (data.result?.dryRun) {
+      notifyActionSuccess(
+        "Promote",
+        `Copied pin${mutationNote(data.result, { argoAvailable: status?.sync })}`,
+      );
+      promoteHandlers.close();
+    }
     void revalidator.revalidate();
   });
 
@@ -270,6 +291,19 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       />
 
       <MutationModeAlert apply={status.apply} push={status.push} />
+
+      {theater ? (
+        <ReleaseTheater
+          session={theater}
+          submitting={
+            theater.kind === "pin"
+              ? pinFetcher.state !== "idle"
+              : promoteFetcher.state !== "idle"
+          }
+          stage={stages.find((st) => st.name === theater.stage)}
+          onDismiss={() => setTheater(null)}
+        />
+      ) : null}
 
       <ReleaseFlow stages={stages} flow={status.flow} />
 
@@ -341,7 +375,9 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
 
       <WorkflowRuns workflows={status.workflows} />
 
-      {previewDiff ? <DiffPanel diff={previewDiff} title="Last mutation diff" /> : null}
+      {previewDiff && theater == null ? (
+        <DiffPanel diff={previewDiff} title="Last mutation diff" />
+      ) : null}
 
       <ReleaseHistory
         stages={stages.map((st) => st.name)}
@@ -424,12 +460,27 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
           </Stack>
         }
         onConfirm={() => {
+          const sync = status.sync && pinSync;
+          if (status.apply) {
+            setTheater({
+              kind: "pin",
+              stage: stageValue,
+              image: selectedImage,
+              startedAt: Date.now(),
+              apply: status.apply,
+              push: status.push,
+              sync,
+              initialPodNames: podNamesFor(stages, stageValue),
+            });
+            pinHandlers.close();
+          }
           void pinFetcher.submit(
             {
               intent: "pin",
               stage: stageValue,
               image: selectedImage,
               ...(status.sync ? { sync: pinSync ? "true" : "false" } : {}),
+              ...(status.apply ? { wait: "false" } : {}),
             },
             { method: "post" },
           );
@@ -474,6 +525,20 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
           const hop = status.flow?.hops.find(
             (h) => h.from === fromStage.name && h.to === toStage.name,
           );
+          const sync = status.sync && promoteSync;
+          if (status.apply) {
+            setTheater({
+              kind: "promote",
+              stage: toStage.name,
+              image: hop?.sourceImage || fromStage.image || "",
+              startedAt: Date.now(),
+              apply: status.apply,
+              push: status.push,
+              sync,
+              initialPodNames: podNamesFor(stages, toStage.name),
+            });
+            promoteHandlers.close();
+          }
           void promoteFetcher.submit(
             {
               intent: "promote",
@@ -481,12 +546,22 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
               to: toStage.name,
               ...(hop?.sourceImage ? { image: hop.sourceImage } : {}),
               ...(status.sync ? { sync: promoteSync ? "true" : "false" } : {}),
+              ...(status.apply ? { wait: "false" } : {}),
             },
             { method: "post" },
           );
         }}
       />
     </Stack>
+  );
+}
+
+function podNamesFor(
+  stages: { name: string; workload?: { pods?: { name: string }[] } }[],
+  stage: string,
+): string[] {
+  return (stages.find((st) => st.name === stage)?.workload?.pods ?? []).map(
+    (p) => p.name,
   );
 }
 

@@ -53,7 +53,7 @@ export function MutationGitHint({
   if (apply) {
     if (sync) {
       const where = syncStage ? ` on ${syncStage}` : "";
-      text += ` Then syncs Argo CD${where} and waits until healthy.`;
+      text += ` Then syncs Argo CD${where}. Watch the rollout until healthy.`;
     } else {
       text += " Does not sync Argo CD.";
     }
@@ -83,7 +83,7 @@ export function ArgoSyncCheckbox({
       checked={checked}
       onChange={(e) => onChange(e.currentTarget.checked)}
       label={`Sync Argo CD${where} after commit`}
-      description="Waits until the app is healthy. Uncheck to review the Argo diff first."
+      description="Triggers a sync. Uncheck to review the Argo diff first."
     />
   );
 }

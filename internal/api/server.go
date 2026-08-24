@@ -32,9 +32,13 @@ func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (s *Server) mutator(sync *bool) *release.Service {
-	if sync == nil {
-		return s.Release
+func (s *Server) mutator(sync, wait *bool) *release.Service {
+	svc := s.Release
+	if sync != nil {
+		svc = svc.WithSync(*sync)
 	}
-	return s.Release.WithSync(*sync)
+	if wait != nil {
+		svc = svc.WithWait(*wait)
+	}
+	return svc
 }

@@ -9,6 +9,7 @@ type pinRequest struct {
 	Stage string `json:"stage"`
 	Image string `json:"image"`
 	Sync  *bool  `json:"sync"`
+	Wait  *bool  `json:"wait"`
 }
 
 func (s *Server) pin(w http.ResponseWriter, r *http.Request) {
@@ -17,7 +18,7 @@ func (s *Server) pin(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	mut, err := s.mutator(req.Sync).Pin(r.Context(), r.PathValue("name"), req.Stage, req.Image)
+	mut, err := s.mutator(req.Sync, req.Wait).Pin(r.Context(), r.PathValue("name"), req.Stage, req.Image)
 	if err != nil {
 		writeError(w, err)
 		return

@@ -128,6 +128,64 @@ func TestPinDryRunThenApplyAndPromote(t *testing.T) {
 	}
 }
 
+func TestPinWaitsHealthyByDefault(t *testing.T) {
+	t.Parallel()
+	dir := initOpsRepo(t)
+	fake := argo.NewFake()
+	fake.Set("kmc", argo.Status{Health: "Progressing", Sync: "OutOfSync"})
+	svc := &Service{
+		Catalog: loadExamples(t),
+		OpsRepo: dir,
+		Apply:   true,
+		Sync:    true,
+		Argo:    argo.StaticRouter{Client: fake},
+		Wait:    80 * time.Millisecond,
+		Author:  gitwrite.Author{Name: "t", Email: "t@t"},
+	}
+	_, err := svc.Pin(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc@sha256:abc")
+	if err == nil || !strings.Contains(err.Error(), "healthy") {
+		t.Fatalf("expected wait-healthy error, got %v", err)
+	}
+}
+
+func TestWithWaitSkipsHealthy(t *testing.T) {
+	t.Parallel()
+	dir := initOpsRepo(t)
+	fake := argo.NewFake()
+	fake.Set("kmc", argo.Status{Health: "Progressing", Sync: "OutOfSync"})
+	svc := &Service{
+		Catalog: loadExamples(t),
+		OpsRepo: dir,
+		Apply:   true,
+		Sync:    true,
+		Argo:    argo.StaticRouter{Client: fake},
+		Wait:    30 * time.Second,
+		Author:  gitwrite.Author{Name: "t", Email: "t@t"},
+	}
+
+	start := time.Now()
+	pin, err := svc.WithWait(false).Pin(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc@sha256:abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if time.Since(start) > 2*time.Second {
+		t.Fatal("WithWait(false) should return before the healthy poll")
+	}
+	if pin.Commit == "" || !pin.Synced {
+		t.Fatalf("expected commit and sync trigger, got %+v", pin)
+	}
+	if len(fake.Synced) != 1 {
+		t.Fatalf("Argo sync %v", fake.Synced)
+	}
+	st, err := fake.Get(t.Context(), "kmc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Health != "Progressing" {
+		t.Fatalf("sync should not wait for healthy, got %+v", st)
+	}
+}
+
 func TestWithSyncSkipArgo(t *testing.T) {
 	t.Parallel()
 	dir := initOpsRepo(t)
