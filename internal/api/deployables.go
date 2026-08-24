@@ -78,6 +78,24 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, st)
 }
 
+func (s *Server) workloads(w http.ResponseWriter, r *http.Request) {
+	wl, err := s.Release.LiveWorkloads(r.Context(), r.PathValue("name"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, wl)
+}
+
+func (s *Server) workflows(w http.ResponseWriter, r *http.Request) {
+	wf, err := s.Release.Workflows(r.Context(), r.PathValue("name"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, wf)
+}
+
 func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 	limit := 0
 	if raw := r.URL.Query().Get("limit"); raw != "" {

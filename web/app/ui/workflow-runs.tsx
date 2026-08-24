@@ -6,11 +6,15 @@ import { ResourceTable, Table } from "~/ui/resource-table";
 import { SourceCommitMeta } from "~/ui/source-commit";
 import { StatusBadge } from "~/ui/status-badge";
 
-export function WorkflowRuns({ workflows }: { workflows?: Workflows | null }) {
-  if (workflows == null) return null;
-
-  const runs = workflows.runs ?? [];
-  const error = workflows.error;
+export function WorkflowRuns({
+  workflows,
+  error,
+}: {
+  workflows?: Workflows | null;
+  error?: string | null;
+}) {
+  const runs = workflows?.runs ?? [];
+  const loadError = error ?? workflows?.error;
 
   return (
     <Stack gap="sm">
@@ -18,7 +22,7 @@ export function WorkflowRuns({ workflows }: { workflows?: Workflows | null }) {
         <Text size="sm" tt="uppercase" c="dimmed" fw={600}>
           Workflows
         </Text>
-        {workflows.url ? (
+        {workflows?.url ? (
           <Anchor
             href={workflows.url}
             size="xs"
@@ -30,15 +34,19 @@ export function WorkflowRuns({ workflows }: { workflows?: Workflows | null }) {
           </Anchor>
         ) : null}
       </Group>
-      {error != null && error !== "" ? (
+      {loadError != null && loadError !== "" ? (
         <Text size="sm" c="dimmed">
-          Could not load workflow runs ({error}).
+          Could not load workflow runs ({loadError}).
         </Text>
       ) : (
         <ResourceTable
           headers={["Status", "Workflow", "Title", "Branch", "Event", "Actor", "Started"]}
           isEmpty={runs.length === 0}
-          emptyMessage="No recent workflow runs."
+          emptyMessage={
+            workflows?.url
+              ? "No recent workflow runs."
+              : "No GitHub Actions for this deployable."
+          }
           minWidth={880}
         >
           {runs.map((run) => (

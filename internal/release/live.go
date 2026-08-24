@@ -12,8 +12,37 @@ import (
 
 const statusKubeTimeout = 4 * time.Second
 
+// StageWorkload is live Deployment/StatefulSet state for one stage.
+type StageWorkload struct {
+	Name     string         `json:"name"`
+	Workload *kube.Workload `json:"workload,omitempty"`
+}
+
+// LiveWorkloads is per-stage kube replica/pod state for the detail page.
+type LiveWorkloads struct {
+	Stages []StageWorkload `json:"stages"`
+}
+
+// LiveWorkloads reads Deployment/StatefulSet replica counts and pods.
+// Status, Latest, and WatchFlows skip this; only the detail overview fetches it.
+func (s *Service) LiveWorkloads(ctx context.Context, name string) (LiveWorkloads, error) {
+	d, err := s.Catalog.Get(name)
+	if err != nil {
+		return LiveWorkloads{}, err
+	}
+	stages := make([]StageStatus, len(d.Spec.Stages))
+	for i, st := range d.Spec.Stages {
+		stages[i] = StageStatus{Name: st.Name}
+	}
+	s.attachLive(ctx, d, stages)
+	out := LiveWorkloads{Stages: make([]StageWorkload, len(stages))}
+	for i, st := range stages {
+		out.Stages[i] = StageWorkload{Name: st.Name, Workload: st.Workload}
+	}
+	return out, nil
+}
+
 // attachLive fills per-stage Deployment/StatefulSet replica counts and pods.
-// Catalog Latest skips this; the detail page is the live view.
 func (s *Service) attachLive(ctx context.Context, d *spec.Deployable, stages []StageStatus) {
 	if s == nil || s.Argo == nil || d == nil || len(stages) == 0 {
 		return

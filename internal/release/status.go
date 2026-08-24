@@ -44,7 +44,6 @@ type Status struct {
 	Push       bool          `json:"push"`
 	Sync       bool          `json:"sync"`
 	Update     *UpdateStatus `json:"update,omitempty"`
-	Workflows  *Workflows    `json:"workflows,omitempty"`
 }
 
 // Live is a catalog-list snapshot: newest Argo deployedAt, stage health, and
@@ -81,17 +80,13 @@ func (s *Service) status(ctx context.Context, name string, fresh bool) (Status, 
 		return Status{}, err
 	}
 	out := s.buildStatus(ctx, d, tree)
-	var wg sync.WaitGroup
-	var workflows *Workflows
-	wg.Go(func() { s.attachLive(ctx, d, out.Stages) })
-	wg.Go(func() { workflows = s.listWorkflows(ctx, d.Spec.Links.RepoURL) })
-	if out.Flow.Tag != "" {
+	// Live kube and GitHub workflows are separate endpoints so catalog
+	// list, WatchFlows, and the core status poll do not wait on them.
+	if fresh && out.Flow.Tag != "" {
 		sctx, cancel := context.WithTimeout(ctx, sourceCommitTimeout)
 		out.Flow.Source = s.resolveSource(sctx, d.Spec.Links.RepoURL, out.Flow.Tag)
 		cancel()
 	}
-	wg.Wait()
-	out.Workflows = workflows
 	return out, nil
 }
 

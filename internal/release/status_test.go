@@ -304,6 +304,22 @@ func TestStatusLiveWorkload(t *testing.T) {
 		if stage.Health != "Healthy" || stage.Sync != "Synced" {
 			t.Fatalf("argo %+v", stage)
 		}
+		if stage.Workload != nil {
+			t.Fatalf("status should skip pods %+v", stage.Workload)
+		}
+	}
+	if podLists.Load() != 0 {
+		t.Fatalf("status listed pods")
+	}
+
+	live, err := svc.LiveWorkloads(t.Context(), "kmc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(live.Stages) != 2 {
+		t.Fatalf("live stages %+v", live.Stages)
+	}
+	for _, stage := range live.Stages {
 		wl := stage.Workload
 		if wl == nil || wl.Kind != "Deployment" || wl.Ready != 1 || wl.Desired != 1 {
 			t.Fatalf("workload %+v", wl)
@@ -331,6 +347,10 @@ func TestStatusLiveWorkload(t *testing.T) {
 	}
 	if podLists.Load() != before {
 		t.Fatalf("latest listed pods")
+	}
+
+	if _, err := svc.LiveWorkloads(t.Context(), "nope"); err == nil {
+		t.Fatal("expected unknown deployable")
 	}
 }
 

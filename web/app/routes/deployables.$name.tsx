@@ -1,17 +1,34 @@
-import { Alert, Button, Group, Stack, Text, TextInput, Select } from "@mantine/core";
+import {
+  Alert,
+  Button,
+  Group,
+  Stack,
+  Tabs,
+  Text,
+  TextInput,
+  Select,
+} from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useFetcher, useRevalidator } from "react-router";
+import {
+  Outlet,
+  useFetcher,
+  useLocation,
+  useNavigate,
+  useRevalidator,
+} from "react-router";
 
 import type { Route } from "./+types/deployables.$name";
 import type { ImagesLoaderData } from "./deployables.$name.images";
+import type { WorkloadsLoaderData } from "./deployables.$name.workloads";
 import {
   getDeployable,
-  getDeployableHistory,
   pinDeployable,
   promoteDeployable,
+  type DeployableStatus,
   type ImageVersion,
   type MutationResult,
+  type StageStatus,
   type UpdateStatus as RegistryUpdate,
 } from "~/lib/api.server";
 import { notifyActionError, notifyActionSuccess } from "~/lib/action-feedback";
@@ -20,14 +37,8 @@ import { useFetcherResult } from "~/lib/use-fetcher-result";
 import { CompactImage, shortDigest } from "~/ui/compact-image";
 import { ConfirmActionModal } from "~/ui/confirm-action-modal";
 import { DiffPanel } from "~/ui/diff-panel";
-import { ReleaseFlow } from "~/ui/release-flow";
-import { ReleaseHistory } from "~/ui/release-history";
 import { ReleaseTheater, type TheaterSession } from "~/ui/release-theater";
-import {
-  DeployableLinkLabels,
-  HostnameLink,
-  StageObservabilityIcons,
-} from "~/ui/external-links";
+import { DeployableLinkLabels } from "~/ui/external-links";
 import {
   ArgoSyncCheckbox,
   formFlag,
@@ -36,11 +47,12 @@ import {
   mutationNote,
 } from "~/ui/mutation-controls";
 import { PageHeader } from "~/ui/page-header";
-import { RelativeTime } from "~/ui/relative-time";
-import { ResourceTable, Table } from "~/ui/resource-table";
-import { StatusBadge, UpdateBadge } from "~/ui/status-badge";
-import { StageReady, WorkloadPods } from "~/ui/workload-pods";
-import { WorkflowRuns } from "~/ui/workflow-runs";
+import { UpdateBadge } from "~/ui/status-badge";
+
+export type DeployableContext = {
+  status: DeployableStatus;
+  stages: StageStatus[];
+};
 
 export function meta({ params }: Route.MetaArgs) {
   return [{ title: `${params.name} · deploybot` }];
@@ -49,26 +61,17 @@ export function meta({ params }: Route.MetaArgs) {
 export async function loader({ params }: Route.LoaderArgs) {
   const name = params.name;
   if (!name) throw new Response("Missing name", { status: 400 });
-  const [statusResult, historyResult] = await Promise.allSettled([
-    getDeployable(name),
-    getDeployableHistory(name),
-  ]);
-  return {
-    status: statusResult.status === "fulfilled" ? statusResult.value : null,
-    error:
-      statusResult.status === "rejected"
-        ? statusResult.reason instanceof Error
-          ? statusResult.reason.message
-          : String(statusResult.reason)
-        : null,
-    history: historyResult.status === "fulfilled" ? historyResult.value : null,
-    historyError:
-      historyResult.status === "rejected"
-        ? historyResult.reason instanceof Error
-          ? historyResult.reason.message
-          : String(historyResult.reason)
-        : null,
-  };
+  try {
+    return {
+      status: await getDeployable(name),
+      error: null as string | null,
+    };
+  } catch (err) {
+    return {
+      status: null,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 type ActionData =
@@ -145,12 +148,28 @@ function RegistryUpdateHint({ update }: { update: RegistryUpdate }) {
   );
 }
 
+function tabFromPath(pathname: string): string {
+  if (pathname.endsWith("/workflows")) return "workflows";
+  if (pathname.endsWith("/history")) return "history";
+  return "overview";
+}
+
+function tabPath(name: string, tab: string | null): string {
+  const base = `/deployables/${name}`;
+  if (tab === "workflows") return `${base}/workflows`;
+  if (tab === "history") return `${base}/history`;
+  return base;
+}
+
 export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
-  const { status, error, history, historyError } = loaderData;
+  const { status, error } = loaderData;
   const revalidator = useRevalidator();
+  const navigate = useNavigate();
+  const location = useLocation();
   const pinFetcher = useFetcher<ActionData>();
   const promoteFetcher = useFetcher<ActionData>();
   const imagesFetcher = useFetcher<ImagesLoaderData>();
+  const workloadsFetcher = useFetcher<WorkloadsLoaderData>();
   const [pinOpen, pinHandlers] = useDisclosure(false);
   const [promoteOpen, promoteHandlers] = useDisclosure(false);
   const [image, setImage] = useState("");
@@ -158,21 +177,32 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
   const [promoteSync, setPromoteSync] = useState(true);
   const [theater, setTheater] = useState<TheaterSession | null>(null);
 
-  const stages = status?.stages ?? [];
+  const stages = useMemo(
+    () => mergeWorkloads(status?.stages ?? [], workloadsFetcher.data?.stages),
+    [status?.stages, workloadsFetcher.data?.stages],
+  );
   const defaultStage = stages[0]?.name ?? "";
   const [pinStage, setPinStage] = useState("");
   const stageValue = pinStage || defaultStage;
   const fromStage = stages[0];
   const toStage = stages[1];
+  const tab = tabFromPath(location.pathname);
 
   const theaterLive = theater != null && (theater.result == null || theater.sync);
   useEffect(() => {
+    if (!status?.name) return;
+    const workloadsPath = `/deployables/${encodeURIComponent(status.name)}/workloads`;
+    const needWorkloads = tab === "overview" || theaterLive;
+    if (needWorkloads) void workloadsFetcher.load(workloadsPath);
     const every = theaterLive ? 2000 : 4000;
     const id = window.setInterval(() => {
       if (revalidator.state === "idle") void revalidator.revalidate();
+      if (needWorkloads) void workloadsFetcher.load(workloadsPath);
     }, every);
     return () => window.clearInterval(id);
-  }, [revalidator, theaterLive]);
+    // Fetcher identity changes; poll while this deployable is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revalidator, theaterLive, status?.name, tab]);
 
   useEffect(() => {
     if (!pinOpen || !status?.name) return;
@@ -187,6 +217,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
     pinOpen && (imagesFetcher.state !== "idle" || imagesFetcher.data == null);
   const imagesSource = imagesFetcher.data?.source ?? "";
   const selectedImage = image || imageOptions[0]?.ref || "";
+  const actionPath = status?.name ? `/deployables/${status.name}` : ".";
 
   useFetcherResult(pinFetcher, (data) => {
     setTheater((t) => {
@@ -315,85 +346,26 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         />
       ) : null}
 
-      <ReleaseFlow stages={stages} flow={status.flow} />
-
-      <ResourceTable
-        headers={[
-          "Stage",
-          "Hostname",
-          "Image",
-          "Sync",
-          "Health",
-          "Ready",
-          "Deployed",
-          "Links",
-          "",
-        ]}
-        isEmpty={stages.length === 0}
-        minWidth={880}
-      >
-        {stages.map((st) => (
-          <Table.Tr key={st.name}>
-            <Table.Td className="db-cell-fit" fw={600}>
-              {st.name}
-            </Table.Td>
-            <Table.Td className="db-cell-fit">
-              <HostnameLink hostname={st.hostname} />
-            </Table.Td>
-            <Table.Td className="db-cell-clip">
-              <CompactImage value={st.image} empty="—" />
-            </Table.Td>
-            <Table.Td className="db-cell-fit">
-              <StatusBadge status={st.sync} href={st.argoURL} />
-            </Table.Td>
-            <Table.Td>
-              <StatusBadge status={st.health} href={st.argoURL} />
-              {st.message ? (
-                <Text size="xs" c="dimmed">
-                  {st.message}
-                </Text>
-              ) : null}
-            </Table.Td>
-            <Table.Td className="db-cell-fit">
-              <StageReady workload={st.workload} />
-            </Table.Td>
-            <Table.Td className="db-cell-fit">
-              <RelativeTime value={st.deployedAt} />
-            </Table.Td>
-            <Table.Td className="db-cell-fit">
-              <StageObservabilityIcons
-                headlampURL={st.headlampURL}
-                grafanaURL={st.grafanaURL}
-                logsURL={st.logsURL}
-              />
-            </Table.Td>
-            <Table.Td className="db-cell-fit">
-              <Button
-                component={Link}
-                to={`/deployables/${status.name}/reconcile/${st.name}`}
-                variant="default"
-                size="compact-sm"
-              >
-                Reconcile
-              </Button>
-            </Table.Td>
-          </Table.Tr>
-        ))}
-      </ResourceTable>
-
-      <WorkloadPods stages={stages} />
-
-      <WorkflowRuns workflows={status.workflows} />
-
       {previewDiff && theater == null ? (
         <DiffPanel diff={previewDiff} title="Last mutation diff" />
       ) : null}
 
-      <ReleaseHistory
-        stages={stages.map((st) => st.name)}
-        releases={history?.releases ?? []}
-        error={historyError}
-      />
+      <Stack gap="md">
+        <Tabs
+          value={tab}
+          onChange={(value) => {
+            void navigate(tabPath(status.name, value));
+          }}
+        >
+          <Tabs.List>
+            <Tabs.Tab value="overview">Overview</Tabs.Tab>
+            <Tabs.Tab value="workflows">Workflows</Tabs.Tab>
+            <Tabs.Tab value="history">Releases</Tabs.Tab>
+          </Tabs.List>
+        </Tabs>
+
+        <Outlet context={{ status, stages } satisfies DeployableContext} />
+      </Stack>
 
       <ConfirmActionModal
         opened={pinOpen}
@@ -492,7 +464,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
               ...(status.sync ? { sync: pinSync ? "true" : "false" } : {}),
               ...(status.apply ? { wait: "false" } : {}),
             },
-            { method: "post" },
+            { method: "post", action: actionPath },
           );
         }}
       />
@@ -558,11 +530,22 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
               ...(status.sync ? { sync: promoteSync ? "true" : "false" } : {}),
               ...(status.apply ? { wait: "false" } : {}),
             },
-            { method: "post" },
+            { method: "post", action: actionPath },
           );
         }}
       />
     </Stack>
+  );
+}
+
+function mergeWorkloads(
+  stages: StageStatus[],
+  live?: Array<{ name: string; workload?: StageStatus["workload"] }>,
+): StageStatus[] {
+  if (live == null) return stages;
+  const byName = new Map(live.map((s) => [s.name, s.workload]));
+  return stages.map((st) =>
+    byName.has(st.name) ? { ...st, workload: byName.get(st.name) } : st,
   );
 }
 

@@ -331,6 +331,72 @@ func TestHistoryEmpty(t *testing.T) {
 	}
 }
 
+func TestWorkloadsAndWorkflows(t *testing.T) {
+	t.Parallel()
+	_, file, _, _ := runtime.Caller(0)
+	specs := filepath.Join(filepath.Dir(file), "..", "..", "examples")
+	cat, err := catalog.Load(specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{
+		Catalog: cat,
+		Release: &release.Service{Catalog: cat},
+	}
+	srv := httptest.NewServer(s.Handler())
+	t.Cleanup(srv.Close)
+
+	res, err := http.Get(srv.URL + "/api/v1/deployables/kmc/workloads")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		t.Fatal(res.Status)
+	}
+	var wl release.LiveWorkloads
+	if err := json.NewDecoder(res.Body).Decode(&wl); err != nil {
+		t.Fatal(err)
+	}
+	if len(wl.Stages) != 2 || wl.Stages[0].Name != "homelab" || wl.Stages[1].Name != "prod" {
+		t.Fatalf("%+v", wl)
+	}
+
+	wfRes, err := http.Get(srv.URL + "/api/v1/deployables/kmc/workflows")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = wfRes.Body.Close() }()
+	if wfRes.StatusCode != http.StatusOK {
+		t.Fatal(wfRes.Status)
+	}
+	var wf release.Workflows
+	if err := json.NewDecoder(wfRes.Body).Decode(&wf); err != nil {
+		t.Fatal(err)
+	}
+	if wf.Runs == nil {
+		t.Fatalf("expected empty runs, got %+v", wf)
+	}
+
+	missing, err := http.Get(srv.URL + "/api/v1/deployables/nope/workloads")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = missing.Body.Close() }()
+	if missing.StatusCode != http.StatusNotFound {
+		t.Fatalf("status %s", missing.Status)
+	}
+
+	missingWF, err := http.Get(srv.URL + "/api/v1/deployables/nope/workflows")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = missingWF.Body.Close() }()
+	if missingWF.StatusCode != http.StatusNotFound {
+		t.Fatalf("status %s", missingWF.Status)
+	}
+}
+
 func TestUpdates(t *testing.T) {
 	t.Parallel()
 	_, file, _, _ := runtime.Caller(0)

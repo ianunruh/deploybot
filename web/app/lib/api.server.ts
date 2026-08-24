@@ -177,7 +177,15 @@ export type DeployableStatus = {
   push: boolean;
   sync: boolean;
   update?: UpdateStatus;
-  workflows?: Workflows;
+};
+
+export type StageWorkload = {
+  name: string;
+  workload?: WorkloadLive;
+};
+
+export type LiveWorkloads = {
+  stages: StageWorkload[];
 };
 
 export type ReleaseStageHit = {
@@ -232,6 +240,16 @@ export function listUpdates() {
 
 export function getDeployable(name: string) {
   return apiFetch<DeployableStatus>(`/api/v1/deployables/${encodeURIComponent(name)}`);
+}
+
+export function getDeployableWorkloads(name: string) {
+  return apiFetch<LiveWorkloads>(
+    `/api/v1/deployables/${encodeURIComponent(name)}/workloads`,
+  );
+}
+
+export function getDeployableWorkflows(name: string) {
+  return apiFetch<Workflows>(`/api/v1/deployables/${encodeURIComponent(name)}/workflows`);
 }
 
 export function getDeployableHistory(name: string) {

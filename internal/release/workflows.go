@@ -19,6 +19,20 @@ type Workflows struct {
 	Error string              `json:"error,omitempty"`
 }
 
+// Workflows is recent GitHub Actions runs for a deployable. Unknown names
+// error; missing Actions config or a non-GitHub repo yields empty runs.
+func (s *Service) Workflows(ctx context.Context, name string) (Workflows, error) {
+	d, err := s.Catalog.Get(name)
+	if err != nil {
+		return Workflows{}, err
+	}
+	got := s.listWorkflows(ctx, d.Spec.Links.RepoURL)
+	if got == nil {
+		return Workflows{Runs: []image.WorkflowRun{}}, nil
+	}
+	return *got, nil
+}
+
 func (s *Service) listWorkflows(ctx context.Context, repoURL string) *Workflows {
 	if s == nil || s.Actions == nil {
 		return nil

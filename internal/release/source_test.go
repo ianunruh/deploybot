@@ -133,7 +133,14 @@ func TestHistoryAndStatusSourceCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.Flow.Source.Message != "Fix the thing" || st.Flow.Source.Author != "Ian Unruh" {
-		t.Fatalf("flow source %+v", st.Flow.Source)
+	if st.Flow.Source != (SourceCommit{}) {
+		t.Fatalf("cached status should skip source %+v", st.Flow.Source)
+	}
+	live, err := svc.LiveStatus(t.Context(), "kmc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if live.Flow.Source.Message != "Fix the thing" || live.Flow.Source.Author != "Ian Unruh" {
+		t.Fatalf("flow source %+v", live.Flow.Source)
 	}
 }

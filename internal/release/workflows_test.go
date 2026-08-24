@@ -76,40 +76,51 @@ func TestListWorkflowsError(t *testing.T) {
 	}
 }
 
-func TestStatusWorkflows(t *testing.T) {
+func TestWorkflowsFor(t *testing.T) {
 	t.Parallel()
 	act := &fakeActions{runs: []image.WorkflowRun{
 		{ID: 101, Name: "Docker", Status: "failure", Number: 42},
 	}}
 	svc := &Service{Catalog: loadExamples(t), Actions: act}
-	st, err := svc.Status(t.Context(), "kmc")
+	if _, err := svc.Status(t.Context(), "kmc"); err != nil {
+		t.Fatal(err)
+	}
+	if act.hits != 0 {
+		t.Fatalf("status should skip workflows, hits %d", act.hits)
+	}
+
+	wf, err := svc.Workflows(t.Context(), "kmc")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.Workflows == nil || len(st.Workflows.Runs) != 1 || st.Workflows.Runs[0].ID != 101 {
-		t.Fatalf("workflows %+v", st.Workflows)
+	if len(wf.Runs) != 1 || wf.Runs[0].ID != 101 {
+		t.Fatalf("workflows %+v", wf)
 	}
 	if act.repo != "https://github.com/ianunruh/kmc" {
 		t.Fatalf("repo %q", act.repo)
 	}
 
-	sonarr, err := svc.Status(t.Context(), "sonarr")
+	sonarr, err := svc.Workflows(t.Context(), "sonarr")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sonarr.Workflows == nil || sonarr.Workflows.URL != "https://github.com/linuxserver/docker-sonarr/actions" {
-		t.Fatalf("sonarr %+v", sonarr.Workflows)
+	if sonarr.URL != "https://github.com/linuxserver/docker-sonarr/actions" {
+		t.Fatalf("sonarr %+v", sonarr)
+	}
+
+	if _, err := svc.Workflows(t.Context(), "nope"); err == nil {
+		t.Fatal("expected unknown deployable")
 	}
 }
 
-func TestStatusOmitsWorkflowsWithoutActions(t *testing.T) {
+func TestWorkflowsWithoutActions(t *testing.T) {
 	t.Parallel()
 	svc := &Service{Catalog: loadExamples(t)}
-	st, err := svc.Status(t.Context(), "kmc")
+	wf, err := svc.Workflows(t.Context(), "kmc")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.Workflows != nil {
-		t.Fatalf("expected omit %+v", st.Workflows)
+	if wf.URL != "" || len(wf.Runs) != 0 {
+		t.Fatalf("expected empty %+v", wf)
 	}
 }
