@@ -1,0 +1,64 @@
+# Routed crash-test dummy: generated Deployment, Service, HTTPRoute, and Argo
+# Applications. No overlay patch — the pod is image + port + probes. Used to
+# exercise pin, promote, bad commits, and rollback.
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: humpty
+spec:
+  namespace: deploybot-system
+  links:
+    repoURL: https://github.com/ianunruh/humpty
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/humpty
+    applicationPath: k8s/apps/projects/sandbox
+  argo:
+    project: sandbox
+    createNamespace: true
+  image:
+    repository: ghcr.io/ianunruh/humpty
+    tag: main
+    pullSecrets:
+      - ghcr-auth
+  workload:
+    kind: Deployment
+    replicas: 1
+    containerName: web
+    containerPort: 8080
+    portName: http
+    probes:
+      liveness:
+        path: /healthz
+        port: http
+        initialDelaySeconds: 3
+        periodSeconds: 10
+      readiness:
+        path: /readyz
+        port: http
+        initialDelaySeconds: 2
+        periodSeconds: 5
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 64Mi
+  route:
+    port: 8080
+    gatewayNamespace: envoy-gateway-system
+  stages:
+    - name: homelab
+      hostname: humpty.k8s.kcloud.zone
+      gateway:
+        name: internal
+        sectionName: https
+    - name: prod
+      hostname: humpty.k8s.kcloud.io
+      gateway:
+        name: internal
+        sectionName: https
+      promote:
+        after:
+          - approval

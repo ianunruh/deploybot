@@ -69,14 +69,19 @@ self-hosted control plane in `deploybot-system`, live in homelab and prod.
 API is ClusterIP in-cluster (console talks to it directly; Service, SA, Argo
 RBAC, git clone of kcloud-ops, and kubeconfig are overlay-owned). Prod
 exposes the API at `deploy-api.k8s.kcloud.io` on Gateway `external` / `https`
-with a GitHub Actions OIDC SecurityPolicy (allow `ianunruh/deploybot` and
-`ianunruh/kmc` on `refs/heads/main`). Console is routed at `deploy.k8s.kcloud.zone` /
+with a GitHub Actions OIDC SecurityPolicy (allow `ianunruh/deploybot`,
+`ianunruh/kmc`, and `ianunruh/humpty` on `refs/heads/main`). Console is routed at `deploy.k8s.kcloud.zone` /
 `deploy.k8s.kcloud.io` on Gateway `internal` / `https`. Specs are baked into
 the API image. GitHub Actions builds both images and pins homelab through
 the prod API; promote to prod is a console action.
 
 GitHub Actions keeps building; deploybot consumes the image. Do not move
 Kaniko or rewrite the image build in `docker-build.yml` for this.
+
+**humpty** (`examples/humpty.yaml`): private crash-test dummy for pin,
+promote, bad commits, and rollback. Routed Deployment in `deploybot-system`
+(reuses `ghcr-auth`), sandbox Argo project, homelab → prod with approval.
+GitHub Actions pins homelab through the prod API. No overlay patches.
 
 **Play** (`examples/sonarr.yaml`, `radarr`, `bazarr`, `jackett`, `tautulli`,
 `ombi`, `flaresolverr`, `nzbget`, `transmission`, `plex-exporter`, `plex`,

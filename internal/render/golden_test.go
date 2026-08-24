@@ -16,7 +16,7 @@ import (
 func TestGoldens(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{
-		"kmc", "kmc-controller", "deploybot", "deploybot-web",
+		"kmc", "kmc-controller", "deploybot", "deploybot-web", "humpty",
 		"sonarr", "radarr", "bazarr", "jackett", "tautulli", "ombi",
 		"flaresolverr", "nzbget", "transmission", "plex-exporter", "plex", "teamspeak",
 	} {

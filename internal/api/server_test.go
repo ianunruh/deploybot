@@ -82,15 +82,15 @@ func TestListAndGet(t *testing.T) {
 		names = append(names, d.Name)
 	}
 	want := []string{
-		"bazarr", "deploybot", "deploybot-web", "flaresolverr", "jackett",
+		"bazarr", "deploybot", "deploybot-web", "flaresolverr", "humpty", "jackett",
 		"kmc", "kmc-controller", "nzbget", "ombi", "plex", "plex-exporter",
 		"radarr", "sonarr", "tautulli", "teamspeak", "transmission",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("catalog names %v", names)
 	}
-	kmc := list.Deployables[5]
-	ctrl := list.Deployables[6]
+	kmc := list.Deployables[6]
+	ctrl := list.Deployables[7]
 	if kmc.RepoURL != "https://github.com/ianunruh/kmc" {
 		t.Fatalf("kmc repo %q", kmc.RepoURL)
 	}
