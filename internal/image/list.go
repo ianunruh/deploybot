@@ -135,10 +135,10 @@ func PreferredTag(tags []string) string {
 func isUnstableTag(tag string) bool {
 	t := strings.ToLower(strings.TrimSpace(tag))
 	switch t {
-	case "latest", "main", "master", "nightly", "beta", "rc", "dev", "develop", "development", "edge":
+	case "latest", "main", "master", "nightly", "beta", "rc", "dev", "develop", "development", "edge", "testing":
 		return true
 	}
-	for _, p := range []string{"nightly", "beta", "dev", "develop", "development"} {
+	for _, p := range []string{"nightly", "beta", "dev", "develop", "development", "testing"} {
 		if strings.HasPrefix(t, p+"-") || strings.HasSuffix(t, "-"+p) || strings.Contains(t, "-"+p+"-") {
 			return true
 		}

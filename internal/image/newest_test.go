@@ -83,6 +83,24 @@ func TestNewestSkipsDevelopWhenStableExists(t *testing.T) {
 	}
 }
 
+func TestNewestSkipsTestingWhenStableExists(t *testing.T) {
+	t.Parallel()
+	old := time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC)
+	newer := old.Add(8 * time.Hour)
+	got, ok := Newest([]Version{
+		hubVer("26.2.20260821", "sha256:stable", old),
+		hubVer("v26.2-ls257", "sha256:stable", old),
+		hubVer("testing-version-c4f9313", "sha256:test", newer),
+		hubVer("testing", "sha256:test", newer),
+	})
+	if !ok {
+		t.Fatal("expected version")
+	}
+	if got.Tag != "26.2.20260821" || got.Digest != "sha256:stable" {
+		t.Fatalf("%+v", got)
+	}
+}
+
 func TestNewestFallsBackToLatest(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)

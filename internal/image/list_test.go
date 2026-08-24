@@ -58,6 +58,7 @@ func TestPreferredTag(t *testing.T) {
 		{[]string{"latest"}, "latest"},
 		{[]string{"v1.2.3", "latest"}, "v1.2.3"},
 		{[]string{"main"}, "main"},
+		{[]string{"testing", "testing-version-c4f9313", "26.2.20260821"}, "26.2.20260821"},
 		{[]string{}, ""},
 	}
 	for _, tc := range cases {
