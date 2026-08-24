@@ -192,7 +192,12 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
     setTheater((t) => {
       if (t?.kind !== "pin") return t;
       return data.ok
-        ? { ...t, result: data.result, error: undefined }
+        ? {
+            ...t,
+            result: data.result,
+            resultAt: t.resultAt ?? Date.now(),
+            error: undefined,
+          }
         : { ...t, error: data.error };
     });
     if (!data.ok) {
@@ -214,7 +219,12 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
     setTheater((t) => {
       if (t?.kind !== "promote") return t;
       return data.ok
-        ? { ...t, result: data.result, error: undefined }
+        ? {
+            ...t,
+            result: data.result,
+            resultAt: t.resultAt ?? Date.now(),
+            error: undefined,
+          }
         : { ...t, error: data.error };
     });
     if (!data.ok) {

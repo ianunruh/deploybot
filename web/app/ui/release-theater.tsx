@@ -22,7 +22,8 @@ import { ResourceTable, Table } from "~/ui/resource-table";
 import { ReplicaReady, StatusBadge } from "~/ui/status-badge";
 
 export const THEATER_TIMEOUT_MS = 5 * 60 * 1000;
-const NOOP_GRACE_MS = 3_000;
+// Post-sync leftover Healthy is not a finished rollout. Clock starts at resultAt.
+const NOOP_GRACE_MS = 12_000;
 
 const FAIL_POD = /crash|error|imagepull|oomkilled|exitcode|signal/i;
 const ROLLING_POD = /pending|creating|initializing|terminating|^init:/i;
@@ -39,6 +40,7 @@ export type TheaterSession = {
   sync: boolean;
   initialPodNames: string[];
   result?: MutationResult;
+  resultAt?: number;
   error?: string;
 };
 
@@ -186,9 +188,14 @@ function rolloutStep(input: {
   const desired = workload?.desired ?? 0;
   const ready = workload?.ready ?? 0;
   const readyNow = desired > 0 && ready >= desired;
-  const rolling = pods.some((p) => podRolling(p.status));
-  const newPods = pods.filter((p) => !input.session.initialPodNames.includes(p.name));
-  const oldLeft = pods.filter((p) => input.session.initialPodNames.includes(p.name));
+  const updating =
+    desired > 0 && typeof workload?.updated === "number" && workload.updated < desired;
+  const rolling = updating || pods.some((p) => podRolling(p.status));
+  const newPods = pods.filter((p) => podFromThisRelease(p, input.session));
+  const oldLeft = pods.filter((p) => !podFromThisRelease(p, input.session));
+  const health = input.stage?.health ?? "";
+  const sync = input.stage?.sync ?? "";
+  const argoMoving = /progressing/i.test(health) || /outofsync/i.test(sync);
   if (newPods.length > 0) {
     step.detail = replicaDetail(ready, desired, newPods.length);
     if (
@@ -206,20 +213,18 @@ function rolloutStep(input: {
     step.state = "running";
     return step;
   }
-  if (rolling) {
+  if (rolling || argoMoving) {
     step.state = "running";
-    step.detail = replicaDetail(ready, desired, 0);
+    step.detail =
+      argoMoving && !rolling ? health || sync : replicaDetail(ready, desired, 0);
     return step;
   }
-  const deployedAt = input.stage?.deployedAt ? Date.parse(input.stage.deployedAt) : NaN;
-  const deployedAfter =
-    Number.isFinite(deployedAt) && deployedAt + 2000 >= input.session.startedAt;
-  const elapsed = input.now - input.session.startedAt;
+  const resultAt = input.session.resultAt ?? input.now;
+  const sinceSync = input.now - resultAt;
   if (
     readyNow &&
     pods.every((p) => p.status === "Running" || p.status === "Succeeded") &&
-    (deployedAfter || /^healthy$/i.test(input.stage?.health ?? "")) &&
-    elapsed >= NOOP_GRACE_MS
+    sinceSync >= NOOP_GRACE_MS
   ) {
     step.state = "done";
     step.detail = replicaDetail(ready, desired, 0);
@@ -233,6 +238,12 @@ function rolloutStep(input: {
   step.state = "running";
   step.detail = readyNow ? "waiting for new replica" : replicaDetail(ready, desired, 0);
   return step;
+}
+
+function podFromThisRelease(pod: PodLive, session: TheaterSession): boolean {
+  if (!session.initialPodNames.includes(pod.name)) return true;
+  const created = pod.createdAt ? Date.parse(pod.createdAt) : NaN;
+  return Number.isFinite(created) && created >= session.startedAt;
 }
 
 function healthyStep(input: {
@@ -260,7 +271,17 @@ function healthyStep(input: {
     step.detail = input.stage?.message || health;
     return step;
   }
-  if (/^healthy$/i.test(health) && input.rollout.state === "done") {
+  if (input.rollout.state !== "done") {
+    if (input.timedOut) {
+      step.state = "failed";
+      step.detail = health ? `last ${health}` : "timed out";
+      return step;
+    }
+    step.state = "running";
+    step.detail = /^(healthy|unknown)?$/i.test(health) ? "waiting" : health;
+    return step;
+  }
+  if (/^healthy$/i.test(health)) {
     step.state = "done";
     step.detail = input.stage?.name;
     return step;
