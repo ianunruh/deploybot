@@ -27,16 +27,16 @@ export const links: Route.LinksFunction = () => [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" {...mantineHtmlProps} data-mantine-color-scheme="dark">
+    <html lang="en" {...mantineHtmlProps}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <ColorSchemeScript forceColorScheme="dark" defaultColorScheme="dark" />
+        <ColorSchemeScript defaultColorScheme="dark" />
         <Meta />
         <Links />
       </head>
       <body>
-        <MantineProvider theme={theme} forceColorScheme="dark" defaultColorScheme="dark">
+        <MantineProvider theme={theme} defaultColorScheme="dark">
           <Notifications position="top-right" />
           {children}
         </MantineProvider>

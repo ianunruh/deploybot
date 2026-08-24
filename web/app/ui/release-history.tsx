@@ -77,7 +77,7 @@ function ReleaseStageCell({ hit }: { hit?: ReleaseStageHit }) {
             size="xs"
             target="_blank"
             rel="noreferrer"
-            c="accent.4"
+            c="var(--db-link)"
           >
             commit
           </Anchor>

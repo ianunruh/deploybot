@@ -24,7 +24,7 @@ export function DiffPanel({
             maxHeight,
             overflow: "auto",
             borderRadius: 4,
-            border: "1px solid #1e242c",
+            border: "1px solid var(--db-border)",
           }}
         >
           <Code block style={{ background: "transparent", color: "inherit" }}>

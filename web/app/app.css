@@ -1,10 +1,28 @@
+:root {
+  --db-bg: #0b0d0f;
+  --db-panel: #12151a;
+  --db-border: #1e242c;
+  --db-rule: #2c333d;
+  --db-text: #e9ecef;
+  --db-link: var(--mantine-color-accent-4);
+}
+
+[data-mantine-color-scheme="light"] {
+  --db-bg: #f8f9fa;
+  --db-panel: #ffffff;
+  --db-border: #dee2e6;
+  --db-rule: #ced4da;
+  --db-text: #212529;
+  --db-link: var(--mantine-color-accent-6);
+}
+
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
-  background: #0b0d0f;
-  color: #e9ecef;
+  background: var(--db-bg);
+  color: var(--db-text);
 }
 
 body {
@@ -20,7 +38,7 @@ a {
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #868e96 !important;
+  color: var(--mantine-color-dimmed) !important;
 }
 
 .db-table tbody td {
@@ -47,8 +65,13 @@ a {
   white-space: nowrap;
 }
 
+.db-shell-chrome {
+  background: var(--db-bg);
+  border-color: var(--db-border);
+}
+
 .db-shell-main {
-  background: #0b0d0f;
+  background: var(--db-bg);
   min-width: 0;
   overflow-x: clip;
 }
@@ -90,7 +113,7 @@ a {
 .db-flow-edge-rule {
   flex: 1 1 auto;
   height: 1px;
-  background: #2c333d;
+  background: var(--db-rule);
 }
 
 .db-flow-inline {
@@ -110,7 +133,7 @@ a {
   font-size: 12px;
   line-height: 1.5;
   padding: 12px;
-  background: #0b0d0f;
+  background: var(--db-bg);
   white-space: pre;
 }
 
@@ -183,7 +206,7 @@ a {
 
 .db-theater-step--running .db-clip-text,
 .db-theater-step--running {
-  color: var(--mantine-color-accent-4);
+  color: var(--db-link);
 }
 
 .db-theater-edge {
@@ -200,7 +223,7 @@ a {
 .db-theater-edge-rule {
   flex: 1 1 auto;
   height: 1px;
-  background: #2c333d;
+  background: var(--db-rule);
 }
 
 .db-spin {

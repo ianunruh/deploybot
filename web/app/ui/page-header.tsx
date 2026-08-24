@@ -29,7 +29,7 @@ export function PageHeader({
                 component={Link}
                 to={crumb.to}
                 size="sm"
-                c="accent.4"
+                c="var(--db-link)"
                 underline="hover"
               >
                 {crumb.label}

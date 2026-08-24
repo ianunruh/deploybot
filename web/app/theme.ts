@@ -35,9 +35,9 @@ export const theme = createTheme({
     fontWeight: "600",
   },
   other: {
-    consoleBg: "#0b0d0f",
-    consolePanel: "#12151a",
-    consoleBorder: "#1e242c",
+    consoleBg: "var(--db-bg)",
+    consolePanel: "var(--db-panel)",
+    consoleBorder: "var(--db-border)",
   },
   components: {
     Select: Select.extend({

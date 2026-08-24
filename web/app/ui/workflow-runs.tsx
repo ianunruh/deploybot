@@ -88,7 +88,7 @@ function WorkflowName({
   const label = number > 0 ? `${name} #${number}` : name;
   if (url) {
     return (
-      <Anchor href={url} size="sm" target="_blank" rel="noreferrer" c="accent.4">
+      <Anchor href={url} size="sm" target="_blank" rel="noreferrer" c="var(--db-link)">
         {label}
       </Anchor>
     );

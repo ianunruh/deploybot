@@ -123,7 +123,12 @@ export default function Updates({ loaderData }: Route.ComponentProps) {
         {updates.map((u) => (
           <Table.Tr key={u.name}>
             <Table.Td>
-              <Text component={Link} to={`/deployables/${u.name}`} fw={600} c="accent.4">
+              <Text
+                component={Link}
+                to={`/deployables/${u.name}`}
+                fw={600}
+                c="var(--db-link)"
+              >
                 {u.name}
               </Text>
             </Table.Td>

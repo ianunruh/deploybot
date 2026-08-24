@@ -15,7 +15,7 @@ export function SourceCommitMeta({ source }: { source?: SourceCommit }) {
         ff="monospace"
         target="_blank"
         rel="noreferrer"
-        c="accent.4"
+        c="var(--db-link)"
       >
         {sha}
       </Anchor>

@@ -118,7 +118,7 @@ function LabeledLink({
   icon: Icon;
 }) {
   return (
-    <Anchor href={href} target="_blank" rel="noreferrer" size="sm" c="accent.4">
+    <Anchor href={href} target="_blank" rel="noreferrer" size="sm" c="var(--db-link)">
       <Group gap={6} wrap="nowrap">
         <Glyph size={14} />
         {label}
@@ -265,7 +265,7 @@ export function HostnameLink({ hostname }: { hostname?: string }) {
       rel="noreferrer"
       size="sm"
       ff="monospace"
-      c="accent.4"
+      c="var(--db-link)"
     >
       {hostname}
     </Anchor>

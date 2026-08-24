@@ -2,8 +2,8 @@ import { Paper, type PaperProps } from "@mantine/core";
 import type { ReactNode } from "react";
 
 const consoleStyle = {
-  background: "#12151a",
-  border: "1px solid #1e242c",
+  background: "var(--db-panel)",
+  border: "1px solid var(--db-border)",
   minWidth: 0,
   maxWidth: "100%",
 } as const;

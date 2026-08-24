@@ -53,7 +53,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   component={Link}
                   to={`/deployables/${d.name}`}
                   fw={600}
-                  c="accent.4"
+                  c="var(--db-link)"
                 >
                   {d.name}
                 </Text>
