@@ -38,6 +38,7 @@ import { PageHeader } from "~/ui/page-header";
 import { RelativeTime } from "~/ui/relative-time";
 import { ResourceTable, Table } from "~/ui/resource-table";
 import { StatusBadge, UpdateBadge } from "~/ui/status-badge";
+import { StageReady, WorkloadPods } from "~/ui/workload-pods";
 
 export function meta({ params }: Route.MetaArgs) {
   return [{ title: `${params.name} · deploybot` }];
@@ -278,12 +279,13 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
           "Image",
           "Sync",
           "Health",
+          "Ready",
           "Deployed",
           "Links",
           "",
         ]}
         isEmpty={stages.length === 0}
-        minWidth={800}
+        minWidth={880}
       >
         {stages.map((st) => (
           <Table.Tr key={st.name}>
@@ -308,6 +310,9 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
               ) : null}
             </Table.Td>
             <Table.Td className="db-cell-fit">
+              <StageReady workload={st.workload} />
+            </Table.Td>
+            <Table.Td className="db-cell-fit">
               <RelativeTime value={st.deployedAt} />
             </Table.Td>
             <Table.Td className="db-cell-fit">
@@ -330,6 +335,8 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
           </Table.Tr>
         ))}
       </ResourceTable>
+
+      <WorkloadPods stages={stages} />
 
       {previewDiff ? <DiffPanel diff={previewDiff} title="Last mutation diff" /> : null}
 

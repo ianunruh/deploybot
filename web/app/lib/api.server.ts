@@ -30,6 +30,28 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+export type PodLive = {
+  name: string;
+  ready: string;
+  status: string;
+  restarts: number;
+  ip?: string;
+  node?: string;
+  createdAt?: string;
+  restartedAt?: string;
+};
+
+export type WorkloadLive = {
+  kind: string;
+  name: string;
+  desired: number;
+  ready: number;
+  updated?: number;
+  available?: number;
+  message?: string;
+  pods?: PodLive[];
+};
+
 export type StageStatus = {
   name: string;
   hostname: string;
@@ -44,6 +66,7 @@ export type StageStatus = {
   headlampURL?: string;
   grafanaURL?: string;
   logsURL?: string;
+  workload?: WorkloadLive;
 };
 
 export type FlowHop = {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ianunruh/deploybot/internal/argo"
 	"github.com/ianunruh/deploybot/internal/image"
+	"github.com/ianunruh/deploybot/internal/kube"
 	"github.com/ianunruh/deploybot/internal/render"
 	"github.com/ianunruh/deploybot/internal/spec"
 )
@@ -15,19 +16,20 @@ import (
 const statusArgoTimeout = 4 * time.Second
 
 type StageStatus struct {
-	Name        string     `json:"name"`
-	Hostname    string     `json:"hostname"`
-	Image       string     `json:"image,omitempty"`
-	Sync        string     `json:"sync"`
-	Health      string     `json:"health"`
-	Revision    string     `json:"revision,omitempty"`
-	Message     string     `json:"message,omitempty"`
-	DeployedAt  *time.Time `json:"deployedAt,omitempty"`
-	PinnedAt    *time.Time `json:"pinnedAt,omitempty"`
-	ArgoURL     string     `json:"argoURL,omitempty"`
-	HeadlampURL string     `json:"headlampURL,omitempty"`
-	GrafanaURL  string     `json:"grafanaURL,omitempty"`
-	LogsURL     string     `json:"logsURL,omitempty"`
+	Name        string         `json:"name"`
+	Hostname    string         `json:"hostname"`
+	Image       string         `json:"image,omitempty"`
+	Sync        string         `json:"sync"`
+	Health      string         `json:"health"`
+	Revision    string         `json:"revision,omitempty"`
+	Message     string         `json:"message,omitempty"`
+	DeployedAt  *time.Time     `json:"deployedAt,omitempty"`
+	PinnedAt    *time.Time     `json:"pinnedAt,omitempty"`
+	ArgoURL     string         `json:"argoURL,omitempty"`
+	HeadlampURL string         `json:"headlampURL,omitempty"`
+	GrafanaURL  string         `json:"grafanaURL,omitempty"`
+	LogsURL     string         `json:"logsURL,omitempty"`
+	Workload    *kube.Workload `json:"workload,omitempty"`
 }
 
 type Status struct {
@@ -62,11 +64,14 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 		return Status{}, err
 	}
 	out := s.buildStatus(ctx, d, tree)
+	var wg sync.WaitGroup
+	wg.Go(func() { s.attachLive(ctx, d, out.Stages) })
 	if out.Flow.Tag != "" {
 		sctx, cancel := context.WithTimeout(ctx, sourceCommitTimeout)
 		out.Flow.Source = s.resolveSource(sctx, d.Spec.Links.RepoURL, out.Flow.Tag)
 		cancel()
 	}
+	wg.Wait()
 	return out, nil
 }
 

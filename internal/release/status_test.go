@@ -2,12 +2,17 @@ package release
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/ianunruh/deploybot/internal/argo"
 	"github.com/ianunruh/deploybot/internal/gitwrite"
 	"github.com/ianunruh/deploybot/internal/image"
+	"github.com/ianunruh/deploybot/internal/kube"
 )
 
 func TestStatusLinksAndArgoURL(t *testing.T) {
@@ -67,6 +72,9 @@ func TestStatusLinksAndArgoURL(t *testing.T) {
 	}
 	if st.Flow.Hops[0].State != HopCaughtUp {
 		t.Fatalf("unpinned stages should be caught up, got %q", st.Flow.Hops[0].State)
+	}
+	if st.Stages[0].Workload != nil || st.Stages[1].Workload != nil {
+		t.Fatalf("fake argo should not attach workload %+v", st.Stages)
 	}
 
 	latest := svc.Latest(t.Context())
@@ -176,6 +184,116 @@ func TestListImages(t *testing.T) {
 	}
 	if _, err := (&Service{Catalog: cat}).ListImages(t.Context(), "kmc"); err == nil {
 		t.Fatal("expected unconfigured listing")
+	}
+}
+
+func TestStatusLiveWorkload(t *testing.T) {
+	t.Parallel()
+	var podLists atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /apis/argoproj.io/v1alpha1/namespaces/argocd/applications", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"items": []any{
+				map[string]any{
+					"metadata": map[string]any{"name": "kmc"},
+					"status": map[string]any{
+						"health": map[string]any{"status": "Healthy"},
+						"sync":   map[string]any{"status": "Synced"},
+					},
+				},
+			},
+		})
+	})
+	mux.HandleFunc("GET /apis/apps/v1/namespaces/kmc-system/deployments/kmc", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"kind":     "Deployment",
+			"metadata": map[string]any{"name": "kmc"},
+			"spec": map[string]any{
+				"replicas": 1,
+				"selector": map[string]any{"matchLabels": map[string]string{"app.kubernetes.io/name": "kmc"}},
+			},
+			"status": map[string]any{"readyReplicas": 1, "updatedReplicas": 1, "availableReplicas": 1},
+		})
+	})
+	mux.HandleFunc("GET /api/v1/namespaces/kmc-system/pods", func(w http.ResponseWriter, r *http.Request) {
+		podLists.Add(1)
+		if got := r.URL.Query().Get("labelSelector"); got != "app.kubernetes.io/name=kmc" {
+			t.Errorf("selector %q", got)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"items": []any{
+				map[string]any{
+					"metadata": map[string]any{
+						"name":              "kmc-abc-1",
+						"creationTimestamp": "2026-08-20T12:00:00Z",
+						"ownerReferences": []any{
+							map[string]any{"kind": "ReplicaSet", "name": "kmc-abc", "controller": true},
+						},
+					},
+					"spec": map[string]any{
+						"nodeName":   "worker-1",
+						"containers": []any{map[string]any{"name": "web"}},
+					},
+					"status": map[string]any{
+						"phase": "Running",
+						"podIP": "10.42.0.8",
+						"containerStatuses": []any{
+							map[string]any{
+								"name": "web", "ready": true, "restartCount": 2,
+								"state": map[string]any{"running": map[string]any{"startedAt": "2026-08-20T12:00:00Z"}},
+							},
+						},
+					},
+				},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	rest := &kube.REST{BaseURL: srv.URL, HTTP: srv.Client(), Auth: kube.Bearer("t")}
+	client := &argo.KubeClient{REST: rest, Namespace: "argocd", UIBaseURL: "https://argocd.example"}
+	svc := &Service{
+		Catalog: loadExamples(t),
+		Argo:    stageRouter{"homelab": client, "prod": client},
+	}
+	st, err := svc.Status(t.Context(), "kmc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(st.Stages) != 2 {
+		t.Fatalf("stages %+v", st.Stages)
+	}
+	for _, stage := range st.Stages {
+		if stage.Health != "Healthy" || stage.Sync != "Synced" {
+			t.Fatalf("argo %+v", stage)
+		}
+		wl := stage.Workload
+		if wl == nil || wl.Kind != "Deployment" || wl.Ready != 1 || wl.Desired != 1 {
+			t.Fatalf("workload %+v", wl)
+		}
+		if len(wl.Pods) != 1 || wl.Pods[0].Name != "kmc-abc-1" {
+			t.Fatalf("pods %+v", wl.Pods)
+		}
+		p := wl.Pods[0]
+		if p.Status != "Running" || p.Ready != "1/1" || p.Restarts != 2 || p.Node != "worker-1" || p.IP != "10.42.0.8" {
+			t.Fatalf("pod %+v", p)
+		}
+	}
+	if podLists.Load() != 2 {
+		t.Fatalf("pod lists %d", podLists.Load())
+	}
+
+	before := podLists.Load()
+	latest := svc.Latest(t.Context())
+	kmc := latest["kmc"]
+	if len(kmc.Stages) != 2 || kmc.Stages[0].Health != "Healthy" {
+		t.Fatalf("latest %+v", kmc)
+	}
+	if kmc.Stages[0].Workload != nil {
+		t.Fatalf("latest should skip pods %+v", kmc.Stages[0].Workload)
+	}
+	if podLists.Load() != before {
+		t.Fatalf("latest listed pods")
 	}
 }
 

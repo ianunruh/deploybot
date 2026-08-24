@@ -71,6 +71,16 @@ func (c *KubeClient) AppURL(app string) string {
 	return joinAppURL(c.UIBaseURL, app)
 }
 
+// REST returns the Kubernetes client backing a KubeClient. Other Client
+// implementations (tests) return nil.
+func REST(c Client) *kube.REST {
+	k, ok := c.(*KubeClient)
+	if !ok || k == nil {
+		return nil
+	}
+	return k.REST
+}
+
 func kubeClientFor(st config.Argo, stage, uiURL string) (*KubeClient, error) {
 	contextName := st.KubeContext
 	if contextName == "" {

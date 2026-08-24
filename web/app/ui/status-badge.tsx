@@ -1,4 +1,4 @@
-import { Badge, Tooltip } from "@mantine/core";
+import { Badge, Text, Tooltip } from "@mantine/core";
 
 const STATUS_COLORS: Record<string, string> = {
   Healthy: "teal",
@@ -10,6 +10,19 @@ const STATUS_COLORS: Record<string, string> = {
   Failed: "red",
   unknown: "gray",
   Unknown: "gray",
+  Running: "teal",
+  Pending: "yellow",
+  Succeeded: "gray",
+  Completed: "gray",
+  CrashLoopBackOff: "red",
+  Error: "red",
+  ErrImagePull: "red",
+  ImagePullBackOff: "red",
+  OOMKilled: "red",
+  ContainerCreating: "yellow",
+  PodInitializing: "yellow",
+  Terminating: "orange",
+  NotReady: "yellow",
 };
 
 export function UpdateBadge({ stale, error }: { stale?: boolean; error?: boolean }) {
@@ -42,8 +55,45 @@ export function UpdateBadge({ stale, error }: { stale?: boolean; error?: boolean
   );
 }
 
+export function ReplicaReady({ ready, desired }: { ready?: number; desired?: number }) {
+  if (ready == null || desired == null) {
+    return (
+      <Text size="sm" c="dimmed">
+        —
+      </Text>
+    );
+  }
+  const color =
+    desired === 0 ? "gray" : ready >= desired ? "teal" : ready === 0 ? "red" : "yellow";
+  return (
+    <Badge
+      color={color}
+      variant="light"
+      size="sm"
+      radius="sm"
+      tt="uppercase"
+      styles={{
+        root: {
+          fontFamily: "inherit",
+          letterSpacing: "0.04em",
+          maxWidth: "none",
+          overflow: "visible",
+          flexShrink: 0,
+        },
+        label: {
+          overflow: "visible",
+          textOverflow: "unset",
+          whiteSpace: "nowrap",
+        },
+      }}
+    >
+      {ready}/{desired}
+    </Badge>
+  );
+}
+
 export function StatusBadge({ status, href }: { status: string; href?: string }) {
-  const color = STATUS_COLORS[status] ?? "gray";
+  const color = STATUS_COLORS[status] ?? (status.startsWith("Init:") ? "yellow" : "gray");
   const badge = (
     <Badge
       {...(href
