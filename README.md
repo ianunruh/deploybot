@@ -167,7 +167,7 @@ Push to `main` runs GitHub Actions: `CI` (Go test + golangci-lint, web `pnpm che
 | Image | Role |
 |-------|------|
 | `ghcr.io/ianunruh/deploybot` | Go API (`serve --addr :8080`, `/healthz`). Specs are baked at `/specs` (`examples/*.yaml`). Set `DEPLOYBOT_OPS_REPO_URL` to clone the ops repo into `DEPLOYBOT_OPS_REPO` at startup. |
-| `ghcr.io/ianunruh/deploybot-web` | React Router console (`PORT=3000`). Talks to the API via `DEPLOYBOT_API_URL`. |
+| `ghcr.io/ianunruh/deploybot-web` | React Router console (`PORT=3000`, `/healthz`). Talks to the API via `DEPLOYBOT_API_URL`. |
 
 ```bash
 just docker

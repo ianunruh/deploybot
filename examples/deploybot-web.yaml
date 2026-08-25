@@ -28,7 +28,7 @@ spec:
     containerPort: 3000
     portName: http
     probes:
-      path: /
+      path: /healthz
       port: http
       startup:
         initialDelaySeconds: 5
