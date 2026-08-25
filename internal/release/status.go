@@ -84,7 +84,7 @@ func (s *Service) status(ctx context.Context, name string, fresh bool) (Status, 
 	out := s.buildStatus(ctx, d, tree)
 	// Live kube and GitHub workflows are separate endpoints so catalog
 	// list, WatchFlows, and the core status poll do not wait on them.
-	if fresh && out.Flow.Tag != "" {
+	if fresh && out.Flow.Tag != "" && d.HasSourceCommits() {
 		sctx, cancel := context.WithTimeout(ctx, sourceCommitTimeout)
 		out.Flow.Source = s.resolveSource(sctx, d.Spec.Links.RepoURL, out.Flow.Tag)
 		cancel()

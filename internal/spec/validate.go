@@ -38,6 +38,9 @@ func (d *Deployable) Validate() error {
 	if err := httpURLError("spec.links.repoURL", d.Spec.Links.RepoURL); err != "" {
 		errs = append(errs, err)
 	}
+	if d.Spec.Links.Source && d.Spec.Links.RepoURL == "" {
+		errs = append(errs, "spec.links.repoURL is required when spec.links.source is set")
+	}
 	if err := httpURLError("spec.links.projectURL", d.Spec.Links.ProjectURL); err != "" {
 		errs = append(errs, err)
 	}

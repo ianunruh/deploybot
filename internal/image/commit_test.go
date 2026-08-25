@@ -78,3 +78,21 @@ func TestGitHubActionsURL(t *testing.T) {
 		t.Fatal("empty")
 	}
 }
+
+func TestGitHubCompareURL(t *testing.T) {
+	t.Parallel()
+	got := GitHubCompareURL("https://github.com/ianunruh/kmc", "aaaaaaa", "bbbbbbb")
+	want := "https://github.com/ianunruh/kmc/compare/aaaaaaa...bbbbbbb"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if GitHubCompareURL("https://gitlab.com/ianunruh/kmc", "a", "b") != "" {
+		t.Fatal("gitlab url")
+	}
+	if GitHubCompareURL("https://github.com/ianunruh/kmc", "", "bbbbbbb") != "" {
+		t.Fatal("empty base")
+	}
+	if GitHubCompareURL("https://github.com/ianunruh/kmc", "aaaaaaa", "") != "" {
+		t.Fatal("empty head")
+	}
+}

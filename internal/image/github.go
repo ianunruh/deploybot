@@ -35,14 +35,20 @@ type GitHub struct {
 	APIBase    string
 	HTTPClient *http.Client
 
-	mu      sync.Mutex
-	commits map[string]cachedCommit
-	runs    map[string]cachedRuns
+	mu       sync.Mutex
+	commits  map[string]cachedCommit
+	compares map[string]cachedCompare
+	runs     map[string]cachedRuns
 }
 
 type cachedCommit struct {
 	commit Commit
 	found  bool
+}
+
+type cachedCompare struct {
+	compare Compare
+	found   bool
 }
 
 type cachedRuns struct {
@@ -223,6 +229,41 @@ func (g *GitHub) LookupCommit(ctx context.Context, repoURL, sha string) (Commit,
 	return got, nil
 }
 
+// CompareCommits is git history from base to head on a github.com repoURL.
+// Commits are newest first. Results are cached for the process lifetime; 404s
+// are cached, other errors are not.
+func (g *GitHub) CompareCommits(ctx context.Context, repoURL, base, head string) (Compare, error) {
+	owner, repo, ok := ParseGitHubRepo(repoURL)
+	if !ok {
+		return Compare{}, fmt.Errorf("not a github.com repo URL")
+	}
+	base = strings.TrimSpace(base)
+	head = strings.TrimSpace(head)
+	if base == "" || head == "" {
+		return Compare{}, fmt.Errorf("empty compare sha")
+	}
+	key := compareCacheKey(owner, repo, base, head)
+	if cached, hit := g.cachedCompare(key); hit {
+		if !cached.found {
+			return Compare{}, fmt.Errorf("github compare not found")
+		}
+		return cached.compare, nil
+	}
+	path := fmt.Sprintf("/repos/%s/%s/compare/%s...%s",
+		url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(base), url.PathEscape(head))
+	var raw gitCompare
+	if _, err := g.getJSON(ctx, path, &raw); err != nil {
+		var apiErr *apiError
+		if errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound {
+			g.storeCompare(key, cachedCompare{})
+		}
+		return Compare{}, authHint(err, "token needs repo access to compare commits")
+	}
+	got := compareFromAPI(raw, repoURL, base, head)
+	g.storeCompare(key, cachedCompare{compare: got, found: true})
+	return got, nil
+}
+
 // ListWorkflowRuns returns recent Actions runs for a github.com repoURL.
 // In-progress and queued runs are listed first; the rest keep GitHub's
 // newest-first order. Results are cached briefly so the console poll
@@ -260,6 +301,24 @@ func (g *GitHub) ListWorkflowRuns(ctx context.Context, repoURL string, limit int
 	slices.SortStableFunc(out, cmpWorkflowRun)
 	g.storeRuns(key, cachedRuns{runs: slices.Clone(out), at: time.Now()})
 	return out, nil
+}
+
+func compareFromAPI(raw gitCompare, repoURL, base, head string) Compare {
+	commits := make([]Commit, 0, len(raw.Commits))
+	for i := len(raw.Commits) - 1; i >= 0; i-- {
+		c := raw.Commits[i]
+		commits = append(commits, commitFromAPI(c, repoURL, c.SHA))
+	}
+	truncated := raw.AheadBy > len(raw.Commits) || raw.TotalCommits > len(raw.Commits)
+	out := Compare{
+		Status:    raw.Status,
+		AheadBy:   raw.AheadBy,
+		BehindBy:  raw.BehindBy,
+		Truncated: truncated,
+		URL:       cmp.Or(raw.HTMLURL, GitHubCompareURL(repoURL, base, head)),
+		Commits:   commits,
+	}
+	return out
 }
 
 func commitFromAPI(raw gitCommit, repoURL, sha string) Commit {
@@ -374,6 +433,29 @@ func (g *GitHub) storeCommit(key string, c cachedCommit) {
 	g.commits[key] = c
 }
 
+func compareCacheKey(owner, repo, base, head string) string {
+	return strings.ToLower(owner + "/" + repo + "@" + base + "..." + head)
+}
+
+func (g *GitHub) cachedCompare(key string) (cachedCompare, bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.compares == nil {
+		return cachedCompare{}, false
+	}
+	c, ok := g.compares[key]
+	return c, ok
+}
+
+func (g *GitHub) storeCompare(key string, c cachedCompare) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.compares == nil {
+		g.compares = map[string]cachedCompare{}
+	}
+	g.compares[key] = c
+}
+
 func workflowCacheKey(owner, repo string, limit int) string {
 	return strings.ToLower(owner+"/"+repo) + "#" + strconv.Itoa(limit)
 }
@@ -417,6 +499,15 @@ type packageVersion struct {
 			Tags []string `json:"tags"`
 		} `json:"container"`
 	} `json:"metadata"`
+}
+
+type gitCompare struct {
+	HTMLURL      string      `json:"html_url"`
+	Status       string      `json:"status"`
+	AheadBy      int         `json:"ahead_by"`
+	BehindBy     int         `json:"behind_by"`
+	TotalCommits int         `json:"total_commits"`
+	Commits      []gitCommit `json:"commits"`
 }
 
 type gitCommit struct {

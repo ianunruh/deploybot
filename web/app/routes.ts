@@ -11,6 +11,7 @@ export default [
   ]),
   route("deployables/:name/images", "routes/deployables.$name.images.ts"),
   route("deployables/:name/workloads", "routes/deployables.$name.workloads.ts"),
+  route("deployables/:name/changelog", "routes/deployables.$name.changelog.ts"),
   route(
     "deployables/:name/reconcile/:stage",
     "routes/deployables.$name.reconcile.$stage.tsx",

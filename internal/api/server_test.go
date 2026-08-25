@@ -141,6 +141,53 @@ func TestListAndGet(t *testing.T) {
 	}
 }
 
+func TestChangelog(t *testing.T) {
+	t.Parallel()
+	_, file, _, _ := runtime.Caller(0)
+	specs := filepath.Join(filepath.Dir(file), "..", "..", "examples")
+	cat, err := catalog.Load(specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{Catalog: cat, Release: &release.Service{Catalog: cat}}
+	srv := httptest.NewServer(s.Handler())
+	t.Cleanup(srv.Close)
+
+	res, err := http.Get(srv.URL + "/api/v1/deployables/kmc/changelog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("missing from/to %s", res.Status)
+	}
+
+	res2, err := http.Get(srv.URL + "/api/v1/deployables/kmc/changelog?from=homelab&to=prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res2.Body.Close() }()
+	if res2.StatusCode != http.StatusOK {
+		t.Fatal(res2.Status)
+	}
+	var cl release.Changelog
+	if err := json.NewDecoder(res2.Body).Decode(&cl); err != nil {
+		t.Fatal(err)
+	}
+	if cl.From != "homelab" || cl.To != "prod" || cl.Commits == nil {
+		t.Fatalf("%+v", cl)
+	}
+
+	res3, err := http.Get(srv.URL + "/api/v1/deployables/nope/changelog?from=homelab&to=prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res3.Body.Close() }()
+	if res3.StatusCode != http.StatusNotFound {
+		t.Fatalf("unknown %s", res3.Status)
+	}
+}
+
 func TestListAndGetDeployedAt(t *testing.T) {
 	t.Parallel()
 	_, file, _, _ := runtime.Caller(0)

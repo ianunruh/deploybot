@@ -260,6 +260,28 @@ export function getDeployableHistory(name: string) {
   );
 }
 
+export type Changelog = {
+  from: string;
+  to: string;
+  base?: SourceCommit;
+  head?: SourceCommit;
+  url?: string;
+  status?: string;
+  aheadBy?: number;
+  behindBy?: number;
+  truncated?: boolean;
+  commits: SourceCommit[];
+  error?: string;
+};
+
+export function getDeployableChangelog(name: string, from: string, to: string) {
+  const q = new URLSearchParams({ from, to });
+  return apiFetch<Changelog>(
+    `/api/v1/deployables/${encodeURIComponent(name)}/changelog?${q}`,
+    { signal: AbortSignal.timeout(10_000) },
+  );
+}
+
 export type ImageVersion = {
   repository: string;
   ref: string;

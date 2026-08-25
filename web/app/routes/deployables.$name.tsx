@@ -19,6 +19,7 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/deployables.$name";
+import type { ChangelogLoaderData } from "./deployables.$name.changelog";
 import type { ImagesLoaderData } from "./deployables.$name.images";
 import type { WorkloadsLoaderData } from "./deployables.$name.workloads";
 import {
@@ -48,6 +49,7 @@ import {
   mutationNote,
 } from "~/ui/mutation-controls";
 import { PageHeader } from "~/ui/page-header";
+import { PromoteChangelog } from "~/ui/promote-changelog";
 import { UpdateBadge } from "~/ui/status-badge";
 
 export type DeployableContext = {
@@ -183,6 +185,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
   const promoteFetcher = useFetcher<ActionData>();
   const rollbackFetcher = useFetcher<ActionData>();
   const imagesFetcher = useFetcher<ImagesLoaderData>();
+  const changelogFetcher = useFetcher<ChangelogLoaderData>();
   const workloadsFetcher = useFetcher<WorkloadsLoaderData>();
   const [pinOpen, pinHandlers] = useDisclosure(false);
   const [promoteOpen, promoteHandlers] = useDisclosure(false);
@@ -230,6 +233,16 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
     // Fetcher identity changes; reload only when the modal opens for a deployable.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load on open
   }, [pinOpen, status?.name]);
+
+  useEffect(() => {
+    if (!promoteOpen || !status?.name || !fromStage?.name || !toStage?.name) return;
+    const q = new URLSearchParams({ from: fromStage.name, to: toStage.name });
+    void changelogFetcher.load(
+      `/deployables/${encodeURIComponent(status.name)}/changelog?${q}`,
+    );
+    // Fetcher identity changes; reload only when the modal opens for a hop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load on open
+  }, [promoteOpen, status?.name, fromStage?.name, toStage?.name]);
 
   const imageOptions = imagesFetcher.data?.images ?? [];
   const imagesError = imagesFetcher.data?.error ?? null;
@@ -567,9 +580,19 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
               <Text size="sm">
                 Copy the pinned image from <strong>{fromStage.name}</strong> (
                 <CompactImage value={fromStage.image} empty="unpinned" />) to{" "}
-                <strong>{toStage.name}</strong>. Homelab must be healthy when Argo is
-                configured.
+                <strong>{toStage.name}</strong> (
+                <CompactImage value={toStage.image} empty="unpinned" />
+                ). Homelab must be healthy when Argo is configured.
               </Text>
+              <PromoteChangelog
+                changelog={changelogFetcher.data?.changelog}
+                error={changelogFetcher.data?.error}
+                loading={
+                  promoteOpen &&
+                  (changelogFetcher.state !== "idle" || changelogFetcher.data == null)
+                }
+                to={toStage.name}
+              />
               <ArgoSyncCheckbox
                 show={status.apply && status.sync}
                 checked={promoteSync}

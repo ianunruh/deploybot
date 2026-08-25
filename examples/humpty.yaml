@@ -11,6 +11,7 @@ spec:
   namespace: deploybot-system
   links:
     repoURL: https://github.com/ianunruh/humpty
+    source: true
   git:
     repoURL: https://github.com/ianunruh/kcloud-ops
     workloadPath: k8s/humpty

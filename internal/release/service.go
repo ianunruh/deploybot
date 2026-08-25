@@ -28,6 +28,7 @@ type Service struct {
 	UpdateEvery time.Duration
 	Images      image.Lister
 	Commits     image.CommitLookup
+	Compares    image.CompareLookup
 	Actions     image.WorkflowLookup
 
 	// Lock serializes git mutations (HTTP pin, auto-promote, auto-pin).

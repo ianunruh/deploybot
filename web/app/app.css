@@ -226,6 +226,21 @@ a {
   background: var(--db-rule);
 }
 
+.db-changelog {
+  max-height: 16rem;
+  overflow: auto;
+  border: 1px solid var(--db-border);
+  border-radius: 4px;
+  background: var(--db-bg);
+  padding: 0.6rem 0.75rem;
+}
+
+.db-changelog-row + .db-changelog-row {
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--db-border);
+}
+
 .db-spin {
   animation: db-spin 0.8s linear infinite;
 }

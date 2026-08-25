@@ -41,9 +41,11 @@ type Spec struct {
 
 // Links are optional URLs shown in the console. RepoURL is the app source
 // (GitHub/GitLab). ProjectURL is a tracker or board (Trello, Linear, …).
+// Source means we build that repo (main-<sha> pins, promote changelog).
 type Links struct {
 	RepoURL    string `yaml:"repoURL,omitempty"`
 	ProjectURL string `yaml:"projectURL,omitempty"`
+	Source     bool   `yaml:"source,omitempty"`
 }
 
 type Git struct {
@@ -78,6 +80,12 @@ const MinAutoUpdate = Duration(time.Hour)
 // TracksRegistry is true when spec.update is set.
 func (d *Deployable) TracksRegistry() bool {
 	return d != nil && d.Spec.Update != nil
+}
+
+// HasSourceCommits is true when spec.links.source is set. Those apps
+// build from repoURL; pin tags are main-<sha> and promote shows a changelog.
+func (d *Deployable) HasSourceCommits() bool {
+	return d != nil && d.Spec.Links.Source && d.Spec.Links.RepoURL != ""
 }
 
 // AutoUpdate is the enrolled pin interval, or 0 if the app is track-only.

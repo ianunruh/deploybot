@@ -14,9 +14,24 @@ type Commit struct {
 	URL     string `json:"url,omitempty"`
 }
 
+// Compare is git history between two SHAs (dest pin → source pin).
+type Compare struct {
+	Status    string   `json:"status,omitempty"`
+	AheadBy   int      `json:"aheadBy,omitempty"`
+	BehindBy  int      `json:"behindBy,omitempty"`
+	Truncated bool     `json:"truncated,omitempty"`
+	URL       string   `json:"url,omitempty"`
+	Commits   []Commit `json:"commits,omitempty"`
+}
+
 // CommitLookup resolves message/author (and a canonical URL) for a SHA in repoURL.
 type CommitLookup interface {
 	LookupCommit(ctx context.Context, repoURL, sha string) (Commit, error)
+}
+
+// CompareLookup is git history from base (already shipped) to head (incoming).
+type CompareLookup interface {
+	CompareCommits(ctx context.Context, repoURL, base, head string) (Compare, error)
 }
 
 // TagSHA extracts a git SHA suffix from tags like main-b8e5098.
@@ -69,4 +84,16 @@ func GitHubActionsURL(repoURL string) string {
 		return ""
 	}
 	return "https://github.com/" + owner + "/" + repo + "/actions"
+}
+
+// GitHubCompareURL is the browser compare view from base (dest pin) to head
+// (source pin) when repoURL is on github.com.
+func GitHubCompareURL(repoURL, base, head string) string {
+	owner, repo, ok := ParseGitHubRepo(repoURL)
+	base = strings.TrimSpace(base)
+	head = strings.TrimSpace(head)
+	if !ok || base == "" || head == "" {
+		return ""
+	}
+	return "https://github.com/" + owner + "/" + repo + "/compare/" + base + "..." + head
 }

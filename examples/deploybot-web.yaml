@@ -8,6 +8,7 @@ spec:
   namespace: deploybot-system
   links:
     repoURL: https://github.com/ianunruh/deploybot
+    source: true
     projectURL: https://trello.com/b/rPALXxJF/kcloud
   git:
     repoURL: https://github.com/ianunruh/kcloud-ops

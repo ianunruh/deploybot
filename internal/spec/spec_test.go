@@ -182,6 +182,36 @@ func TestParseLinks(t *testing.T) {
 	if d.Spec.Links.ProjectURL != "https://trello.com/b/abc/kmc" {
 		t.Fatalf("project %q", d.Spec.Links.ProjectURL)
 	}
+	if d.Spec.Links.Source || d.HasSourceCommits() {
+		t.Fatal("source should default off")
+	}
+}
+
+func TestParseSourceLinks(t *testing.T) {
+	t.Parallel()
+	body := kmcYAML + `
+  links:
+    repoURL: https://github.com/ianunruh/kmc
+    source: true
+`
+	d, err := Parse([]byte(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !d.Spec.Links.Source || !d.HasSourceCommits() {
+		t.Fatalf("source %+v", d.Spec.Links)
+	}
+}
+
+func TestParseSourceRequiresRepoURL(t *testing.T) {
+	t.Parallel()
+	body := kmcYAML + `
+  links:
+    source: true
+`
+	if _, err := Parse([]byte(body)); err == nil {
+		t.Fatal("expected error")
+	}
 }
 
 func TestParseUpdate(t *testing.T) {

@@ -114,6 +114,21 @@ func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, h)
 }
 
+func (s *Server) changelog(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	from, to := q.Get("from"), q.Get("to")
+	if from == "" || to == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "from and to are required"})
+		return
+	}
+	out, err := s.Release.Changelog(r.Context(), r.PathValue("name"), from, to)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 func (s *Server) images(w http.ResponseWriter, r *http.Request) {
 	out, err := s.Release.ListImages(r.Context(), r.PathValue("name"))
 	if err != nil {

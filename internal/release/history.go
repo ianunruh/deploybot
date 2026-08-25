@@ -89,7 +89,9 @@ func (s *Service) History(ctx context.Context, name string, limit int) (History,
 		}
 	}
 	releases := groupReleases(events, current)
-	s.attachSources(ctx, d.Spec.Links.RepoURL, releases)
+	if d.HasSourceCommits() {
+		s.attachSources(ctx, d.Spec.Links.RepoURL, releases)
+	}
 	return History{Events: events, Releases: releases}, nil
 }
 

@@ -164,6 +164,126 @@ func TestGitHubLookupCommit(t *testing.T) {
 	}
 }
 
+func TestGitHubCompareCommitsNewestFirst(t *testing.T) {
+	t.Parallel()
+	var hits int
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/ianunruh/kmc/compare/aaaaaaa...bbbbbbb", func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		if r.Header.Get("Authorization") != "Bearer t" {
+			t.Errorf("auth %s", r.Header.Get("Authorization"))
+		}
+		writeJSON(t, w, map[string]any{
+			"html_url":      "https://github.com/ianunruh/kmc/compare/aaaaaaa...bbbbbbb",
+			"status":        "ahead",
+			"ahead_by":      2,
+			"behind_by":     0,
+			"total_commits": 2,
+			"commits": []map[string]any{
+				{
+					"sha":      "aaaaaaa111",
+					"html_url": "https://github.com/ianunruh/kmc/commit/aaaaaaa111",
+					"commit": map[string]any{
+						"message": "Old thing",
+						"author":  map[string]any{"name": "Ada"},
+					},
+				},
+				{
+					"sha":      "bbbbbbb222",
+					"html_url": "https://github.com/ianunruh/kmc/commit/bbbbbbb222",
+					"commit": map[string]any{
+						"message": "New thing\n\nMore detail.",
+						"author":  map[string]any{"name": "Ian Unruh"},
+					},
+				},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	g := &GitHub{Token: "t", APIBase: srv.URL, HTTPClient: srv.Client()}
+	got, err := g.CompareCommits(t.Context(), "https://github.com/ianunruh/kmc", "aaaaaaa", "bbbbbbb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "ahead" || got.AheadBy != 2 || got.Truncated {
+		t.Fatalf("%+v", got)
+	}
+	if got.URL != "https://github.com/ianunruh/kmc/compare/aaaaaaa...bbbbbbb" {
+		t.Fatalf("url %s", got.URL)
+	}
+	if len(got.Commits) != 2 {
+		t.Fatalf("commits %+v", got.Commits)
+	}
+	if got.Commits[0].SHA != "bbbbbbb222" || got.Commits[0].Message != "New thing" || got.Commits[0].Author != "Ian Unruh" {
+		t.Fatalf("newest %+v", got.Commits[0])
+	}
+	if got.Commits[1].SHA != "aaaaaaa111" || got.Commits[1].Message != "Old thing" {
+		t.Fatalf("older %+v", got.Commits[1])
+	}
+	again, err := g.CompareCommits(t.Context(), "https://github.com/ianunruh/kmc", "aaaaaaa", "bbbbbbb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.AheadBy != got.AheadBy || len(again.Commits) != 2 {
+		t.Fatalf("cache %+v", again)
+	}
+	if hits != 1 {
+		t.Fatalf("hits %d", hits)
+	}
+	if _, err := g.CompareCommits(t.Context(), "https://gitlab.com/ianunruh/kmc", "a", "b"); err == nil {
+		t.Fatal("expected gitlab error")
+	}
+}
+
+func TestGitHubCompareCommitsTruncated(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(t, w, map[string]any{
+			"status":        "ahead",
+			"ahead_by":      5,
+			"total_commits": 5,
+			"commits": []map[string]any{
+				{"sha": "oldold1", "commit": map[string]any{"message": "Old"}},
+				{"sha": "newnew2", "commit": map[string]any{"message": "New"}},
+			},
+		})
+	}))
+	t.Cleanup(srv.Close)
+	g := &GitHub{APIBase: srv.URL, HTTPClient: srv.Client()}
+	got, err := g.CompareCommits(t.Context(), "https://github.com/ianunruh/kmc", "old", "new")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Truncated || got.AheadBy != 5 || len(got.Commits) != 2 || got.Commits[0].Message != "New" {
+		t.Fatalf("%+v", got)
+	}
+	if got.URL != "https://github.com/ianunruh/kmc/compare/old...new" {
+		t.Fatalf("fallback url %s", got.URL)
+	}
+}
+
+func TestGitHubCompareCommitsNotFoundCached(t *testing.T) {
+	t.Parallel()
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		http.Error(w, `{"message":"Not Found"}`, http.StatusNotFound)
+	}))
+	t.Cleanup(srv.Close)
+	g := &GitHub{APIBase: srv.URL, HTTPClient: srv.Client()}
+	if _, err := g.CompareCommits(t.Context(), "https://github.com/ianunruh/kmc", "deadbee", "b8e5098"); err == nil {
+		t.Fatal("expected error")
+	}
+	if _, err := g.CompareCommits(t.Context(), "https://github.com/ianunruh/kmc", "deadbee", "b8e5098"); err == nil {
+		t.Fatal("expected cached error")
+	}
+	if hits != 1 {
+		t.Fatalf("hits %d", hits)
+	}
+}
+
 func TestGitHubListWorkflowRuns(t *testing.T) {
 	t.Parallel()
 	var hits int

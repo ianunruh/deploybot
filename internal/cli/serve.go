@@ -88,6 +88,7 @@ func runServe(ctx context.Context, args []string) error {
 		Wait:     5 * time.Minute,
 		Images:   &image.Registry{GitHub: gh, DockerHub: hub},
 		Commits:  gh,
+		Compares: gh,
 		Actions:  gh,
 		AutoPin:  s.autoPin,
 		Lock:     new(sync.Mutex),

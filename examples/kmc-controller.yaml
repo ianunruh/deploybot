@@ -10,6 +10,7 @@ spec:
   namespace: kmc-system
   links:
     repoURL: https://github.com/ianunruh/kmc
+    source: true
     projectURL: https://trello.com/b/rPALXxJF/kcloud
   git:
     repoURL: https://github.com/ianunruh/kcloud-ops
