@@ -1,6 +1,8 @@
 # Routed crash-test dummy: generated Deployment, Service, HTTPRoute, and Argo
 # Applications. No overlay patch — the pod is image + port + probes. Used to
-# exercise pin, promote, bad commits, and rollback.
+# exercise pin, promote, bad commits, and rollback. Pin
+# ghcr.io/ianunruh/humpty:broken for a crashloop, then rollback to the previous
+# homelab digest.
 apiVersion: deploybot.kcloud.io/v1alpha1
 kind: Deployable
 metadata:

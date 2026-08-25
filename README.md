@@ -25,9 +25,12 @@ your app.
 - **Staged promotion.** Copy a pin from one stage to the next. Gates for
   Argo health, bake time, and human approval. GitHub Actions can pin
   homelab through the API; promote to prod is a console action.
+- **Rollback.** Re-pin a digest that stage already had. History rows and
+  a degraded-stage banner open the same commit / sync / rollout theater
+  as pin. It is not `kubectl rollout undo`.
 - **Console and CLI.** Catalog of deployables, per-app release flow,
-  pin / promote with diffs, release history, and links out to Argo,
-  Headlamp, and Grafana. The CLI is the same loop; dry-run unless
+  pin / promote / rollback with diffs, release history, and links out to
+  Argo, Headlamp, and Grafana. The CLI is the same loop; dry-run unless
   `--apply`, nothing is pushed unless `--push`, and it never force-pushes.
 - **GitOps, not a second source of truth.** Deploybot writes git and
   talks to Application CRs. Argo applies the cluster.
@@ -67,6 +70,8 @@ just build
   --image ghcr.io/ianunruh/kmc@sha256:… --repo /path/to/kcloud-ops --apply --push
 ./build/deploybot promote --spec examples/kmc.yaml --from homelab --to prod \
   --repo /path/to/kcloud-ops --apply --push
+./build/deploybot rollback --spec examples/kmc.yaml --stage homelab \
+  --image ghcr.io/ianunruh/kmc@sha256:… --repo /path/to/kcloud-ops --apply --push
 ./build/deploybot reconcile --spec examples/kmc.yaml --stage homelab \
   --repo /path/to/kcloud-ops --apply --push
 ```

@@ -15,6 +15,7 @@ import (
 const (
 	EventPin       = "pin"
 	EventPromote   = "promote"
+	EventRollback  = "rollback"
 	EventOverlay   = "overlay"
 	EventReconcile = "reconcile"
 
@@ -198,6 +199,8 @@ func eventKind(message string) string {
 		return EventPin
 	case strings.HasPrefix(msg, "promote "):
 		return EventPromote
+	case strings.HasPrefix(msg, "rollback "):
+		return EventRollback
 	case strings.HasPrefix(msg, "reconcile "):
 		return EventReconcile
 	default:
@@ -259,6 +262,30 @@ func groupReleases(events []Event, current image.Ref) []Release {
 		out = append(out, *by[k])
 	}
 	return out
+}
+
+func previousPin(events []Event, stage string, current image.Ref, repo string) (compact, full string) {
+	if current.IsZero() {
+		return "", ""
+	}
+	seenCurrent := false
+	for _, e := range events {
+		if e.Stage != stage {
+			continue
+		}
+		got := eventRef(repo, e)
+		if !seenCurrent {
+			if historicRelease(got, current) {
+				seenCurrent = true
+			}
+			continue
+		}
+		if historicRelease(got, current) {
+			continue
+		}
+		return e.Image, got.String()
+	}
+	return "", ""
 }
 
 func pinTime(events []Event, stage string, current image.Ref) *time.Time {

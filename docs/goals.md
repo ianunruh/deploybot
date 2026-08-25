@@ -82,6 +82,8 @@ Kaniko or rewrite the image build in `docker-build.yml` for this.
 promote, bad commits, and rollback. Routed Deployment in `deploybot-system`
 (reuses `ghcr-auth`), sandbox Argo project, homelab → prod with approval.
 GitHub Actions pins homelab through the prod API. No overlay patches.
+`ghcr.io/ianunruh/humpty:broken` crashloops on start; pin it, then roll
+back to the previous homelab digest from the console.
 
 **Play** (`examples/sonarr.yaml`, `radarr`, `bazarr`, `jackett`, `tautulli`,
 `ombi`, `flaresolverr`, `nzbget`, `transmission`, `plex-exporter`, `plex`,
@@ -101,8 +103,9 @@ Docker Hub picker, newest first; `lscr.io` canonicalizes to `docker.io`),
 registry tracking for third-party images (`spec.update`, optional
 `auto: 24h` first-stage pin; `serve` auto-pin is a process flag so only
 one instance writes), local git write, opt-in git push (no force),
-Argo sync/health/promote, RR console (catalog, updates, stage matrix, pin,
-promote, per-stage reconcile).
+Argo sync/health/promote, rollback to a previous overlay pin (console
+history + degraded banner; same git write as pin), RR console (catalog,
+updates, stage matrix, pin, promote, rollback, per-stage reconcile).
 Deploybot is cut over in homelab and prod; push to `main` pins homelab via
 the prod API (GitHub OIDC).
 

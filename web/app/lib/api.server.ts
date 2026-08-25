@@ -62,6 +62,8 @@ export type StageStatus = {
   message?: string;
   deployedAt?: string;
   pinnedAt?: string;
+  previousImage?: string;
+  previousRef?: string;
   argoURL?: string;
   headlampURL?: string;
   grafanaURL?: string;
@@ -301,6 +303,26 @@ export function pinDeployable(
       ...(opts?.wait != null ? { wait: opts.wait } : {}),
     }),
   });
+}
+
+export function rollbackDeployable(
+  name: string,
+  stage: string,
+  image: string,
+  opts?: { sync?: boolean; wait?: boolean },
+) {
+  return apiFetch<MutationResult>(
+    `/api/v1/deployables/${encodeURIComponent(name)}/rollback`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        stage,
+        image,
+        ...(opts?.sync != null ? { sync: opts.sync } : {}),
+        ...(opts?.wait != null ? { wait: opts.wait } : {}),
+      }),
+    },
+  );
 }
 
 export function promoteDeployable(

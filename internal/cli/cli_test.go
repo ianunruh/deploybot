@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -64,6 +65,27 @@ func TestRunServeAutoPinRequiresApply(t *testing.T) {
 	isolateEnv(t)
 	err := Run(t.Context(), []string{"serve", "--auto-pin"})
 	if err == nil || err.Error() != "--auto-pin requires --apply" {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestRunRollbackRequiresFlags(t *testing.T) {
+	isolateEnv(t)
+	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
+	err := Run(t.Context(), []string{"rollback", "--spec", spec, "--stage", "homelab"})
+	if err == nil || err.Error() != "rollback requires --spec, --stage, and --image" {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestRunRollbackNoPreviousPin(t *testing.T) {
+	isolateEnv(t)
+	spec := filepath.Join("..", "..", "examples", "kmc.yaml")
+	err := Run(t.Context(), []string{
+		"rollback", "--spec", spec, "--stage", "homelab",
+		"--image", "ghcr.io/ianunruh/kmc:main-dead@sha256:abc",
+	})
+	if err == nil || !strings.Contains(err.Error(), "no previous pin") {
 		t.Fatalf("got %v", err)
 	}
 }

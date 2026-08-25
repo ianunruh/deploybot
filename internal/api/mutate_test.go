@@ -135,3 +135,51 @@ func TestReconcileDiffAndPost(t *testing.T) {
 		t.Fatalf("missing stage status %s", missing.Status)
 	}
 }
+
+func TestRollbackNoPreviousPin(t *testing.T) {
+	t.Parallel()
+	_, file, _, _ := runtime.Caller(0)
+	specs := filepath.Join(filepath.Dir(file), "..", "..", "examples")
+	cat, err := catalog.Load(specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{
+		Catalog: cat,
+		Release: &release.Service{Catalog: cat},
+	}
+	srv := httptest.NewServer(s.Handler())
+	t.Cleanup(srv.Close)
+
+	body, err := json.Marshal(map[string]string{
+		"stage": "homelab",
+		"image": "ghcr.io/ianunruh/kmc:main-dead@sha256:abc",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := http.Post(srv.URL+"/api/v1/deployables/kmc/rollback", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status %s", res.Status)
+	}
+	var got map[string]string
+	if err := json.NewDecoder(res.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got["error"] == "" || !bytes.Contains([]byte(got["error"]), []byte("no previous pin")) {
+		t.Fatalf("error %+v", got)
+	}
+
+	missing, err := http.Post(srv.URL+"/api/v1/deployables/nope/rollback", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = missing.Body.Close() }()
+	if missing.StatusCode != http.StatusNotFound {
+		t.Fatalf("unknown deployable status %s", missing.Status)
+	}
+}

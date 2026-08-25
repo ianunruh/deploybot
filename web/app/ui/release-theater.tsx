@@ -28,7 +28,7 @@ const NOOP_GRACE_MS = 12_000;
 const FAIL_POD = /crash|error|imagepull|oomkilled|exitcode|signal/i;
 const ROLLING_POD = /pending|creating|initializing|terminating|^init:/i;
 
-export type TheaterKind = "pin" | "promote";
+export type TheaterKind = "pin" | "promote" | "rollback";
 
 export type TheaterSession = {
   kind: TheaterKind;
@@ -331,7 +331,17 @@ export function ReleaseTheater({
   }, [phase]);
 
   const title =
-    session.kind === "promote" ? `Promote to ${session.stage}` : `Pin ${session.stage}`;
+    session.kind === "promote"
+      ? `Promote to ${session.stage}`
+      : session.kind === "rollback"
+        ? `Rollback ${session.stage}`
+        : `Pin ${session.stage}`;
+  const failTitle =
+    session.kind === "promote"
+      ? "Promote failed"
+      : session.kind === "rollback"
+        ? "Rollback failed"
+        : "Pin failed";
   const showPods = session.sync && (session.result != null || submitting);
 
   return (
@@ -366,10 +376,7 @@ export function ReleaseTheater({
         </div>
 
         {session.error ? (
-          <Alert
-            color="red"
-            title={session.kind === "promote" ? "Promote failed" : "Pin failed"}
-          >
+          <Alert color="red" title={failTitle}>
             {session.error}
           </Alert>
         ) : null}

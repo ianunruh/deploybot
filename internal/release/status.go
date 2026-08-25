@@ -16,20 +16,22 @@ import (
 const statusArgoTimeout = 4 * time.Second
 
 type StageStatus struct {
-	Name        string         `json:"name"`
-	Hostname    string         `json:"hostname"`
-	Image       string         `json:"image,omitempty"`
-	Sync        string         `json:"sync"`
-	Health      string         `json:"health"`
-	Revision    string         `json:"revision,omitempty"`
-	Message     string         `json:"message,omitempty"`
-	DeployedAt  *time.Time     `json:"deployedAt,omitempty"`
-	PinnedAt    *time.Time     `json:"pinnedAt,omitempty"`
-	ArgoURL     string         `json:"argoURL,omitempty"`
-	HeadlampURL string         `json:"headlampURL,omitempty"`
-	GrafanaURL  string         `json:"grafanaURL,omitempty"`
-	LogsURL     string         `json:"logsURL,omitempty"`
-	Workload    *kube.Workload `json:"workload,omitempty"`
+	Name          string         `json:"name"`
+	Hostname      string         `json:"hostname"`
+	Image         string         `json:"image,omitempty"`
+	Sync          string         `json:"sync"`
+	Health        string         `json:"health"`
+	Revision      string         `json:"revision,omitempty"`
+	Message       string         `json:"message,omitempty"`
+	DeployedAt    *time.Time     `json:"deployedAt,omitempty"`
+	PinnedAt      *time.Time     `json:"pinnedAt,omitempty"`
+	PreviousImage string         `json:"previousImage,omitempty"`
+	PreviousRef   string         `json:"previousRef,omitempty"`
+	ArgoURL       string         `json:"argoURL,omitempty"`
+	HeadlampURL   string         `json:"headlampURL,omitempty"`
+	GrafanaURL    string         `json:"grafanaURL,omitempty"`
+	LogsURL       string         `json:"logsURL,omitempty"`
+	Workload      *kube.Workload `json:"workload,omitempty"`
 }
 
 type Status struct {
@@ -150,6 +152,7 @@ func (s *Service) buildStatus(ctx context.Context, d *spec.Deployable, tree rend
 			ss.Image = img.Compact()
 			refs[i] = img
 			ss.PinnedAt = pinTime(events, st.Name, img)
+			ss.PreviousImage, ss.PreviousRef = previousPin(events, st.Name, img, d.Spec.Image.Repository)
 		}
 		if s.Argo != nil {
 			if c := s.Argo.ForStage(st.Name); c != nil {

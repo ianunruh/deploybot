@@ -26,6 +26,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/deployables/{name}/reconcile", s.reconcileDiff)
 	mux.HandleFunc("POST /api/v1/deployables/{name}/pin", s.pin)
 	mux.HandleFunc("POST /api/v1/deployables/{name}/promote", s.promote)
+	mux.HandleFunc("POST /api/v1/deployables/{name}/rollback", s.rollback)
 	mux.HandleFunc("POST /api/v1/deployables/{name}/reconcile", s.reconcile)
 	return withJSON(mux)
 }

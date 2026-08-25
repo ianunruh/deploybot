@@ -25,6 +25,7 @@ import {
   getDeployable,
   pinDeployable,
   promoteDeployable,
+  rollbackDeployable,
   type DeployableStatus,
   type ImageVersion,
   type MutationResult,
@@ -52,6 +53,7 @@ import { UpdateBadge } from "~/ui/status-badge";
 export type DeployableContext = {
   status: DeployableStatus;
   stages: StageStatus[];
+  onRollback: (stage: string, image: string) => void;
 };
 
 export function meta({ params }: Route.MetaArgs) {
@@ -113,6 +115,17 @@ export async function action({ request, params }: Route.ActionArgs) {
             },
           ),
         } satisfies ActionData;
+      case "rollback":
+        return {
+          ok: true,
+          intent,
+          result: await rollbackDeployable(
+            name,
+            String(form.get("stage") ?? ""),
+            String(form.get("image") ?? ""),
+            { sync: formFlag(form, "sync"), wait: formFlag(form, "wait") },
+          ),
+        } satisfies ActionData;
       default:
         return { ok: false, error: `unknown intent ${intent}` } satisfies ActionData;
     }
@@ -168,13 +181,20 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
   const location = useLocation();
   const pinFetcher = useFetcher<ActionData>();
   const promoteFetcher = useFetcher<ActionData>();
+  const rollbackFetcher = useFetcher<ActionData>();
   const imagesFetcher = useFetcher<ImagesLoaderData>();
   const workloadsFetcher = useFetcher<WorkloadsLoaderData>();
   const [pinOpen, pinHandlers] = useDisclosure(false);
   const [promoteOpen, promoteHandlers] = useDisclosure(false);
+  const [rollbackOpen, rollbackHandlers] = useDisclosure(false);
   const [image, setImage] = useState("");
   const [pinSync, setPinSync] = useState(true);
   const [promoteSync, setPromoteSync] = useState(true);
+  const [rollbackSync, setRollbackSync] = useState(true);
+  const [rollbackTarget, setRollbackTarget] = useState<{
+    stage: string;
+    image: string;
+  } | null>(null);
   const [theater, setTheater] = useState<TheaterSession | null>(null);
 
   const stages = useMemo(
@@ -272,11 +292,44 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
     void revalidator.revalidate();
   });
 
+  useFetcherResult(rollbackFetcher, (data) => {
+    setTheater((t) => {
+      if (t?.kind !== "rollback") return t;
+      return data.ok
+        ? {
+            ...t,
+            result: data.result,
+            resultAt: t.resultAt ?? Date.now(),
+            error: undefined,
+          }
+        : { ...t, error: data.error };
+    });
+    if (!data.ok) {
+      notifyActionError("Rollback failed", data.error);
+      return;
+    }
+    if (data.result?.dryRun) {
+      notifyActionSuccess(
+        "Rollback",
+        `Wrote overlay${mutationNote(data.result, { argoAvailable: status?.sync })}`,
+      );
+      rollbackHandlers.close();
+    }
+    void revalidator.revalidate();
+  });
+
   const previewDiff = useMemo(() => {
     if (pinFetcher.data?.ok) return pinFetcher.data.result?.diff ?? "";
     if (promoteFetcher.data?.ok) return promoteFetcher.data.result?.diff ?? "";
+    if (rollbackFetcher.data?.ok) return rollbackFetcher.data.result?.diff ?? "";
     return "";
-  }, [pinFetcher.data, promoteFetcher.data]);
+  }, [pinFetcher.data, promoteFetcher.data, rollbackFetcher.data]);
+
+  function openRollback(stage: string, imageRef: string) {
+    setRollbackTarget({ stage, image: imageRef });
+    setRollbackSync(true);
+    rollbackHandlers.open();
+  }
 
   if (error != null || status == null) {
     return (
@@ -333,13 +386,41 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
 
       <MutationModeAlert apply={status.apply} push={status.push} />
 
+      {stages
+        .filter(
+          (st) =>
+            /^(degraded|missing)$/i.test(st.health) &&
+            st.previousRef &&
+            theater?.stage !== st.name,
+        )
+        .map((st) => (
+          <Alert key={st.name} color="red" title={`${st.name} is ${st.health}`}>
+            <Group justify="space-between" align="center" gap="sm" wrap="wrap">
+              <Text size="sm">
+                Last pin on this stage was{" "}
+                <CompactImage value={st.previousImage} empty="the previous digest" />.
+                {st.message ? ` ${st.message}` : ""}
+              </Text>
+              <Button
+                size="compact-sm"
+                color="red"
+                onClick={() => openRollback(st.name, st.previousRef ?? "")}
+              >
+                Rollback
+              </Button>
+            </Group>
+          </Alert>
+        ))}
+
       {theater ? (
         <ReleaseTheater
           session={theater}
           submitting={
             theater.kind === "pin"
               ? pinFetcher.state !== "idle"
-              : promoteFetcher.state !== "idle"
+              : theater.kind === "rollback"
+                ? rollbackFetcher.state !== "idle"
+                : promoteFetcher.state !== "idle"
           }
           stage={stages.find((st) => st.name === theater.stage)}
           onDismiss={() => setTheater(null)}
@@ -364,7 +445,11 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
           </Tabs.List>
         </Tabs>
 
-        <Outlet context={{ status, stages } satisfies DeployableContext} />
+        <Outlet
+          context={
+            { status, stages, onRollback: openRollback } satisfies DeployableContext
+          }
+        />
       </Stack>
 
       <ConfirmActionModal
@@ -528,6 +613,75 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
               to: toStage.name,
               ...(hop?.sourceImage ? { image: hop.sourceImage } : {}),
               ...(status.sync ? { sync: promoteSync ? "true" : "false" } : {}),
+              ...(status.apply ? { wait: "false" } : {}),
+            },
+            { method: "post", action: actionPath },
+          );
+        }}
+      />
+
+      <ConfirmActionModal
+        opened={rollbackOpen}
+        onClose={() => {
+          rollbackHandlers.close();
+          setRollbackTarget(null);
+        }}
+        loading={rollbackFetcher.state !== "idle"}
+        title={`Rollback ${status.name}`}
+        confirmLabel={mutationCommitLabel(
+          status,
+          "rollback",
+          status.sync && rollbackSync,
+        )}
+        confirmDisabled={!rollbackTarget?.image.trim()}
+        argoURL={stages.find((s) => s.name === rollbackTarget?.stage)?.argoURL}
+        message={
+          rollbackTarget ? (
+            <Stack gap="sm">
+              <Text size="sm">
+                Re-pin <strong>{rollbackTarget.stage}</strong> to{" "}
+                <CompactImage value={rollbackTarget.image} empty={rollbackTarget.image} />
+                . The overlay change is the same as pin. Git remains the source of truth.
+              </Text>
+              <ArgoSyncCheckbox
+                show={status.apply && status.sync}
+                checked={rollbackSync}
+                onChange={setRollbackSync}
+                stage={rollbackTarget.stage}
+              />
+              <MutationGitHint
+                apply={status.apply}
+                push={status.push}
+                sync={status.sync && rollbackSync}
+                syncStage={rollbackTarget.stage}
+              />
+            </Stack>
+          ) : (
+            <Text size="sm">Pick a previous digest to roll back to.</Text>
+          )
+        }
+        onConfirm={() => {
+          if (!rollbackTarget) return;
+          const sync = status.sync && rollbackSync;
+          if (status.apply) {
+            setTheater({
+              kind: "rollback",
+              stage: rollbackTarget.stage,
+              image: rollbackTarget.image,
+              startedAt: Date.now(),
+              apply: status.apply,
+              push: status.push,
+              sync,
+              initialPodNames: podNamesFor(stages, rollbackTarget.stage),
+            });
+            rollbackHandlers.close();
+          }
+          void rollbackFetcher.submit(
+            {
+              intent: "rollback",
+              stage: rollbackTarget.stage,
+              image: rollbackTarget.image,
+              ...(status.sync ? { sync: rollbackSync ? "true" : "false" } : {}),
               ...(status.apply ? { wait: "false" } : {}),
             },
             { method: "post", action: actionPath },

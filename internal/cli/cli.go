@@ -12,6 +12,7 @@ Usage:
   deploybot render [--out dir] <spec>
   deploybot pin --spec <file> --stage <name> --image <ref> [--config file] [--repo dir] [--apply] [--push] [--sync]
   deploybot promote --spec <file> --from <stage> --to <stage> [--image <ref>] [--config file] [--repo dir] [--apply] [--push] [--sync]
+  deploybot rollback --spec <file> --stage <name> --image <ref> [--config file] [--repo dir] [--apply] [--push] [--sync]
   deploybot reconcile --spec <file> [--stage name]... [--config file] [--repo dir] [--apply] [--push] [--sync]
   deploybot update [--spec file] [--specs dir] [--config file] [--repo dir] [--apply] [--push] [--sync]
   deploybot serve [--config file] [--addr host:port] [--specs dir] [--repo dir] [--apply] [--push] [--sync] [--auto-pin]
@@ -36,6 +37,8 @@ func Run(ctx context.Context, args []string) error {
 		return runPin(ctx, args[1:])
 	case "promote":
 		return runPromote(ctx, args[1:])
+	case "rollback":
+		return runRollback(ctx, args[1:])
 	case "reconcile":
 		return runReconcile(ctx, args[1:])
 	case "update":

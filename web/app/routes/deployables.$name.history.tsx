@@ -26,12 +26,16 @@ export function shouldRevalidate({ formMethod }: { formMethod?: string }) {
 }
 
 export default function DeployableHistory({ loaderData }: Route.ComponentProps) {
-  const { stages } = useOutletContext<DeployableContext>();
+  const { status, stages, onRollback } = useOutletContext<DeployableContext>();
+  const stageImages = Object.fromEntries(stages.map((st) => [st.name, st.image]));
   return (
     <ReleaseHistory
       stages={stages.map((st) => st.name)}
       releases={loaderData.history?.releases ?? []}
+      imageRepo={status.imageRepo}
+      stageImages={stageImages}
       error={loaderData.error}
+      onRollback={onRollback}
     />
   );
 }

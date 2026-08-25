@@ -63,6 +63,45 @@ func TestHistoryPinThenPromote(t *testing.T) {
 	}
 }
 
+func TestHistoryRollbackEvent(t *testing.T) {
+	t.Parallel()
+	dir := initOpsRepo(t)
+	svc := &Service{
+		Catalog: loadExamples(t),
+		OpsRepo: dir,
+		Apply:   true,
+		Author:  gitwrite.Author{Name: "t", Email: "t@t"},
+	}
+	if _, err := svc.Pin(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc:main-dead@sha256:abc"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Pin(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc:main-bad@sha256:def"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Rollback(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc:main-dead@sha256:abc"); err != nil {
+		t.Fatal(err)
+	}
+	h, err := svc.History(t.Context(), "kmc", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(h.Events) < 3 || h.Events[0].Kind != EventRollback || h.Events[0].Stage != "homelab" {
+		t.Fatalf("events %+v", h.Events)
+	}
+	if len(h.Releases) != 2 {
+		t.Fatalf("releases %+v", h.Releases)
+	}
+	foundCurrent := false
+	for _, rel := range h.Releases {
+		if rel.Digest == "sha256:abc" && rel.Current {
+			foundCurrent = true
+		}
+	}
+	if !foundCurrent {
+		t.Fatalf("current release %+v", h.Releases)
+	}
+}
+
 func TestHistoryUnknownDeployable(t *testing.T) {
 	t.Parallel()
 	svc := &Service{Catalog: loadExamples(t)}

@@ -1,7 +1,7 @@
-import { Anchor, Badge, Group, Stack, Text } from "@mantine/core";
+import { Anchor, Badge, Button, Group, Stack, Text } from "@mantine/core";
 
 import type { Release, ReleaseStageHit } from "~/lib/api.server";
-import { CompactImage } from "~/ui/compact-image";
+import { CompactImage, releaseImageRef, releaseMatchesImage } from "~/ui/compact-image";
 import { RelativeTime } from "~/ui/relative-time";
 import { ResourceTable, Table } from "~/ui/resource-table";
 import { SourceCommitMeta } from "~/ui/source-commit";
@@ -9,11 +9,17 @@ import { SourceCommitMeta } from "~/ui/source-commit";
 export function ReleaseHistory({
   stages,
   releases,
+  imageRepo,
+  stageImages,
   error,
+  onRollback,
 }: {
   stages: string[];
   releases: Release[];
+  imageRepo?: string;
+  stageImages?: Record<string, string | undefined>;
   error?: string | null;
+  onRollback?: (stage: string, image: string) => void;
 }) {
   return (
     <Stack gap="sm">
@@ -48,7 +54,19 @@ export function ReleaseHistory({
               </Table.Td>
               {stages.map((stage) => (
                 <Table.Td key={stage} className="db-cell-fit">
-                  <ReleaseStageCell hit={rel.stages[stage]} />
+                  <ReleaseStageCell
+                    hit={rel.stages[stage]}
+                    canRollback={
+                      onRollback != null &&
+                      imageRepo != null &&
+                      rel.stages[stage] != null &&
+                      !releaseMatchesImage(rel, stageImages?.[stage])
+                    }
+                    onRollback={() => {
+                      if (!imageRepo || onRollback == null) return;
+                      onRollback(stage, releaseImageRef(imageRepo, rel));
+                    }}
+                  />
                 </Table.Td>
               ))}
             </Table.Tr>
@@ -59,7 +77,15 @@ export function ReleaseHistory({
   );
 }
 
-function ReleaseStageCell({ hit }: { hit?: ReleaseStageHit }) {
+function ReleaseStageCell({
+  hit,
+  canRollback,
+  onRollback,
+}: {
+  hit?: ReleaseStageHit;
+  canRollback?: boolean;
+  onRollback?: () => void;
+}) {
   if (hit == null) {
     return (
       <Text size="xs" c="dimmed">
@@ -68,22 +94,29 @@ function ReleaseStageCell({ hit }: { hit?: ReleaseStageHit }) {
     );
   }
   return (
-    <Stack gap={0}>
-      <Group gap={6} wrap="nowrap">
-        <Text size="xs">{hit.kind}</Text>
-        {hit.commitURL ? (
-          <Anchor
-            href={hit.commitURL}
-            size="xs"
-            target="_blank"
-            rel="noreferrer"
-            c="var(--db-link)"
-          >
-            commit
-          </Anchor>
-        ) : null}
-      </Group>
-      <RelativeTime value={hit.at} size="xs" />
+    <Stack gap={4}>
+      <Stack gap={0}>
+        <Group gap={6} wrap="nowrap">
+          <Text size="xs">{hit.kind}</Text>
+          {hit.commitURL ? (
+            <Anchor
+              href={hit.commitURL}
+              size="xs"
+              target="_blank"
+              rel="noreferrer"
+              c="var(--db-link)"
+            >
+              commit
+            </Anchor>
+          ) : null}
+        </Group>
+        <RelativeTime value={hit.at} size="xs" />
+      </Stack>
+      {canRollback ? (
+        <Button variant="default" size="compact-xs" onClick={onRollback}>
+          Rollback
+        </Button>
+      ) : null}
     </Stack>
   );
 }
