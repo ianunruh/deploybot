@@ -104,15 +104,29 @@ func (s *Server) workflows(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, wf)
 }
 
+func (s *Server) listHistory(w http.ResponseWriter, r *http.Request) {
+	if s.Release == nil {
+		writeJSON(w, http.StatusOK, release.GlobalHistory{Events: []release.Event{}})
+		return
+	}
+	limit, ok := queryLimit(r)
+	if !ok {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "limit must be a non-negative integer"})
+		return
+	}
+	h, err := s.Release.ListHistory(r.Context(), limit)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, h)
+}
+
 func (s *Server) history(w http.ResponseWriter, r *http.Request) {
-	limit := 0
-	if raw := r.URL.Query().Get("limit"); raw != "" {
-		n, err := strconv.Atoi(raw)
-		if err != nil || n < 0 {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "limit must be a non-negative integer"})
-			return
-		}
-		limit = n
+	limit, ok := queryLimit(r)
+	if !ok {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "limit must be a non-negative integer"})
+		return
 	}
 	h, err := s.Release.History(r.Context(), r.PathValue("name"), limit)
 	if err != nil {
@@ -120,6 +134,18 @@ func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, h)
+}
+
+func queryLimit(r *http.Request) (int, bool) {
+	raw := r.URL.Query().Get("limit")
+	if raw == "" {
+		return 0, true
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 0 {
+		return 0, false
+	}
+	return n, true
 }
 
 func (s *Server) changelog(w http.ResponseWriter, r *http.Request) {

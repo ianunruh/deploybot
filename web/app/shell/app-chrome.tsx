@@ -10,7 +10,13 @@ import {
   useMantineColorScheme,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { IconApps, IconMoon, IconRefresh, IconSun } from "@tabler/icons-react";
+import {
+  IconApps,
+  IconHistory,
+  IconMoon,
+  IconRefresh,
+  IconSun,
+} from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigation } from "react-router";
 
@@ -67,6 +73,15 @@ export function AppChrome({ children }: { children: ReactNode }) {
           leftSection={<IconApps size={16} />}
           active={
             location.pathname === "/" || location.pathname.startsWith("/deployables")
+          }
+        />
+        <NavLink
+          component={Link}
+          to="/history"
+          label="History"
+          leftSection={<IconHistory size={16} />}
+          active={
+            location.pathname === "/history" || location.pathname.startsWith("/history")
           }
         />
         <NavLink

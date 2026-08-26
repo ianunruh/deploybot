@@ -20,20 +20,28 @@ const (
 	EventReconcile = "reconcile"
 
 	maxPathRevs         = 80
+	maxGlobalPathRevs   = 200
 	defaultHistoryLimit = 50
 	maxHistoryLimit     = 200
 )
 
 type Event struct {
-	At        time.Time `json:"at"`
-	Kind      string    `json:"kind"`
-	Stage     string    `json:"stage"`
-	Image     string    `json:"image"`
-	Digest    string    `json:"digest,omitempty"`
-	Tag       string    `json:"tag,omitempty"`
-	Commit    string    `json:"commit"`
-	CommitURL string    `json:"commitURL,omitempty"`
-	Author    string    `json:"author,omitempty"`
+	At         time.Time `json:"at"`
+	Kind       string    `json:"kind"`
+	Deployable string    `json:"deployable,omitempty"`
+	Namespace  string    `json:"namespace,omitempty"`
+	Project    string    `json:"project,omitempty"`
+	Stage      string    `json:"stage"`
+	Image      string    `json:"image"`
+	Digest     string    `json:"digest,omitempty"`
+	Tag        string    `json:"tag,omitempty"`
+	Commit     string    `json:"commit"`
+	CommitURL  string    `json:"commitURL,omitempty"`
+	Author     string    `json:"author,omitempty"`
+}
+
+type GlobalHistory struct {
+	Events []Event `json:"events"`
 }
 
 type ReleaseStage struct {
@@ -69,12 +77,7 @@ func (s *Service) History(ctx context.Context, name string, limit int) (History,
 	if err != nil {
 		return History{}, err
 	}
-	if limit <= 0 {
-		limit = defaultHistoryLimit
-	}
-	if limit > maxHistoryLimit {
-		limit = maxHistoryLimit
-	}
+	limit = clampHistoryLimit(limit)
 	events, err := s.overlayChanges(ctx, d, limit)
 	if err != nil {
 		return History{}, err
@@ -95,13 +98,33 @@ func (s *Service) History(ctx context.Context, name string, limit int) (History,
 	return History{Events: events, Releases: releases}, nil
 }
 
+func clampHistoryLimit(limit int) int {
+	if limit <= 0 {
+		return defaultHistoryLimit
+	}
+	if limit > maxHistoryLimit {
+		return maxHistoryLimit
+	}
+	return limit
+}
+
+func (s *Service) ListHistory(ctx context.Context, limit int) (GlobalHistory, error) {
+	limit = clampHistoryLimit(limit)
+	events, err := s.allOverlayChanges(ctx, limit)
+	if err != nil {
+		return GlobalHistory{}, err
+	}
+	if events == nil {
+		events = []Event{}
+	}
+	return GlobalHistory{Events: events}, nil
+}
+
 func (s *Service) overlayChanges(ctx context.Context, d *spec.Deployable, limit int) ([]Event, error) {
 	if s == nil || s.OpsRepo == "" || d == nil {
 		return nil, nil
 	}
-	if limit <= 0 {
-		limit = defaultHistoryLimit
-	}
+	limit = clampHistoryLimit(limit)
 	head, err := gitwrite.HeadHash(s.OpsRepo)
 	if err != nil {
 		return s.computeOverlayChanges(ctx, d, limit)
@@ -110,10 +133,7 @@ func (s *Service) overlayChanges(ctx context.Context, d *spec.Deployable, limit 
 	c := s.overlays
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.head != head {
-		c.head = head
-		c.events = map[string][]Event{}
-	}
+	resetOverlayCache(c, head)
 	if ev, ok := c.events[d.Metadata.Name]; ok {
 		return clipEvents(ev, limit), nil
 	}
@@ -125,6 +145,45 @@ func (s *Service) overlayChanges(ctx context.Context, d *spec.Deployable, limit 
 	return clipEvents(ev, limit), nil
 }
 
+func (s *Service) allOverlayChanges(ctx context.Context, limit int) ([]Event, error) {
+	if s == nil || s.OpsRepo == "" || s.Catalog == nil {
+		return nil, nil
+	}
+	limit = clampHistoryLimit(limit)
+	head, err := gitwrite.HeadHash(s.OpsRepo)
+	if err != nil {
+		return s.computeAllOverlayChanges(ctx, limit)
+	}
+	s.initCaches()
+	c := s.overlays
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	resetOverlayCache(c, head)
+	if c.global != nil && (len(c.global) >= limit || c.globalLimit >= limit) {
+		return clipEvents(c.global, limit), nil
+	}
+	ev, err := s.computeAllOverlayChanges(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+	if ev == nil {
+		ev = []Event{}
+	}
+	c.global = ev
+	c.globalLimit = limit
+	return clipEvents(ev, limit), nil
+}
+
+func resetOverlayCache(c *overlayCache, head string) {
+	if c == nil || c.head == head {
+		return
+	}
+	c.head = head
+	c.events = map[string][]Event{}
+	c.global = nil
+	c.globalLimit = 0
+}
+
 func clipEvents(events []Event, limit int) []Event {
 	if limit <= 0 || len(events) <= limit {
 		return events
@@ -133,14 +192,61 @@ func clipEvents(events []Event, limit int) []Event {
 }
 
 func (s *Service) computeOverlayChanges(ctx context.Context, d *spec.Deployable, limit int) ([]Event, error) {
-	paths := make([]string, 0, len(d.Spec.Stages))
-	stageOf := make(map[string]string, len(d.Spec.Stages))
-	for _, st := range d.Spec.Stages {
-		p := render.OverlayKustomizationPath(d, st.Name)
-		paths = append(paths, p)
-		stageOf[p] = st.Name
+	paths, byPath := overlayIndex([]*spec.Deployable{d})
+	return s.overlayEvents(ctx, paths, byPath, maxPathRevs, limit)
+}
+
+func (s *Service) computeAllOverlayChanges(ctx context.Context, limit int) ([]Event, error) {
+	if s.Catalog == nil {
+		return nil, nil
 	}
-	revs, err := gitwrite.LogPaths(ctx, s.OpsRepo, paths, maxPathRevs)
+	paths, byPath := overlayIndex(s.Catalog.List())
+	return s.overlayEvents(ctx, paths, byPath, gitRevsFor(limit), limit)
+}
+
+func gitRevsFor(eventLimit int) int {
+	n := eventLimit * 2
+	if n < maxPathRevs {
+		n = maxPathRevs
+	}
+	if n > maxGlobalPathRevs {
+		n = maxGlobalPathRevs
+	}
+	return n
+}
+
+type overlayHit struct {
+	d     *spec.Deployable
+	stage string
+}
+
+func overlayIndex(deployables []*spec.Deployable) ([]string, map[string]overlayHit) {
+	byPath := map[string]overlayHit{}
+	var paths []string
+	for _, d := range deployables {
+		if d == nil {
+			continue
+		}
+		for _, st := range d.Spec.Stages {
+			p := render.OverlayKustomizationPath(d, st.Name)
+			if p == "" {
+				continue
+			}
+			if _, ok := byPath[p]; ok {
+				continue
+			}
+			byPath[p] = overlayHit{d: d, stage: st.Name}
+			paths = append(paths, p)
+		}
+	}
+	return paths, byPath
+}
+
+func (s *Service) overlayEvents(ctx context.Context, paths []string, byPath map[string]overlayHit, revsLimit, eventLimit int) ([]Event, error) {
+	if s == nil || s.OpsRepo == "" || len(paths) == 0 {
+		return nil, nil
+	}
+	revs, err := gitwrite.LogPaths(ctx, s.OpsRepo, paths, revsLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -150,33 +256,49 @@ func (s *Service) computeOverlayChanges(ctx context.Context, d *spec.Deployable,
 		if kind == EventReconcile {
 			continue
 		}
-		url := gitCommitURL(d.Spec.Git.RepoURL, rev.Hash)
 		for _, p := range paths {
-			stage := stageOf[p]
-			cur, ok := overlayImage(d, stage, rev.Files[p])
+			hit, ok := byPath[p]
 			if !ok {
 				continue
 			}
-			if prev, prevOK := overlayImage(d, stage, rev.Prev[p]); prevOK && cur.ReleaseKey() == prev.ReleaseKey() {
+			ev, ok := overlayChange(hit, p, kind, rev)
+			if !ok {
 				continue
 			}
-			events = append(events, Event{
-				At:        rev.When,
-				Kind:      kind,
-				Stage:     stage,
-				Image:     cur.Compact(),
-				Digest:    cur.Digest,
-				Tag:       cur.Tag,
-				Commit:    rev.Hash,
-				CommitURL: url,
-				Author:    rev.Author,
-			})
-			if limit > 0 && len(events) >= limit {
+			events = append(events, ev)
+			if eventLimit > 0 && len(events) >= eventLimit {
 				return events, nil
 			}
 		}
 	}
 	return events, nil
+}
+
+func overlayChange(hit overlayHit, path, kind string, rev gitwrite.Rev) (Event, bool) {
+	if hit.d == nil {
+		return Event{}, false
+	}
+	cur, ok := overlayImage(hit.d, hit.stage, rev.Files[path])
+	if !ok {
+		return Event{}, false
+	}
+	if prev, prevOK := overlayImage(hit.d, hit.stage, rev.Prev[path]); prevOK && cur.ReleaseKey() == prev.ReleaseKey() {
+		return Event{}, false
+	}
+	return Event{
+		At:         rev.When,
+		Kind:       kind,
+		Deployable: hit.d.Metadata.Name,
+		Namespace:  hit.d.Spec.Namespace,
+		Project:    hit.d.Spec.Argo.Project,
+		Stage:      hit.stage,
+		Image:      cur.Compact(),
+		Digest:     cur.Digest,
+		Tag:        cur.Tag,
+		Commit:     rev.Hash,
+		CommitURL:  gitCommitURL(hit.d.Spec.Git.RepoURL, rev.Hash),
+		Author:     rev.Author,
+	}, true
 }
 
 func overlayImage(d *spec.Deployable, stage string, blob []byte) (image.Ref, bool) {

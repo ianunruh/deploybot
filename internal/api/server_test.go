@@ -397,6 +397,34 @@ func TestHistoryEmpty(t *testing.T) {
 	if missing.StatusCode != http.StatusNotFound {
 		t.Fatalf("status %s", missing.Status)
 	}
+
+	global, err := http.Get(srv.URL + "/api/v1/history")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = global.Body.Close() }()
+	if global.StatusCode != http.StatusOK {
+		t.Fatal(global.Status)
+	}
+	var all release.GlobalHistory
+	if err := json.NewDecoder(global.Body).Decode(&all); err != nil {
+		t.Fatal(err)
+	}
+	if all.Events == nil {
+		t.Fatal("expected empty events slice")
+	}
+	if len(all.Events) != 0 {
+		t.Fatalf("%+v", all)
+	}
+
+	bad, err := http.Get(srv.URL + "/api/v1/history?limit=nope")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = bad.Body.Close() }()
+	if bad.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status %s", bad.Status)
+	}
 }
 
 func TestWorkloadsAndWorkflows(t *testing.T) {

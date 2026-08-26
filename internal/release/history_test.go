@@ -51,6 +51,9 @@ func TestHistoryPinThenPromote(t *testing.T) {
 	if rel.Stages["homelab"].Kind != EventPin || rel.Stages["prod"].Kind != EventPromote {
 		t.Fatalf("stages %+v", rel.Stages)
 	}
+	if h.Events[0].Deployable != "kmc" || h.Events[0].Namespace != "kmc-system" || h.Events[0].Project != "sandbox" {
+		t.Fatalf("event meta %+v", h.Events[0])
+	}
 	st, err := svc.Status(t.Context(), "kmc")
 	if err != nil {
 		t.Fatal(err)
@@ -107,5 +110,62 @@ func TestHistoryUnknownDeployable(t *testing.T) {
 	svc := &Service{Catalog: loadExamples(t)}
 	if _, err := svc.History(t.Context(), "nope", 0); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestListHistoryAcrossDeployables(t *testing.T) {
+	t.Parallel()
+	dir := initOpsRepo(t)
+	svc := &Service{
+		Catalog: loadExamples(t),
+		OpsRepo: dir,
+		Apply:   true,
+		Author:  gitwrite.Author{Name: "t", Email: "t@t"},
+	}
+	if _, err := svc.Pin(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc:main-dead@sha256:abc"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Promote(t.Context(), "kmc", "homelab", "prod", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Pin(t.Context(), "humpty", "homelab", "ghcr.io/ianunruh/humpty:main-dead@sha256:fff"); err != nil {
+		t.Fatal(err)
+	}
+	h, err := svc.ListHistory(t.Context(), 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(h.Events) != 3 {
+		t.Fatalf("events %+v", h.Events)
+	}
+	if h.Events[0].Kind != EventPin || h.Events[0].Deployable != "humpty" || h.Events[0].Stage != "homelab" {
+		t.Fatalf("newest %+v", h.Events[0])
+	}
+	if h.Events[0].Namespace != "deploybot-system" || h.Events[0].Project != "sandbox" {
+		t.Fatalf("humpty meta %+v", h.Events[0])
+	}
+	if h.Events[1].Kind != EventPromote || h.Events[1].Deployable != "kmc" || h.Events[1].Stage != "prod" {
+		t.Fatalf("middle %+v", h.Events[1])
+	}
+	if h.Events[2].Kind != EventPin || h.Events[2].Deployable != "kmc" || h.Events[2].Stage != "homelab" {
+		t.Fatalf("oldest %+v", h.Events[2])
+	}
+	clipped, err := svc.ListHistory(t.Context(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(clipped.Events) != 1 || clipped.Events[0].Deployable != "humpty" {
+		t.Fatalf("limit %+v", clipped.Events)
+	}
+}
+
+func TestListHistoryEmpty(t *testing.T) {
+	t.Parallel()
+	h, err := (&Service{Catalog: loadExamples(t)}).ListHistory(t.Context(), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.Events == nil || len(h.Events) != 0 {
+		t.Fatalf("%+v", h)
 	}
 }

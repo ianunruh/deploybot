@@ -219,19 +219,28 @@ export type Release = {
   stages: Record<string, ReleaseStageHit>;
 };
 
+export type HistoryEvent = {
+  at: string;
+  kind: string;
+  deployable?: string;
+  namespace?: string;
+  project?: string;
+  stage: string;
+  image: string;
+  digest?: string;
+  tag?: string;
+  commit: string;
+  commitURL?: string;
+  author?: string;
+};
+
 export type DeployableHistory = {
-  events: Array<{
-    at: string;
-    kind: string;
-    stage: string;
-    image: string;
-    digest?: string;
-    tag?: string;
-    commit: string;
-    commitURL?: string;
-    author?: string;
-  }>;
+  events: HistoryEvent[];
   releases: Release[];
+};
+
+export type GlobalHistory = {
+  events: HistoryEvent[];
 };
 
 export type MutationResult = {
@@ -251,6 +260,10 @@ export function listDeployables() {
 
 export function listUpdates() {
   return apiFetch<UpdateList>("/api/v1/updates");
+}
+
+export function listHistory() {
+  return apiFetch<GlobalHistory>("/api/v1/history");
 }
 
 export function getDeployable(name: string) {

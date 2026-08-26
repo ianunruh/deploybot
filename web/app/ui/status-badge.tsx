@@ -43,6 +43,41 @@ const STATUS_COLORS: Record<string, string> = {
   stale: "orange",
 };
 
+const KIND_COLORS: Record<string, string> = {
+  pin: "teal",
+  promote: "accent",
+  rollback: "orange",
+  overlay: "gray",
+};
+
+export function EventKindBadge({ kind }: { kind: string }) {
+  return (
+    <Badge
+      color={KIND_COLORS[kind] ?? "gray"}
+      variant="light"
+      size="sm"
+      radius="sm"
+      tt="uppercase"
+      styles={{
+        root: {
+          fontFamily: "inherit",
+          letterSpacing: "0.04em",
+          maxWidth: "none",
+          overflow: "visible",
+          flexShrink: 0,
+        },
+        label: {
+          overflow: "visible",
+          textOverflow: "unset",
+          whiteSpace: "nowrap",
+        },
+      }}
+    >
+      {kind || "overlay"}
+    </Badge>
+  );
+}
+
 export function UpdateBadge({
   stale,
   error,

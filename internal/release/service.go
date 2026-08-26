@@ -43,9 +43,11 @@ type Service struct {
 }
 
 type overlayCache struct {
-	mu     sync.Mutex
-	head   string
-	events map[string][]Event
+	mu          sync.Mutex
+	head        string
+	events      map[string][]Event
+	global      []Event
+	globalLimit int
 }
 
 type Mutation struct {

@@ -17,6 +17,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("GET /api/v1/deployables", s.list)
 	mux.HandleFunc("GET /api/v1/updates", s.updates)
+	mux.HandleFunc("GET /api/v1/history", s.listHistory)
 	mux.HandleFunc("GET /api/v1/deployables/{name}", s.get)
 	mux.HandleFunc("GET /api/v1/deployables/{name}/images", s.images)
 	mux.HandleFunc("GET /api/v1/deployables/{name}/history", s.history)
