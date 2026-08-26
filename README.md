@@ -130,10 +130,13 @@ Docker Hub listing is unauthenticated for public images; set
 
 Third-party images opt into registry tracking with `spec.update`. The
 console **Updates** page compares the first-stage pin to the newest
-published digest. `spec.update.auto: 24h` enrolls the app; `serve` only
-writes those pins when auto-pin is enabled on that process. Promote gates
-are unchanged — prod still needs approval. `deploybot update` is the same
-check from the CLI (dry-run unless `--apply`).
+published digest. `spec.update.match` is an optional Go regex that limits
+which tags count as newest (linuxserver `v1.2.3-ls123` instead of the
+floating `1.6.0` / `latest` aliases). `spec.update.auto: 24h` enrolls the
+app; `serve` only writes those pins when auto-pin is enabled on that
+process. Promote gates are unchanged — prod still needs approval.
+`deploybot update` is the same check from the CLI (dry-run unless
+`--apply`).
 
 HTTPS git push uses `DEPLOYBOT_GIT_TOKEN`, then the same GitHub tokens as
 the pin picker. SSH remotes use the ssh-agent (or `~/.ssh/id_ed25519` /

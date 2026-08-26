@@ -24,6 +24,7 @@ spec:
     tag: 5.26.2.10099-ls276
   update:
     auto: 24h
+    match: '^v?\d+(\.\d+)+-ls\d+$'
   workload:
     kind: StatefulSet
     containerName: radarr

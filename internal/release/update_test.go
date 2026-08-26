@@ -45,6 +45,38 @@ spec:
           - approval
 `
 
+const miniSonarrMatch = `
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: sonarr
+spec:
+  namespace: play
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/play/sonarr
+    applicationPath: k8s/apps/projects/play
+  argo:
+    project: play
+    name: play-sonarr
+  image:
+    repository: docker.io/linuxserver/sonarr
+    tag: 4.0.15.2941-ls285
+  update:
+    auto: 24h
+    match: '^v?\d+(\.\d+)+-ls\d+$'
+  workload:
+    kind: StatefulSet
+    containerName: sonarr
+    containerPort: 8989
+  stages:
+    - name: homelab
+    - name: prod
+      promote:
+        after:
+          - approval
+`
+
 const miniSonarrTrackOnly = `
 apiVersion: deploybot.kcloud.io/v1alpha1
 kind: Deployable
@@ -139,6 +171,81 @@ func TestCheckUpdateStale(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !st.Stale || st.Newest == nil || st.Newest.Tag != "4.0.16" || st.Auto != "24h" {
+		t.Fatalf("%+v", st)
+	}
+}
+
+func TestCheckUpdateMatchSelectsLinuxServerTag(t *testing.T) {
+	t.Parallel()
+	dir := initOpsRepo(t)
+	lister := &fakeList{versions: []image.Version{
+		sonarrVer("1.6.0", "sha256:new", 0),
+		sonarrVer("version-v1.6.0", "sha256:new", 0),
+		sonarrVer("v1.6.0-ls361", "sha256:new", 0),
+		sonarrVer("latest", "sha256:new", 0),
+		sonarrVer("1.6.1-development", "sha256:dev", time.Minute),
+	}}
+	svc := &Service{
+		Catalog: catalogNamed(t, "sonarr", miniSonarrMatch),
+		OpsRepo: dir,
+		Apply:   true,
+		Author:  gitwrite.Author{Name: "t", Email: "t@t"},
+		Images:  lister,
+	}
+	if _, err := svc.Pin(t.Context(), "sonarr", "homelab", "docker.io/linuxserver/sonarr:1.6.0@sha256:old"); err != nil {
+		t.Fatal(err)
+	}
+	st, err := svc.CheckUpdate(t.Context(), "sonarr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !st.Stale || st.Newest == nil || st.Newest.Tag != "v1.6.0-ls361" {
+		t.Fatalf("%+v", st)
+	}
+}
+
+func TestCheckUpdateMatchSameDigestNotStale(t *testing.T) {
+	t.Parallel()
+	dir := initOpsRepo(t)
+	lister := &fakeList{versions: []image.Version{
+		sonarrVer("1.6.0", "sha256:same", 0),
+		sonarrVer("v1.6.0-ls361", "sha256:same", 0),
+		sonarrVer("latest", "sha256:same", 0),
+	}}
+	svc := &Service{
+		Catalog: catalogNamed(t, "sonarr", miniSonarrMatch),
+		OpsRepo: dir,
+		Apply:   true,
+		Author:  gitwrite.Author{Name: "t", Email: "t@t"},
+		Images:  lister,
+	}
+	if _, err := svc.Pin(t.Context(), "sonarr", "homelab", "docker.io/linuxserver/sonarr:v1.6.0-ls361@sha256:same"); err != nil {
+		t.Fatal(err)
+	}
+	st, err := svc.CheckUpdate(t.Context(), "sonarr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Stale || st.Newest == nil || st.Newest.Tag != "v1.6.0-ls361" {
+		t.Fatalf("%+v", st)
+	}
+}
+
+func TestCheckUpdateMatchNoTagsErrors(t *testing.T) {
+	t.Parallel()
+	lister := &fakeList{versions: []image.Version{
+		sonarrVer("1.6.0", "sha256:new", 0),
+		sonarrVer("latest", "sha256:new", 0),
+	}}
+	svc := &Service{
+		Catalog: catalogNamed(t, "sonarr", miniSonarrMatch),
+		Images:  lister,
+	}
+	st, err := svc.CheckUpdate(t.Context(), "sonarr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Error == "" || st.Newest != nil || st.Stale {
 		t.Fatalf("%+v", st)
 	}
 }
@@ -323,7 +430,7 @@ func TestReconcileUpdatesSkipsWhenNotAutoPin(t *testing.T) {
 func TestListUpdatesOmitsOwned(t *testing.T) {
 	t.Parallel()
 	lister := &fakeList{versions: []image.Version{
-		sonarrVer("4.0.16", "sha256:new", 0),
+		sonarrVer("4.0.16.2945-ls286", "sha256:new", 0),
 	}}
 	svc := &Service{Catalog: loadExamples(t), Images: lister}
 	svc.RefreshUpdates(t.Context())
@@ -343,7 +450,7 @@ func TestListUpdatesOmitsOwned(t *testing.T) {
 	for _, u := range got.Updates {
 		if u.Name == "sonarr" {
 			found = true
-			if u.Auto != "24h" || u.Newest == nil || u.Newest.Tag != "4.0.16" {
+			if u.Auto != "24h" || u.Newest == nil || u.Newest.Tag != "4.0.16.2945-ls286" {
 				t.Fatalf("sonarr %+v", u)
 			}
 		}

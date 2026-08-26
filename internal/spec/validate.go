@@ -3,6 +3,7 @@ package spec
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -112,10 +113,15 @@ func validateGroup(g string) string {
 }
 
 func validateUpdate(u *UpdatePolicy) string {
-	if u == nil || u.Auto == nil {
+	if u == nil {
 		return ""
 	}
-	if u.Auto.Duration() < MinAutoUpdate.Duration() {
+	if s := strings.TrimSpace(u.Match); s != "" {
+		if _, err := regexp.Compile(s); err != nil {
+			return fmt.Sprintf("spec.update.match is not a valid regex: %v", err)
+		}
+	}
+	if u.Auto != nil && u.Auto.Duration() < MinAutoUpdate.Duration() {
 		return "spec.update.auto must be at least 1h"
 	}
 	return ""

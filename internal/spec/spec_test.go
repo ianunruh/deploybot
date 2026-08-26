@@ -280,6 +280,18 @@ func TestParseUpdate(t *testing.T) {
 	if d.AutoUpdate() != 24*time.Hour {
 		t.Fatalf("auto %s", d.AutoUpdate())
 	}
+
+	d, err = Parse([]byte(sonarrUpdateYAML("    match: '^v?\\d+(\\.\\d+)+-ls\\d+$'\n")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Spec.Update.Match != `^v?\d+(\.\d+)+-ls\d+$` {
+		t.Fatalf("match %q", d.Spec.Update.Match)
+	}
+	re := d.UpdateMatch()
+	if re == nil || !re.MatchString("v1.6.0-ls361") || re.MatchString("1.6.0") {
+		t.Fatalf("UpdateMatch %v", re)
+	}
 }
 
 func TestParseUpdateRejectsShortAuto(t *testing.T) {
@@ -288,6 +300,13 @@ func TestParseUpdateRejectsShortAuto(t *testing.T) {
 		if _, err := Parse([]byte(sonarrUpdateYAML("    auto: " + auto + "\n"))); err == nil {
 			t.Fatalf("expected error for auto %q", auto)
 		}
+	}
+}
+
+func TestParseUpdateRejectsBadMatch(t *testing.T) {
+	t.Parallel()
+	if _, err := Parse([]byte(sonarrUpdateYAML("    match: '['\n"))); err == nil {
+		t.Fatal("expected error")
 	}
 }
 

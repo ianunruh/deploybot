@@ -23,6 +23,7 @@ spec:
     tag: v0.22.2037-ls67
   update:
     auto: 24h
+    match: '^v?\d+(\.\d+)+-ls\d+$'
   workload:
     kind: StatefulSet
     containerName: jackett

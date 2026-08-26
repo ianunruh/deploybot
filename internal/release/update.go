@@ -224,7 +224,16 @@ func (s *Service) applyListing(st *UpdateStatus, d *spec.Deployable, ctx context
 		st.Error = item.err.Error()
 		return
 	}
-	newest, ok := image.Newest(item.listing.Versions)
+	versions := item.listing.Versions
+	if re := d.UpdateMatch(); re != nil {
+		matched := image.Matching(versions, re)
+		if len(versions) > 0 && len(matched) == 0 {
+			st.Error = fmt.Sprintf("no published tags matching %q", strings.TrimSpace(d.Spec.Update.Match))
+			return
+		}
+		versions = matched
+	}
+	newest, ok := image.Newest(versions)
 	if !ok {
 		return
 	}

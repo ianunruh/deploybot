@@ -1,6 +1,7 @@
 package image
 
 import (
+	"regexp"
 	"testing"
 	"time"
 )
@@ -119,6 +120,36 @@ func TestPreferredTagSkipsNightly(t *testing.T) {
 	t.Parallel()
 	if got := PreferredTag([]string{"nightly", "v1.2.3"}); got != "v1.2.3" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestMatchingFiltersLinuxServerAliases(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 8, 25, 21, 51, 0, 0, time.UTC)
+	re := regexp.MustCompile(`^v?\d+(\.\d+)+-ls\d+$`)
+	got := Matching([]Version{
+		hubVer("1.6.0", "sha256:new", now),
+		hubVer("version-v1.6.0", "sha256:new", now),
+		hubVer("v1.6.0-ls361", "sha256:new", now),
+		hubVer("latest", "sha256:new", now),
+		hubVer("1.6.1-development", "sha256:dev", now.Add(-time.Hour)),
+		hubVer("amd64-v1.6.0-ls361", "sha256:arch", now),
+	}, re)
+	if len(got) != 1 || got[0].Tag != "v1.6.0-ls361" {
+		t.Fatalf("%+v", got)
+	}
+	newest, ok := Newest(got)
+	if !ok || newest.Tag != "v1.6.0-ls361" || newest.Digest != "sha256:new" {
+		t.Fatalf("%+v ok=%v", newest, ok)
+	}
+}
+
+func TestMatchingNilIsNoop(t *testing.T) {
+	t.Parallel()
+	in := []Version{hubVer("1.6.0", "sha256:new", time.Now())}
+	got := Matching(in, nil)
+	if len(got) != 1 || got[0].Tag != "1.6.0" {
+		t.Fatalf("%+v", got)
 	}
 }
 

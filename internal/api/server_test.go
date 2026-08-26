@@ -469,10 +469,10 @@ func TestUpdates(t *testing.T) {
 		Source: "dockerhub",
 		Images: []image.Version{{
 			Repository: "docker.io/linuxserver/sonarr",
-			Ref:        "docker.io/linuxserver/sonarr:4.0.16@sha256:new",
-			Tag:        "4.0.16",
+			Ref:        "docker.io/linuxserver/sonarr:4.0.16.2945-ls286@sha256:new",
+			Tag:        "4.0.16.2945-ls286",
 			Digest:     "sha256:new",
-			Tags:       []string{"4.0.16"},
+			Tags:       []string{"4.0.16.2945-ls286"},
 			CreatedAt:  time.Now().UTC(),
 		}},
 	}}
@@ -505,7 +505,7 @@ func TestUpdates(t *testing.T) {
 	for _, u := range body.Updates {
 		if u.Name == "sonarr" {
 			found = true
-			if u.Auto != "24h" || u.Newest == nil || u.Newest.Tag != "4.0.16" {
+			if u.Auto != "24h" || u.Newest == nil || u.Newest.Tag != "4.0.16.2945-ls286" {
 				t.Fatalf("sonarr %+v", u)
 			}
 		}

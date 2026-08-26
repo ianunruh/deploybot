@@ -28,6 +28,7 @@ spec:
     tag: v26.2-ls257
   update:
     auto: 24h
+    match: '^v?\d+(\.\d+)+-ls\d+$'
   workload:
     kind: StatefulSet
     containerName: nzbget

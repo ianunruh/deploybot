@@ -24,6 +24,7 @@ spec:
     tag: v1.5.2-ls307
   update:
     auto: 24h
+    match: '^v?\d+(\.\d+)+-ls\d+$'
   workload:
     kind: StatefulSet
     containerName: bazarr

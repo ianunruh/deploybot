@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -80,9 +81,11 @@ type Image struct {
 
 // UpdatePolicy opts a deployable into registry tracking. Presence of the
 // block means deploybot compares the first-stage pin to the newest published
-// image. Auto, if set, enrolls in scheduled first-stage pins.
+// image. Auto, if set, enrolls in scheduled first-stage pins. Match, if set,
+// is a Go regex; only tags that match it are candidates for newest.
 type UpdatePolicy struct {
-	Auto *Duration `yaml:"auto,omitempty"`
+	Auto  *Duration `yaml:"auto,omitempty"`
+	Match string    `yaml:"match,omitempty"`
 }
 
 const MinAutoUpdate = Duration(time.Hour)
@@ -104,6 +107,22 @@ func (d *Deployable) AutoUpdate() time.Duration {
 		return 0
 	}
 	return d.Spec.Update.Auto.Duration()
+}
+
+// UpdateMatch is the compiled spec.update.match regex, or nil if unset.
+func (d *Deployable) UpdateMatch() *regexp.Regexp {
+	if d == nil || d.Spec.Update == nil {
+		return nil
+	}
+	s := strings.TrimSpace(d.Spec.Update.Match)
+	if s == "" {
+		return nil
+	}
+	re, err := regexp.Compile(s)
+	if err != nil {
+		return nil
+	}
+	return re
 }
 
 func Load(path string) (*Deployable, error) {

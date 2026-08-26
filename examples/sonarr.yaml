@@ -24,6 +24,7 @@ spec:
     tag: 4.0.15.2941-ls285
   update:
     auto: 24h
+    match: '^v?\d+(\.\d+)+-ls\d+$'
   workload:
     kind: StatefulSet
     containerName: sonarr

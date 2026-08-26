@@ -1,6 +1,7 @@
 package image
 
 import (
+	"regexp"
 	"strings"
 	"time"
 )
@@ -10,6 +11,33 @@ type digestGroup struct {
 	tags      []string
 	createdAt time.Time
 	repo      string
+}
+
+// Matching keeps versions that have at least one tag matching re. Remaining
+// tags are rewritten so PreferredTag can pick them. A nil regex is a no-op.
+func Matching(versions []Version, re *regexp.Regexp) []Version {
+	if re == nil {
+		return versions
+	}
+	out := make([]Version, 0, len(versions))
+	for _, v := range versions {
+		var tags []string
+		for _, t := range versionTags(v) {
+			if t == "" || skipArchTag(t) || !re.MatchString(t) {
+				continue
+			}
+			tags = append(tags, t)
+		}
+		if len(tags) == 0 {
+			continue
+		}
+		v.Tags = tags
+		v.Tag = PreferredTag(tags)
+		ref := Ref{Repository: v.Repository, Tag: v.Tag, Digest: v.Digest}
+		v.Ref = ref.String()
+		out = append(out, v)
+	}
+	return out
 }
 
 // Newest picks the newest published digest, preferring a stable tag on that
