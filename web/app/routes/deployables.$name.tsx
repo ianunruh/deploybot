@@ -1,5 +1,6 @@
 import {
   Alert,
+  Badge,
   Button,
   Group,
   Stack,
@@ -139,7 +140,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 }
 
-const deployablesCrumb = { label: "Deployables", to: "/" };
+const deployablesCrumb = { label: "Catalog", to: "/" };
 
 function RegistryUpdateHint({ update }: { update: RegistryUpdate }) {
   const interval = update.auto ? ` Auto-pin ${update.auto}.` : "";
@@ -362,13 +363,22 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         crumbs={[deployablesCrumb]}
         description={
           <Stack gap={6}>
-            <Text size="sm" c="dimmed">
-              {status.namespace} · {status.imageRepo}
-            </Text>
+            {status.summary ? <Text size="sm">{status.summary}</Text> : null}
+            <Group gap="xs" wrap="wrap">
+              {status.group ? (
+                <Badge variant="light" size="sm" tt="uppercase" radius="sm">
+                  {status.group}
+                </Badge>
+              ) : null}
+              <Text size="sm" c="dimmed">
+                {status.namespace} · {status.imageRepo}
+              </Text>
+            </Group>
             {status.update != null ? <RegistryUpdateHint update={status.update} /> : null}
             <DeployableLinkLabels
               repoURL={status.repoURL}
               projectURL={status.projectURL}
+              docsURL={status.docsURL}
             />
           </Stack>
         }

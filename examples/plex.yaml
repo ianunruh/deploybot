@@ -9,8 +9,11 @@ metadata:
   name: plex
 spec:
   namespace: play
+  group: play
+  summary: Media server
   links:
     repoURL: https://github.com/linuxserver/docker-plex
+    docsURL: https://www.plex.tv
   git:
     repoURL: https://github.com/ianunruh/kcloud-ops
     workloadPath: k8s/play/plex

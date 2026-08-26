@@ -11,8 +11,11 @@ metadata:
   name: nzbget
 spec:
   namespace: play
+  group: play
+  summary: Usenet downloader
   links:
     repoURL: https://github.com/linuxserver/docker-nzbget
+    docsURL: https://nzbget.com
   git:
     repoURL: https://github.com/ianunruh/kcloud-ops
     workloadPath: k8s/play/nzbget

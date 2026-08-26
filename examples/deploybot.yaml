@@ -9,6 +9,8 @@ metadata:
   name: deploybot
 spec:
   namespace: deploybot-system
+  group: platform
+  summary: Staged GitOps deploys
   links:
     repoURL: https://github.com/ianunruh/deploybot
     source: true

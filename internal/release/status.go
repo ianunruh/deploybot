@@ -37,6 +37,10 @@ type StageStatus struct {
 type Status struct {
 	Name       string        `json:"name"`
 	Namespace  string        `json:"namespace"`
+	Group      string        `json:"group,omitempty"`
+	Summary    string        `json:"summary,omitempty"`
+	Icon       string        `json:"icon,omitempty"`
+	DocsURL    string        `json:"docsURL,omitempty"`
 	ImageRepo  string        `json:"imageRepo"`
 	RepoURL    string        `json:"repoURL,omitempty"`
 	ProjectURL string        `json:"projectURL,omitempty"`
@@ -126,6 +130,10 @@ func (s *Service) buildStatus(ctx context.Context, d *spec.Deployable, tree rend
 	out := Status{
 		Name:       d.Metadata.Name,
 		Namespace:  d.Spec.Namespace,
+		Group:      d.Spec.Group,
+		Summary:    d.Spec.Summary,
+		Icon:       d.Spec.Links.Icon,
+		DocsURL:    d.Spec.Links.DocsURL,
 		ImageRepo:  d.Spec.Image.Repository,
 		RepoURL:    d.Spec.Links.RepoURL,
 		ProjectURL: d.Spec.Links.ProjectURL,

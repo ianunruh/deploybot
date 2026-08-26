@@ -7,8 +7,11 @@ metadata:
   name: sonarr
 spec:
   namespace: play
+  group: play
+  summary: TV library manager
   links:
     repoURL: https://github.com/linuxserver/docker-sonarr
+    docsURL: https://sonarr.tv
   git:
     repoURL: https://github.com/ianunruh/kcloud-ops
     workloadPath: k8s/play/sonarr

@@ -57,6 +57,9 @@ func TestListAndGet(t *testing.T) {
 	var list struct {
 		Deployables []struct {
 			Name       string `json:"name"`
+			Group      string `json:"group"`
+			Summary    string `json:"summary"`
+			DocsURL    string `json:"docsURL"`
 			RepoURL    string `json:"repoURL"`
 			ProjectURL string `json:"projectURL"`
 			Flow       struct {
@@ -97,6 +100,13 @@ func TestListAndGet(t *testing.T) {
 	if kmc.ProjectURL != "https://trello.com/b/rPALXxJF/kcloud" {
 		t.Fatalf("kmc project %q", kmc.ProjectURL)
 	}
+	if kmc.Group != "platform" || kmc.Summary == "" {
+		t.Fatalf("kmc catalog %+v", kmc)
+	}
+	sonarr := list.Deployables[13]
+	if sonarr.Name != "sonarr" || sonarr.Group != "play" || sonarr.Summary == "" || sonarr.DocsURL == "" {
+		t.Fatalf("sonarr catalog %+v", sonarr)
+	}
 	if ctrl.RepoURL != "https://github.com/ianunruh/kmc" {
 		t.Fatalf("controller repo %q", ctrl.RepoURL)
 	}
@@ -135,6 +145,9 @@ func TestListAndGet(t *testing.T) {
 	}
 	if st.RepoURL != "https://github.com/ianunruh/kmc" || st.ProjectURL != "https://trello.com/b/rPALXxJF/kcloud" {
 		t.Fatalf("status links %+v", st)
+	}
+	if st.Group != "platform" || st.Summary == "" {
+		t.Fatalf("status catalog group=%q summary=%q", st.Group, st.Summary)
 	}
 	if len(st.Stages) != 2 || st.Stages[0].LogsURL == "" || st.Stages[1].LogsURL != "" {
 		t.Fatalf("status observability %+v", st.Stages)

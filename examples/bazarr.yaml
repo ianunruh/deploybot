@@ -7,8 +7,11 @@ metadata:
   name: bazarr
 spec:
   namespace: play
+  group: play
+  summary: Media subtitle manager
   links:
     repoURL: https://github.com/linuxserver/docker-bazarr
+    docsURL: https://www.bazarr.media
   git:
     repoURL: https://github.com/ianunruh/kcloud-ops
     workloadPath: k8s/play/bazarr

@@ -8,8 +8,11 @@ metadata:
   name: teamspeak
 spec:
   namespace: teamspeak
+  group: play
+  summary: Voice server
   links:
     repoURL: https://github.com/TeamSpeak-Systems/teamspeak-linux-docker-images
+    docsURL: https://www.teamspeak.com
   git:
     repoURL: https://github.com/ianunruh/kcloud-ops
     workloadPath: k8s/teamspeak

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ianunruh/deploybot/internal/image"
@@ -28,23 +29,32 @@ type Metadata struct {
 }
 
 type Spec struct {
-	Namespace string        `yaml:"namespace"`
-	Links     Links         `yaml:"links,omitempty"`
-	Git       Git           `yaml:"git"`
-	Argo      Argo          `yaml:"argo"`
-	Image     Image         `yaml:"image"`
-	Update    *UpdatePolicy `yaml:"update,omitempty"`
-	Workload  Workload      `yaml:"workload"`
-	Route     Route         `yaml:"route"`
-	Stages    []Stage       `yaml:"stages"`
+	Namespace string `yaml:"namespace"`
+	// Summary is a one-line catalog blurb. Group shelves the app in the
+	// console (play, platform, …). Both are optional and console-only.
+	Summary  string        `yaml:"summary,omitempty"`
+	Group    string        `yaml:"group,omitempty"`
+	Links    Links         `yaml:"links,omitempty"`
+	Git      Git           `yaml:"git"`
+	Argo     Argo          `yaml:"argo"`
+	Image    Image         `yaml:"image"`
+	Update   *UpdatePolicy `yaml:"update,omitempty"`
+	Workload Workload      `yaml:"workload"`
+	Route    Route         `yaml:"route"`
+	Stages   []Stage       `yaml:"stages"`
 }
+
+const MaxSummaryLen = 160
 
 // Links are optional URLs shown in the console. RepoURL is the app source
 // (GitHub/GitLab). ProjectURL is a tracker or board (Trello, Linear, …).
+// DocsURL is product documentation. Icon is a catalog image URL.
 // Source means we build that repo (main-<sha> pins, promote changelog).
 type Links struct {
 	RepoURL    string `yaml:"repoURL,omitempty"`
 	ProjectURL string `yaml:"projectURL,omitempty"`
+	DocsURL    string `yaml:"docsURL,omitempty"`
+	Icon       string `yaml:"icon,omitempty"`
 	Source     bool   `yaml:"source,omitempty"`
 }
 
@@ -117,6 +127,8 @@ func Parse(b []byte) (*Deployable, error) {
 }
 
 func (d *Deployable) Default() {
+	d.Spec.Summary = strings.TrimSpace(d.Spec.Summary)
+	d.Spec.Group = strings.TrimSpace(d.Spec.Group)
 	d.Spec.Git.TargetRevision = cmp.Or(d.Spec.Git.TargetRevision, "HEAD")
 	d.Spec.Argo.Name = cmp.Or(d.Spec.Argo.Name, d.Metadata.Name)
 	d.Spec.Argo.DestinationServer = cmp.Or(d.Spec.Argo.DestinationServer, "https://kubernetes.default.svc")

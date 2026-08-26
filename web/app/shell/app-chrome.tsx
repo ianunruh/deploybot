@@ -10,7 +10,7 @@ import {
   useMantineColorScheme,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { IconMoon, IconRefresh, IconRocket, IconSun } from "@tabler/icons-react";
+import { IconApps, IconMoon, IconRefresh, IconSun } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigation } from "react-router";
 
@@ -63,8 +63,8 @@ export function AppChrome({ children }: { children: ReactNode }) {
         <NavLink
           component={Link}
           to="/"
-          label="Deployables"
-          leftSection={<IconRocket size={16} />}
+          label="Catalog"
+          leftSection={<IconApps size={16} />}
           active={
             location.pathname === "/" || location.pathname.startsWith("/deployables")
           }

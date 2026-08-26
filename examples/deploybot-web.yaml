@@ -6,6 +6,8 @@ metadata:
   name: deploybot-web
 spec:
   namespace: deploybot-system
+  group: platform
+  summary: deploybot web console
   links:
     repoURL: https://github.com/ianunruh/deploybot
     source: true

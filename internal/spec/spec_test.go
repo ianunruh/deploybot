@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -200,6 +201,51 @@ func TestParseSourceLinks(t *testing.T) {
 	}
 	if !d.Spec.Links.Source || !d.HasSourceCommits() {
 		t.Fatalf("source %+v", d.Spec.Links)
+	}
+}
+
+func TestParseCatalogMetadata(t *testing.T) {
+	t.Parallel()
+	body := kmcYAML + `
+  group: platform
+  summary: Kubernetes multi-cluster console
+  links:
+    repoURL: https://github.com/ianunruh/kmc
+    docsURL: https://github.com/ianunruh/kmc#readme
+    icon: https://github.com/ianunruh/kmc/raw/main/web/public/favicon.svg
+`
+	d, err := Parse([]byte(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Spec.Group != "platform" {
+		t.Fatalf("group %q", d.Spec.Group)
+	}
+	if d.Spec.Summary != "Kubernetes multi-cluster console" {
+		t.Fatalf("summary %q", d.Spec.Summary)
+	}
+	if d.Spec.Links.DocsURL != "https://github.com/ianunruh/kmc#readme" {
+		t.Fatalf("docs %q", d.Spec.Links.DocsURL)
+	}
+	if d.Spec.Links.Icon != "https://github.com/ianunruh/kmc/raw/main/web/public/favicon.svg" {
+		t.Fatalf("icon %q", d.Spec.Links.Icon)
+	}
+}
+
+func TestParseCatalogRejects(t *testing.T) {
+	t.Parallel()
+	cases := []string{
+		kmcYAML + "\n  group: Platform\n",
+		kmcYAML + "\n  group: play_media\n",
+		kmcYAML + "\n  group: \"-play\"\n",
+		kmcYAML + "\n  summary: " + strings.Repeat("x", MaxSummaryLen+1) + "\n",
+		kmcYAML + "\n  links:\n    docsURL: javascript:alert(1)\n",
+		kmcYAML + "\n  links:\n    icon: \"git@github.com:ianunruh/kmc.git\"\n",
+	}
+	for _, body := range cases {
+		if _, err := Parse([]byte(body)); err == nil {
+			t.Fatalf("expected error for %q", body[len(body)-40:])
+		}
 	}
 }
 

@@ -9,8 +9,11 @@ metadata:
   name: transmission
 spec:
   namespace: play
+  group: play
+  summary: BitTorrent client with OpenVPN
   links:
     repoURL: https://github.com/haugene/docker-transmission-openvpn
+    docsURL: https://transmissionbt.com
   git:
     repoURL: https://github.com/ianunruh/kcloud-ops
     workloadPath: k8s/play/transmission

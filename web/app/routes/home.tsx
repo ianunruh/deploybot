@@ -1,17 +1,13 @@
-import { Alert, Group, Stack, Text } from "@mantine/core";
-import { Link } from "react-router";
+import { Alert, Stack } from "@mantine/core";
+import { useLocalStorage } from "@mantine/hooks";
 
 import type { Route } from "./+types/home";
 import { listDeployables } from "~/lib/api.server";
-import { DeployableLinkIcons, ObservabilityClusterMenus } from "~/ui/external-links";
+import { CatalogView, CatalogViewToggle, type CatalogViewMode } from "~/ui/catalog-view";
 import { PageHeader } from "~/ui/page-header";
-import { RelativeTime } from "~/ui/relative-time";
-import { ReleaseFlowInline } from "~/ui/release-flow";
-import { ResourceTable, Table } from "~/ui/resource-table";
-import { UpdateBadge } from "~/ui/status-badge";
 
 export function meta(_args: Route.MetaArgs) {
-  return [{ title: "deploybot" }];
+  return [{ title: "Catalog · deploybot" }];
 }
 
 export async function loader(_args: Route.LoaderArgs) {
@@ -28,64 +24,25 @@ export async function loader(_args: Route.LoaderArgs) {
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   const { deployables, error } = loaderData;
+  const [view, setView] = useLocalStorage<CatalogViewMode>({
+    key: "deploybot-catalog-view",
+    defaultValue: "cards",
+    deserialize: (value) => (value === "table" ? "table" : "cards"),
+  });
 
   return (
     <Stack gap="lg">
       <PageHeader
-        title="Deployables"
-        description="Catalog of apps deploybot can pin, promote, and reconcile."
+        title="Catalog"
+        description="Apps deploybot can pin, promote, and reconcile."
+        actions={<CatalogViewToggle value={view} onChange={setView} />}
       />
       {error != null && (
         <Alert color="red" title="API unavailable">
           {error}. Start the Go API with `just serve`.
         </Alert>
       )}
-      <ResourceTable
-        headers={["Name", "Namespace", "Flow", "Last deploy", "Links"]}
-        isEmpty={deployables.length === 0 && error == null}
-        emptyMessage="No deployable specs found."
-      >
-        {deployables.map((d) => (
-          <Table.Tr key={d.name}>
-            <Table.Td>
-              <Group gap="xs" wrap="nowrap">
-                <Text
-                  component={Link}
-                  to={`/deployables/${d.name}`}
-                  fw={600}
-                  c="var(--db-link)"
-                >
-                  {d.name}
-                </Text>
-                {d.update?.stale ? <UpdateBadge stale /> : null}
-              </Group>
-            </Table.Td>
-            <Table.Td>{d.namespace}</Table.Td>
-            <Table.Td>
-              <ReleaseFlowInline stages={d.stages ?? []} flow={d.flow} />
-            </Table.Td>
-            <Table.Td className="db-cell-fit">
-              <RelativeTime value={d.deployedAt} />
-            </Table.Td>
-            <Table.Td>
-              {d.repoURL ||
-              d.projectURL ||
-              (d.stages ?? []).some(
-                (st) => st.headlampURL || st.grafanaURL || st.logsURL,
-              ) ? (
-                <Group gap={2} wrap="nowrap">
-                  <DeployableLinkIcons repoURL={d.repoURL} projectURL={d.projectURL} />
-                  <ObservabilityClusterMenus stages={d.stages ?? []} />
-                </Group>
-              ) : (
-                <Text size="sm" c="dimmed">
-                  —
-                </Text>
-              )}
-            </Table.Td>
-          </Table.Tr>
-        ))}
-      </ResourceTable>
+      <CatalogView deployables={deployables} view={view} />
     </Stack>
   );
 }

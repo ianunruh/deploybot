@@ -138,6 +138,10 @@ export type UpdateList = {
 export type DeployableSummary = {
   name: string;
   namespace: string;
+  group?: string;
+  summary?: string;
+  icon?: string;
+  docsURL?: string;
   repoURL?: string;
   projectURL?: string;
   deployedAt?: string;
@@ -170,6 +174,10 @@ export type Workflows = {
 export type DeployableStatus = {
   name: string;
   namespace: string;
+  group?: string;
+  summary?: string;
+  icon?: string;
+  docsURL?: string;
   imageRepo: string;
   repoURL?: string;
   projectURL?: string;

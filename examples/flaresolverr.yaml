@@ -6,6 +6,8 @@ metadata:
   name: flaresolverr
 spec:
   namespace: play
+  group: play
+  summary: Cloudflare challenge proxy
   links:
     repoURL: https://github.com/FlareSolverr/FlareSolverr
   git:

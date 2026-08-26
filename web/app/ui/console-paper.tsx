@@ -1,5 +1,5 @@
 import { Paper, type PaperProps } from "@mantine/core";
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 const consoleStyle = {
   background: "var(--db-panel)",
@@ -12,7 +12,7 @@ export function ConsolePaper({
   children,
   style,
   ...props
-}: PaperProps & { children: ReactNode }) {
+}: PaperProps & HTMLAttributes<HTMLDivElement> & { children: ReactNode }) {
   return (
     <Paper p="md" radius="sm" style={{ ...consoleStyle, ...style }} {...props}>
       {children}

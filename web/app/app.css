@@ -241,6 +241,25 @@ a {
   border-top: 1px solid var(--db-border);
 }
 
+.db-catalog-card {
+  cursor: pointer;
+  height: 100%;
+  transition: border-color 120ms ease;
+}
+
+.db-catalog-card:hover,
+.db-catalog-card:focus-visible {
+  border-color: var(--db-rule);
+  outline: none;
+}
+
+.db-stage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .db-spin {
   animation: db-spin 0.8s linear infinite;
 }

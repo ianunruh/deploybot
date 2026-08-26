@@ -1,5 +1,6 @@
 import { ActionIcon, Anchor, Group, Menu, Text, Tooltip } from "@mantine/core";
 import {
+  IconBook,
   IconBrandGit,
   IconBrandGithub,
   IconBrandGitlab,
@@ -64,13 +65,15 @@ function LinkIcon({
 export function DeployableLinkIcons({
   repoURL,
   projectURL,
+  docsURL,
   size = 16,
 }: {
   repoURL?: string;
   projectURL?: string;
+  docsURL?: string;
   size?: number;
 }) {
-  if (!repoURL && !projectURL) return null;
+  if (!repoURL && !projectURL && !docsURL) return null;
   return (
     <Group gap={2} wrap="nowrap">
       {repoURL ? (
@@ -84,6 +87,9 @@ export function DeployableLinkIcons({
           size={size}
         />
       ) : null}
+      {docsURL ? (
+        <LinkIcon href={docsURL} label="Docs" icon={IconBook} size={size} />
+      ) : null}
     </Group>
   );
 }
@@ -91,11 +97,13 @@ export function DeployableLinkIcons({
 export function DeployableLinkLabels({
   repoURL,
   projectURL,
+  docsURL,
 }: {
   repoURL?: string;
   projectURL?: string;
+  docsURL?: string;
 }) {
-  if (!repoURL && !projectURL) return null;
+  if (!repoURL && !projectURL && !docsURL) return null;
   return (
     <Group gap="md" wrap="wrap">
       {repoURL ? (
@@ -104,6 +112,7 @@ export function DeployableLinkLabels({
       {projectURL ? (
         <LabeledLink href={projectURL} label="Project" icon={projectIcon(projectURL)} />
       ) : null}
+      {docsURL ? <LabeledLink href={docsURL} label="Docs" icon={IconBook} /> : null}
     </Group>
   );
 }

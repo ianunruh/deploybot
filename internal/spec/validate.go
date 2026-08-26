@@ -20,6 +20,12 @@ func (d *Deployable) Validate() error {
 	if d.Spec.Namespace == "" {
 		errs = append(errs, "spec.namespace is required")
 	}
+	if len(d.Spec.Summary) > MaxSummaryLen {
+		errs = append(errs, fmt.Sprintf("spec.summary must be at most %d characters", MaxSummaryLen))
+	}
+	if err := validateGroup(d.Spec.Group); err != "" {
+		errs = append(errs, err)
+	}
 	if d.Spec.Image.Repository == "" {
 		errs = append(errs, "spec.image.repository is required")
 	}
@@ -42,6 +48,12 @@ func (d *Deployable) Validate() error {
 		errs = append(errs, "spec.links.repoURL is required when spec.links.source is set")
 	}
 	if err := httpURLError("spec.links.projectURL", d.Spec.Links.ProjectURL); err != "" {
+		errs = append(errs, err)
+	}
+	if err := httpURLError("spec.links.docsURL", d.Spec.Links.DocsURL); err != "" {
+		errs = append(errs, err)
+	}
+	if err := httpURLError("spec.links.icon", d.Spec.Links.Icon); err != "" {
 		errs = append(errs, err)
 	}
 	if d.Spec.Workload.Kind != "Deployment" && d.Spec.Workload.Kind != "StatefulSet" {
@@ -81,6 +93,22 @@ func (d *Deployable) Validate() error {
 		return fmt.Errorf("invalid spec: %s", strings.Join(errs, "; "))
 	}
 	return nil
+}
+
+func validateGroup(g string) string {
+	if g == "" {
+		return ""
+	}
+	if len(g) > 63 {
+		return "spec.group must be at most 63 characters"
+	}
+	for i, r := range g {
+		ok := r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || (r == '-' && i > 0 && i < len(g)-1)
+		if !ok {
+			return "spec.group must be a lowercase DNS label"
+		}
+	}
+	return ""
 }
 
 func validateUpdate(u *UpdatePolicy) string {
