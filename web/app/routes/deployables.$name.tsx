@@ -477,9 +477,7 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
             <Tabs.Tab value="overview">Overview</Tabs.Tab>
             <Tabs.Tab value="history">History</Tabs.Tab>
             <Tabs.Tab value="workload">Workload</Tabs.Tab>
-            {showWorkflows ? (
-              <Tabs.Tab value="workflows">CI Runs</Tabs.Tab>
-            ) : null}
+            {showWorkflows ? <Tabs.Tab value="workflows">CI Runs</Tabs.Tab> : null}
           </Tabs.List>
         </Tabs>
 
