@@ -20,7 +20,14 @@ type File struct {
 	Push       *bool              `yaml:"push,omitempty"`
 	Sync       *bool              `yaml:"sync,omitempty"`
 	AutoPin    *bool              `yaml:"autoPin,omitempty"`
+	Valkey     Valkey             `yaml:"valkey,omitempty"`
 	Clusters   map[string]Cluster `yaml:"clusters,omitempty"`
+}
+
+// Valkey is the local live-state cache. Addr is host:port. Empty means the
+// API process keeps snapshots in memory only.
+type Valkey struct {
+	Addr string `yaml:"addr,omitempty"`
 }
 
 // Cluster is a named environment (homelab, prod) with per-cluster UIs.

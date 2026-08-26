@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: deploybot-valkey
+spec:
+  type: ClusterIP
+  ports:
+    - name: redis
+      port: 6379

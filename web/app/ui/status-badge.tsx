@@ -1,6 +1,9 @@
 import { Anchor, Badge, Text, Tooltip } from "@mantine/core";
 import { Link } from "react-router";
 
+import { formatRelative } from "~/lib/time";
+import type { StageStatus } from "~/lib/api.server";
+
 const STATUS_COLORS: Record<string, string> = {
   Healthy: "teal",
   Synced: "teal",
@@ -128,8 +131,25 @@ export function ReplicaReady({ ready, desired }: { ready?: number; desired?: num
   );
 }
 
-export function StatusBadge({ status, href }: { status: string; href?: string }) {
+export function stageStaleHint(
+  stage: Pick<StageStatus, "connected" | "updatedAt">,
+): string | undefined {
+  if (stage.connected !== false) return undefined;
+  if (stage.updatedAt) return `last seen ${formatRelative(stage.updatedAt)}`;
+  return "unreachable";
+}
+
+export function StatusBadge({
+  status,
+  href,
+  hint,
+}: {
+  status: string;
+  href?: string;
+  hint?: string;
+}) {
   const color = STATUS_COLORS[status] ?? (status.startsWith("Init:") ? "yellow" : "gray");
+  const tooltip = hint ?? (href ? "Open in Argo CD" : undefined);
   const badge = (
     <Badge
       {...(href
@@ -160,9 +180,9 @@ export function StatusBadge({ status, href }: { status: string; href?: string })
       {status || "Unknown"}
     </Badge>
   );
-  if (!href) return badge;
+  if (!tooltip) return badge;
   return (
-    <Tooltip label="Open in Argo CD" withArrow>
+    <Tooltip label={tooltip} withArrow>
       {badge}
     </Tooltip>
   );

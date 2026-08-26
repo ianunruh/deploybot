@@ -6,12 +6,13 @@ import type { Flow, FlowHop, StageStatus } from "~/lib/api.server";
 import { CompactImage } from "~/ui/compact-image";
 import { ConsolePaper } from "~/ui/console-paper";
 import { SourceCommitMeta } from "~/ui/source-commit";
-import { StatusBadge } from "~/ui/status-badge";
+import { stageStaleHint, StatusBadge } from "~/ui/status-badge";
 
 const HOP_LABEL: Record<string, string> = {
   caught_up: "caught up",
   dest_ahead: "dest is newer",
   source_unhealthy: "source not healthy",
+  source_stale: "source unreachable",
   baking: "baking",
   waiting_approval: "waiting for approval",
   ready: "ready to promote",
@@ -22,6 +23,7 @@ const HOP_COLOR: Record<string, string> = {
   caught_up: "teal",
   dest_ahead: "yellow",
   source_unhealthy: "red",
+  source_stale: "orange",
   baking: "yellow",
   waiting_approval: "accent",
   ready: "teal",
@@ -63,7 +65,11 @@ export function ReleaseFlow({ stages, flow }: { stages: StageStatus[]; flow?: Fl
                     {st.name}
                   </Text>
                   <CompactImage value={st.image} empty="unpinned" />
-                  <StatusBadge status={st.health} href={st.argoURL} />
+                  <StatusBadge
+                    status={st.health}
+                    href={st.argoURL}
+                    hint={stageStaleHint(st)}
+                  />
                 </Stack>
                 {i < stages.length - 1 ? (
                   <div className="db-flow-edge">

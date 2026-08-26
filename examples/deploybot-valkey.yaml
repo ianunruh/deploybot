@@ -1,0 +1,45 @@
+# In-cluster live-state cache for deploybot. Generated StatefulSet + Argo
+# Applications only. Human extras live next to this file under
+# deploybot-valkey/ (Service, TCP probes, data PVC). Each cluster runs its
+# own instance; deploybot serve reads and writes that local Valkey, never
+# the other cluster's. The Argo app name is metadata.name (deploybot-valkey).
+apiVersion: deploybot.kcloud.io/v1alpha1
+kind: Deployable
+metadata:
+  name: deploybot-valkey
+spec:
+  namespace: deploybot-system
+  summary: Live-state cache for deploybot
+  links:
+    repoURL: https://github.com/valkey-io/valkey
+    docsURL: https://valkey.io
+  git:
+    repoURL: https://github.com/ianunruh/kcloud-ops
+    workloadPath: k8s/deploybot-valkey
+    applicationPath: k8s/apps/projects/sandbox
+  argo:
+    project: sandbox
+    createNamespace: true
+  image:
+    repository: docker.io/valkey/valkey
+    tag: 8.1.3
+  update:
+    match: '^\d+\.\d+\.\d+$'
+  workload:
+    kind: StatefulSet
+    containerName: valkey
+    containerPort: 6379
+    portName: redis
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+  stages:
+    - name: homelab
+    - name: prod
+      promote:
+        after:
+          - approval

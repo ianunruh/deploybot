@@ -44,13 +44,30 @@ func (s *Service) LiveWorkloads(ctx context.Context, name string) (LiveWorkloads
 
 // attachLive fills per-stage Deployment/StatefulSet replica counts and pods.
 func (s *Service) attachLive(ctx context.Context, d *spec.Deployable, stages []StageStatus) {
-	if s == nil || s.Argo == nil || d == nil || len(stages) == 0 {
+	if s == nil || d == nil || len(stages) == 0 {
 		return
 	}
 	var wg sync.WaitGroup
 	for i, st := range d.Spec.Stages {
 		if i >= len(stages) {
 			break
+		}
+		key := workloadKey(d.Spec.Namespace, d.Spec.Workload.Kind, d.Metadata.Name)
+		if snap, ok := s.liveSnapshot(st.Name); ok {
+			wl := snap.Workloads[key]
+			stages[i].Workload = &wl
+			continue
+		}
+		if s.liveWatching() {
+			stages[i].Workload = &kube.Workload{
+				Kind:    d.Spec.Workload.Kind,
+				Name:    d.Metadata.Name,
+				Message: "waiting for live snapshot",
+			}
+			continue
+		}
+		if s.Argo == nil {
+			continue
 		}
 		rest := argo.REST(s.Argo.ForStage(st.Name))
 		if rest == nil {

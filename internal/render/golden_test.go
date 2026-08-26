@@ -16,7 +16,7 @@ import (
 func TestGoldens(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{
-		"kmc", "kmc-controller", "deploybot", "deploybot-web", "humpty",
+		"kmc", "kmc-controller", "deploybot", "deploybot-web", "deploybot-valkey", "humpty",
 		"sonarr", "radarr", "bazarr", "jackett", "tautulli", "ombi",
 		"flaresolverr", "nzbget", "transmission", "plex-exporter", "plex", "teamspeak",
 	} {
@@ -146,6 +146,7 @@ func TestUnroutedOmitsServiceAndRoute(t *testing.T) {
 		{"plex-exporter", "k8s/play/plex-exporter", "deployment.yaml"},
 		{"plex", "k8s/play/plex", "statefulset.yaml"},
 		{"teamspeak", "k8s/teamspeak", "statefulset.yaml"},
+		{"deploybot-valkey", "k8s/deploybot-valkey", "statefulset.yaml"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

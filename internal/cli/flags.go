@@ -40,7 +40,7 @@ func configFlag(fs *flag.FlagSet) *string {
 }
 
 type settings struct {
-	addr, specs, repo          string
+	addr, specs, repo, valkey  string
 	apply, push, sync, autoPin bool
 }
 

@@ -56,8 +56,10 @@ and Play apps (Sonarr, Radarr, Plex, Transmission, …). Specs are in
 ```bash
 just web-install
 just check
-just dev          # API :8080 + console :5173
+just dev          # Valkey :6379 + API :8080 + console :5173
 ```
+
+`just dev` starts Valkey with `docker compose` (same `valkey/valkey:8.1.3` as the cluster). `just valkey` is that compose service by itself. `deploybot.yaml` points local serve at `127.0.0.1:6379`; in-cluster config uses `deploybot-valkey:6379`.
 
 ### CLI
 
@@ -89,6 +91,8 @@ Process config is YAML (`deploybot.yaml` or `--config` / `DEPLOYBOT_CONFIG`).
 Flags override env, env overrides the file. Clusters live in the file:
 
 ```yaml
+valkey:
+  addr: 127.0.0.1:6379          # local compose; in-cluster is deploybot-valkey:6379
 clusters:
   homelab:
     argo:
@@ -116,6 +120,14 @@ at a specific file. `DEPLOYBOT_ARGO_URL_<CLUSTER>` overrides a cluster UI URL.
 Headlamp and Grafana `url` values are UI origins; observability links append
 paths and query params. Grafana `logs: true` adds the Loki namespace
 drilldown (homelab only today).
+
+`serve` polls Argo Applications and workloads on each cluster in the
+background and serves catalog/detail/workload reads from that snapshot.
+User requests never wait on kube. `valkey.addr` hydrates and persists the
+snapshot across API restarts (`DEPLOYBOT_VALKEY` overrides). Each cluster runs
+its own Valkey (`deploybot-valkey`). When a cluster is unreachable the API
+keeps last-known health and the console marks the stage stale. Auto-promote
+does not fire off a disconnected source.
 
 ### Registry and git auth
 

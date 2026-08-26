@@ -47,6 +47,7 @@ func runServe(ctx context.Context, args []string) error {
 		push:    pickBool(got["push"], *push, "DEPLOYBOT_PUSH", file.Push),
 		sync:    pickBool(got["sync"], *syncArgo, "DEPLOYBOT_SYNC", file.Sync),
 		autoPin: pickBool(got["auto-pin"], *autoPin, "DEPLOYBOT_AUTO_PIN", file.AutoPin),
+		valkey:  pickString(false, "", "DEPLOYBOT_VALKEY", file.Valkey.Addr),
 	}
 	if s.push && !s.apply {
 		return fmt.Errorf("--push requires --apply")
@@ -91,6 +92,7 @@ func runServe(ctx context.Context, args []string) error {
 		Compares: gh,
 		Actions:  gh,
 		AutoPin:  s.autoPin,
+		Valkey:   s.valkey,
 		Lock:     new(sync.Mutex),
 	}
 	h := (&api.Server{Release: svc, Catalog: cat}).Handler()
@@ -98,6 +100,8 @@ func runServe(ctx context.Context, args []string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var wg sync.WaitGroup
+	svc.SetLiveWatching()
+	wg.Go(func() { svc.WatchLive(ctx) })
 	wg.Go(func() { svc.WatchFlows(ctx) })
 	wg.Go(func() { svc.WatchUpdates(ctx) })
 	wg.Go(func() {
@@ -106,7 +110,7 @@ func runServe(ctx context.Context, args []string) error {
 		defer stop()
 		_ = srv.Shutdown(shCtx)
 	})
-	slog.Info("api listening", "addr", s.addr, "specs", s.specs, "config", path, "apply", s.apply, "push", s.push, "sync", s.sync, "autoPin", s.autoPin, "github", tokenSrc)
+	slog.Info("api listening", "addr", s.addr, "specs", s.specs, "config", path, "apply", s.apply, "push", s.push, "sync", s.sync, "autoPin", s.autoPin, "valkey", s.valkey, "github", tokenSrc)
 	err = srv.ListenAndServe()
 	cancel()
 	wg.Wait()

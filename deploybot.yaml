@@ -2,6 +2,8 @@
 # Precedence: CLI flags > DEPLOYBOT_* env > this file > defaults.
 # Argo status/sync uses Application CRs via kubeconfig.
 # kubeContext defaults to the cluster name.
+valkey:
+  addr: 127.0.0.1:6379
 clusters:
   homelab:
     argo:

@@ -70,6 +70,9 @@ func (s *Service) initCaches() {
 		if s.overlays == nil {
 			s.overlays = &overlayCache{events: map[string][]Event{}}
 		}
+		if s.live == nil {
+			s.live = newLiveStore(s.Valkey)
+		}
 	})
 }
 

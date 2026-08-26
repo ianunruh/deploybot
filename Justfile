@@ -38,10 +38,14 @@ docker:
 serve *args:
     go run . serve {{args}}
 
-# API on :8080 and the React Router console on :5173.
+valkey:
+    docker compose up -d --wait valkey
+
+# API on :8080 and the React Router console on :5173. Starts local Valkey.
 dev:
     #!/usr/bin/env bash
     set -euo pipefail
+    docker compose up -d --wait valkey
     go run . serve --addr 127.0.0.1:8080 &
     api=$!
     trap 'kill "$api"' EXIT

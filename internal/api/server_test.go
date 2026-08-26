@@ -86,15 +86,15 @@ func TestListAndGet(t *testing.T) {
 		names = append(names, d.Name)
 	}
 	want := []string{
-		"bazarr", "deploybot", "deploybot-web", "flaresolverr", "humpty", "jackett",
-		"kmc", "kmc-controller", "nzbget", "ombi", "plex", "plex-exporter",
+		"bazarr", "deploybot", "deploybot-valkey", "deploybot-web", "flaresolverr", "humpty",
+		"jackett", "kmc", "kmc-controller", "nzbget", "ombi", "plex", "plex-exporter",
 		"radarr", "sonarr", "tautulli", "teamspeak", "transmission",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("catalog names %v", names)
 	}
-	kmc := list.Deployables[6]
-	ctrl := list.Deployables[7]
+	kmc := list.Deployables[7]
+	ctrl := list.Deployables[8]
 	if kmc.RepoURL != "https://github.com/ianunruh/kmc" {
 		t.Fatalf("kmc repo %q", kmc.RepoURL)
 	}
@@ -107,7 +107,7 @@ func TestListAndGet(t *testing.T) {
 	if kmc.Namespace != "kmc-system" || kmc.Project != "sandbox" {
 		t.Fatalf("kmc namespace/project %+v", kmc)
 	}
-	sonarr := list.Deployables[13]
+	sonarr := list.Deployables[14]
 	if sonarr.Name != "sonarr" || sonarr.Summary == "" || sonarr.DocsURL == "" {
 		t.Fatalf("sonarr catalog %+v", sonarr)
 	}

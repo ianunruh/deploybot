@@ -1,5 +1,7 @@
 # In-cluster process config. Secrets stay in env / Secret deploybot-env.
 # kubeconfig is mounted next to this file at /config/kubeconfig.
+valkey:
+  addr: deploybot-valkey:6379
 clusters:
   homelab:
     argo:

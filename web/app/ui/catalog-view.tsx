@@ -14,6 +14,7 @@ import type { KeyboardEvent } from "react";
 import { Link, useNavigate } from "react-router";
 
 import type { DeployableSummary, StageStatus } from "~/lib/api.server";
+import { formatRelative } from "~/lib/time";
 import { ConsolePaper } from "~/ui/console-paper";
 import { DeployableLinkIcons, ObservabilityClusterMenus } from "~/ui/external-links";
 import { RelativeTime } from "~/ui/relative-time";
@@ -251,9 +252,16 @@ function StageDots({ stages }: { stages: StageStatus[] }) {
   return (
     <Group gap="sm" wrap="nowrap">
       {stages.map((st) => (
-        <Tooltip key={st.name} label={`${st.name}: ${st.health || "unknown"}`} withArrow>
+        <Tooltip key={st.name} label={stageDotLabel(st)} withArrow>
           <Group gap={6} wrap="nowrap">
-            <Box className="db-stage-dot" bg={healthDotColor(st.health)} />
+            <Box
+              className="db-stage-dot"
+              bg={
+                st.connected === false
+                  ? "var(--mantine-color-orange-6)"
+                  : healthDotColor(st.health)
+              }
+            />
             <Text size="xs" c="dimmed">
               {st.name}
             </Text>
@@ -285,6 +293,15 @@ function groupByNamespace(
   return [...buckets.keys()]
     .sort((a, b) => a.localeCompare(b))
     .map((namespace) => ({ namespace, items: buckets.get(namespace) ?? [] }));
+}
+
+function stageDotLabel(st: StageStatus): string {
+  const health = st.health || "unknown";
+  if (st.connected === false) {
+    const seen = st.updatedAt ? ` last seen ${formatRelative(st.updatedAt)}` : "";
+    return `${st.name}: ${health} (unreachable${seen})`;
+  }
+  return `${st.name}: ${health}`;
 }
 
 function healthDotColor(status?: string): string {

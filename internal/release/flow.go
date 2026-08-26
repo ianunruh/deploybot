@@ -13,6 +13,7 @@ const (
 	HopCaughtUp        = "caught_up"
 	HopDestAhead       = "dest_ahead"
 	HopSourceUnhealthy = "source_unhealthy"
+	HopSourceStale     = "source_stale"
 	HopBaking          = "baking"
 	HopWaitingApproval = "waiting_approval"
 	HopReady           = "ready"
@@ -39,12 +40,13 @@ type Hop struct {
 }
 
 type stageSnap struct {
-	name     string
-	ref      image.Ref
-	health   string
-	pinnedAt *time.Time
-	policy   *spec.PromotePolicy
-	hasArgo  bool
+	name         string
+	ref          image.Ref
+	health       string
+	pinnedAt     *time.Time
+	policy       *spec.PromotePolicy
+	hasArgo      bool
+	disconnected bool
 }
 
 func buildFlow(snaps []stageSnap, now time.Time) Flow {
@@ -103,6 +105,10 @@ func hopBetween(src, dest stageSnap, now time.Time) Hop {
 		return h
 	}
 	if p != nil && p.AutoPromote() {
+		if src.hasArgo && src.disconnected {
+			h.State = HopSourceStale
+			return h
+		}
 		h.State = HopReady
 		return h
 	}

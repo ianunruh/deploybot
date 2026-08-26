@@ -69,6 +69,8 @@ export type StageStatus = {
   grafanaURL?: string;
   logsURL?: string;
   workload?: WorkloadLive;
+  connected?: boolean;
+  updatedAt?: string;
 };
 
 export type FlowHop = {

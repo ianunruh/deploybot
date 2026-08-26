@@ -25,11 +25,14 @@ type Service struct {
 	Wait        time.Duration
 	NoWait      bool
 	FlowEvery   time.Duration
+	LiveEvery   time.Duration
 	UpdateEvery time.Duration
 	Images      image.Lister
 	Commits     image.CommitLookup
 	Compares    image.CompareLookup
 	Actions     image.WorkflowLookup
+	// Valkey is host:port for the local live snapshot. Empty means memory only.
+	Valkey string
 
 	// Lock serializes git mutations (HTTP pin, auto-promote, auto-pin).
 	Lock      *sync.Mutex
@@ -37,6 +40,7 @@ type Service struct {
 	update    *updateState
 	apps      *appsCache
 	appsTTL   time.Duration
+	live      *liveStore
 	cacheOnce *sync.Once
 }
 

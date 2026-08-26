@@ -54,6 +54,33 @@ func TestHopBakingThenApproval(t *testing.T) {
 	}
 }
 
+func TestHopSourceStaleBlocksAutoPromote(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	src := stageSnap{
+		name:         "homelab",
+		ref:          image.MustParse("ghcr.io/ianunruh/kmc@sha256:abc"),
+		health:       "Healthy",
+		hasArgo:      true,
+		disconnected: true,
+	}
+	dest := stageSnap{
+		name: "prod",
+		policy: &spec.PromotePolicy{
+			After: []string{spec.AfterHealthy},
+		},
+	}
+	hop := hopBetween(src, dest, now)
+	if hop.State != HopSourceStale {
+		t.Fatalf("%+v", hop)
+	}
+	dest.policy = &spec.PromotePolicy{After: []string{spec.AfterApproval}}
+	hop = hopBetween(src, dest, now)
+	if hop.State != HopWaitingApproval {
+		t.Fatalf("approval still human %+v", hop)
+	}
+}
+
 func TestHopReadyAutoPromote(t *testing.T) {
 	t.Parallel()
 	now := time.Now().UTC()
