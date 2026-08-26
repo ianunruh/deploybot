@@ -42,15 +42,14 @@ export function ReleaseFlow({ stages, flow }: { stages: StageStatus[]; flow?: Fl
   const hops = flow?.hops ?? [];
   return (
     <Stack gap="sm">
-      <Group justify="space-between" align="baseline">
-        <Text size="sm" tt="uppercase" c="dimmed" fw={600}>
-          Release
-        </Text>
-        {flow?.tag || flow?.image ? (
-          <CompactImage value={flow.tag || flow.image} />
-        ) : null}
-      </Group>
-      <SourceCommitMeta source={flow?.source} />
+      {flow?.source || flow?.tag || flow?.image ? (
+        <Group justify="space-between" align="baseline">
+          <SourceCommitMeta source={flow?.source} />
+          {flow?.tag || flow?.image ? (
+            <CompactImage value={flow.tag || flow.image} />
+          ) : null}
+        </Group>
+      ) : null}
       <ConsolePaper>
         <div className="db-flow">
           {stages.map((st, i) => {

@@ -1,4 +1,4 @@
-import { Anchor, Group, Stack, Text } from "@mantine/core";
+import { Anchor, Stack, Text } from "@mantine/core";
 
 import type { Workflows } from "~/lib/api.server";
 import { RelativeTime } from "~/ui/relative-time";
@@ -18,22 +18,17 @@ export function WorkflowRuns({
 
   return (
     <Stack gap="sm">
-      <Group justify="space-between" align="baseline">
-        <Text size="sm" tt="uppercase" c="dimmed" fw={600}>
-          Workflows
-        </Text>
-        {workflows?.url ? (
-          <Anchor
-            href={workflows.url}
-            size="xs"
-            c="dimmed"
-            target="_blank"
-            rel="noreferrer"
-          >
-            GitHub Actions
-          </Anchor>
-        ) : null}
-      </Group>
+      {workflows?.url ? (
+        <Anchor
+          href={workflows.url}
+          size="xs"
+          c="dimmed"
+          target="_blank"
+          rel="noreferrer"
+        >
+          GitHub Actions
+        </Anchor>
+      ) : null}
       {loadError != null && loadError !== "" ? (
         <Text size="sm" c="dimmed">
           Could not load workflow runs ({loadError}).

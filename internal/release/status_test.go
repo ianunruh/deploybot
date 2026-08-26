@@ -44,6 +44,9 @@ func TestStatusLinksAndArgoURL(t *testing.T) {
 	if st.ProjectURL != "https://trello.com/b/rPALXxJF/kcloud" {
 		t.Fatalf("project %q", st.ProjectURL)
 	}
+	if !st.Source {
+		t.Fatal("kmc should have spec.links.source")
+	}
 	if len(st.Stages) != 2 {
 		t.Fatalf("stages %+v", st.Stages)
 	}
@@ -75,6 +78,14 @@ func TestStatusLinksAndArgoURL(t *testing.T) {
 	}
 	if st.Stages[0].Workload != nil || st.Stages[1].Workload != nil {
 		t.Fatalf("fake argo should not attach workload %+v", st.Stages)
+	}
+
+	sonarr, err := svc.Status(t.Context(), "sonarr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sonarr.Source {
+		t.Fatal("sonarr should not have spec.links.source")
 	}
 
 	latest := svc.Latest(t.Context())

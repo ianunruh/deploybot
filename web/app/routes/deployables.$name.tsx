@@ -171,6 +171,7 @@ function RegistryUpdateHint({ update }: { update: RegistryUpdate }) {
 function tabFromPath(pathname: string): string {
   if (pathname.endsWith("/workflows")) return "workflows";
   if (pathname.endsWith("/history")) return "history";
+  if (pathname.endsWith("/workload")) return "workload";
   return "overview";
 }
 
@@ -178,6 +179,7 @@ function tabPath(name: string, tab: string | null): string {
   const base = `/deployables/${name}`;
   if (tab === "workflows") return `${base}/workflows`;
   if (tab === "history") return `${base}/history`;
+  if (tab === "workload") return `${base}/workload`;
   return base;
 }
 
@@ -215,12 +217,13 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
   const fromStage = stages[0];
   const toStage = stages[1];
   const tab = tabFromPath(location.pathname);
+  const showWorkflows = Boolean(status?.source);
 
   const theaterLive = theater != null && (theater.result == null || theater.sync);
   useEffect(() => {
     if (!status?.name) return;
     const workloadsPath = `/deployables/${encodeURIComponent(status.name)}/workloads`;
-    const needWorkloads = tab === "overview" || theaterLive;
+    const needWorkloads = tab === "overview" || tab === "workload" || theaterLive;
     if (needWorkloads) void workloadsFetcher.load(workloadsPath);
     const every = theaterLive ? 2000 : 4000;
     const id = window.setInterval(() => {
@@ -231,6 +234,11 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
     // Fetcher identity changes; poll while this deployable is open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revalidator, theaterLive, status?.name, tab]);
+
+  useEffect(() => {
+    if (!status?.name || showWorkflows || tab !== "workflows") return;
+    void navigate(tabPath(status.name, "overview"), { replace: true });
+  }, [navigate, showWorkflows, status?.name, tab]);
 
   useEffect(() => {
     if (!pinOpen || !status?.name) return;
@@ -467,8 +475,11 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         >
           <Tabs.List>
             <Tabs.Tab value="overview">Overview</Tabs.Tab>
-            <Tabs.Tab value="workflows">Workflows</Tabs.Tab>
-            <Tabs.Tab value="history">Releases</Tabs.Tab>
+            <Tabs.Tab value="history">History</Tabs.Tab>
+            <Tabs.Tab value="workload">Workload</Tabs.Tab>
+            {showWorkflows ? (
+              <Tabs.Tab value="workflows">CI Runs</Tabs.Tab>
+            ) : null}
           </Tabs.List>
         </Tabs>
 

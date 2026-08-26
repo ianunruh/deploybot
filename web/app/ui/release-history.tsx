@@ -23,9 +23,6 @@ export function ReleaseHistory({
 }) {
   return (
     <Stack gap="sm">
-      <Text size="sm" tt="uppercase" c="dimmed" fw={600}>
-        Releases
-      </Text>
       {error != null ? (
         <Text size="sm" c="dimmed">
           Could not load history ({error}).

@@ -183,6 +183,7 @@ export type DeployableStatus = {
   imageRepo: string;
   repoURL?: string;
   projectURL?: string;
+  source?: boolean;
   stages: StageStatus[];
   flow?: Flow;
   apply: boolean;

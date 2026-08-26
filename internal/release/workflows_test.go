@@ -104,8 +104,11 @@ func TestWorkflowsFor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sonarr.URL != "https://github.com/linuxserver/docker-sonarr/actions" {
-		t.Fatalf("sonarr %+v", sonarr)
+	if sonarr.URL != "" || len(sonarr.Runs) != 0 {
+		t.Fatalf("source=false should skip workflows %+v", sonarr)
+	}
+	if act.hits != 1 {
+		t.Fatalf("sonarr should not list Actions, hits %d", act.hits)
 	}
 
 	if _, err := svc.Workflows(t.Context(), "nope"); err == nil {

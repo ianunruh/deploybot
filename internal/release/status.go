@@ -44,6 +44,7 @@ type Status struct {
 	ImageRepo  string        `json:"imageRepo"`
 	RepoURL    string        `json:"repoURL,omitempty"`
 	ProjectURL string        `json:"projectURL,omitempty"`
+	Source     bool          `json:"source,omitempty"`
 	Stages     []StageStatus `json:"stages"`
 	Flow       Flow          `json:"flow"`
 	Apply      bool          `json:"apply"`
@@ -137,6 +138,7 @@ func (s *Service) buildStatus(ctx context.Context, d *spec.Deployable, tree rend
 		ImageRepo:  d.Spec.Image.Repository,
 		RepoURL:    d.Spec.Links.RepoURL,
 		ProjectURL: d.Spec.Links.ProjectURL,
+		Source:     d.HasSourceCommits(),
 		Apply:      s.Apply,
 		Push:       s.Push,
 		Sync:       s.Sync,

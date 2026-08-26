@@ -8,7 +8,7 @@ import { ReleaseFlow } from "~/ui/release-flow";
 import { RelativeTime } from "~/ui/relative-time";
 import { ResourceTable, Table } from "~/ui/resource-table";
 import { StatusBadge } from "~/ui/status-badge";
-import { StageReady, WorkloadPods } from "~/ui/workload-pods";
+import { StageReady } from "~/ui/workload-pods";
 
 export default function DeployableOverview() {
   const { status, stages } = useOutletContext<DeployableContext>();
@@ -80,8 +80,6 @@ export default function DeployableOverview() {
           </Table.Tr>
         ))}
       </ResourceTable>
-
-      <WorkloadPods stages={stages} />
     </Stack>
   );
 }

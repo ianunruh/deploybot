@@ -20,11 +20,15 @@ type Workflows struct {
 }
 
 // Workflows is recent GitHub Actions runs for a deployable. Unknown names
-// error; missing Actions config or a non-GitHub repo yields empty runs.
+// error; missing Actions config, a non-GitHub repo, or spec.links.source
+// unset yields empty runs.
 func (s *Service) Workflows(ctx context.Context, name string) (Workflows, error) {
 	d, err := s.Catalog.Get(name)
 	if err != nil {
 		return Workflows{}, err
+	}
+	if !d.HasSourceCommits() {
+		return Workflows{Runs: []image.WorkflowRun{}}, nil
 	}
 	got := s.listWorkflows(ctx, d.Spec.Links.RepoURL)
 	if got == nil {

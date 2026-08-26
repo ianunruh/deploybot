@@ -1,4 +1,4 @@
-import { Group, Stack, Text } from "@mantine/core";
+import { Stack, Text } from "@mantine/core";
 
 import type { StageStatus, WorkloadLive } from "~/lib/api.server";
 import { RelativeTime } from "~/ui/relative-time";
@@ -18,8 +18,6 @@ type PodRow = {
 
 export function WorkloadPods({ stages }: { stages: StageStatus[] }) {
   const live = stages.filter((st) => st.workload != null);
-  if (live.length === 0) return null;
-
   const kind = live.find((st) => st.workload?.kind)?.workload?.kind;
   const name = live.find((st) => st.workload?.name)?.workload?.name;
   const errors = live.flatMap((st) =>
@@ -40,16 +38,11 @@ export function WorkloadPods({ stages }: { stages: StageStatus[] }) {
 
   return (
     <Stack gap="sm">
-      <Group justify="space-between" align="baseline">
-        <Text size="sm" tt="uppercase" c="dimmed" fw={600}>
-          Workload
+      {kind || name ? (
+        <Text size="xs" c="dimmed">
+          {[kind, name].filter(Boolean).join(" · ")}
         </Text>
-        {kind || name ? (
-          <Text size="xs" c="dimmed">
-            {[kind, name].filter(Boolean).join(" · ")}
-          </Text>
-        ) : null}
-      </Group>
+      ) : null}
       {errors.map((err) => (
         <Text key={err} size="xs" c="red.4">
           {err}
