@@ -1,4 +1,5 @@
-import { Badge, Text, Tooltip } from "@mantine/core";
+import { Anchor, Badge, Text, Tooltip } from "@mantine/core";
+import { Link } from "react-router";
 
 const STATUS_COLORS: Record<string, string> = {
   Healthy: "teal",
@@ -39,10 +40,18 @@ const STATUS_COLORS: Record<string, string> = {
   stale: "orange",
 };
 
-export function UpdateBadge({ stale, error }: { stale?: boolean; error?: boolean }) {
+export function UpdateBadge({
+  stale,
+  error,
+  to,
+}: {
+  stale?: boolean;
+  error?: boolean;
+  to?: string;
+}) {
   const color = error ? "red" : stale ? "orange" : "teal";
   const label = error ? "error" : stale ? "behind" : "up-to-date";
-  return (
+  const badge = (
     <Badge
       color={color}
       variant="light"
@@ -56,6 +65,7 @@ export function UpdateBadge({ stale, error }: { stale?: boolean; error?: boolean
           maxWidth: "none",
           overflow: "visible",
           flexShrink: 0,
+          cursor: to ? "pointer" : undefined,
         },
         label: {
           overflow: "visible",
@@ -66,6 +76,18 @@ export function UpdateBadge({ stale, error }: { stale?: boolean; error?: boolean
     >
       {label}
     </Badge>
+  );
+  if (!to) return badge;
+  return (
+    <Anchor
+      component={Link}
+      to={to}
+      underline="never"
+      display="inline-flex"
+      onClick={(event) => event.stopPropagation()}
+    >
+      {badge}
+    </Anchor>
   );
 }
 

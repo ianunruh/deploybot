@@ -24,6 +24,12 @@ import {
 } from "~/ui/mutation-controls";
 import { PageHeader } from "~/ui/page-header";
 import { RelativeTime } from "~/ui/relative-time";
+import {
+  matchesResourceFilters,
+  ResourceFilterBar,
+  uniqueSorted,
+  useResourceFilters,
+} from "~/ui/resource-filter";
 import { ResourceTable, Table } from "~/ui/resource-table";
 import { UpdateBadge } from "~/ui/status-badge";
 
@@ -81,6 +87,8 @@ export default function Updates({ loaderData }: Route.ComponentProps) {
   const [pinOpen, pinHandlers] = useDisclosure(false);
   const [selected, setSelected] = useState<UpdateStatus | null>(null);
   const [pinSync, setPinSync] = useState(true);
+  const [filters, setFilters] = useResourceFilters();
+  const filtered = updates.filter((u) => matchesResourceFilters(u, filters));
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -114,13 +122,25 @@ export default function Updates({ loaderData }: Route.ComponentProps) {
           {error}. Start the Go API with `just serve`.
         </Alert>
       )}
+      {updates.length > 0 ? (
+        <ResourceFilterBar
+          value={filters}
+          onChange={setFilters}
+          namespaces={uniqueSorted(updates.map((u) => u.namespace))}
+          projects={uniqueSorted(updates.map((u) => u.project))}
+        />
+      ) : null}
       <ResourceTable
         headers={["Name", "Status", "Current", "Newest", "Auto", "Checked", ""]}
-        isEmpty={updates.length === 0 && error == null}
-        emptyMessage="No deployables opt into registry tracking (spec.update)."
+        isEmpty={filtered.length === 0 && error == null}
+        emptyMessage={
+          updates.length === 0
+            ? "No deployables opt into registry tracking (spec.update)."
+            : "No updates match these filters."
+        }
         minWidth={960}
       >
-        {updates.map((u) => (
+        {filtered.map((u) => (
           <Table.Tr key={u.name}>
             <Table.Td>
               <Text

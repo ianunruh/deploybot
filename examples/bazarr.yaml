@@ -7,7 +7,6 @@ metadata:
   name: bazarr
 spec:
   namespace: play
-  group: play
   summary: Media subtitle manager
   links:
     repoURL: https://github.com/linuxserver/docker-bazarr

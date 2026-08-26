@@ -8,7 +8,6 @@ metadata:
   name: teamspeak
 spec:
   namespace: teamspeak
-  group: play
   summary: Voice server
   links:
     repoURL: https://github.com/TeamSpeak-Systems/teamspeak-linux-docker-images

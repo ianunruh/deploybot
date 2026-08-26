@@ -57,7 +57,8 @@ func TestListAndGet(t *testing.T) {
 	var list struct {
 		Deployables []struct {
 			Name       string `json:"name"`
-			Group      string `json:"group"`
+			Namespace  string `json:"namespace"`
+			Project    string `json:"project"`
 			Summary    string `json:"summary"`
 			DocsURL    string `json:"docsURL"`
 			RepoURL    string `json:"repoURL"`
@@ -100,12 +101,18 @@ func TestListAndGet(t *testing.T) {
 	if kmc.ProjectURL != "https://trello.com/b/rPALXxJF/kcloud" {
 		t.Fatalf("kmc project %q", kmc.ProjectURL)
 	}
-	if kmc.Group != "platform" || kmc.Summary == "" {
+	if kmc.Summary == "" {
 		t.Fatalf("kmc catalog %+v", kmc)
 	}
+	if kmc.Namespace != "kmc-system" || kmc.Project != "sandbox" {
+		t.Fatalf("kmc namespace/project %+v", kmc)
+	}
 	sonarr := list.Deployables[13]
-	if sonarr.Name != "sonarr" || sonarr.Group != "play" || sonarr.Summary == "" || sonarr.DocsURL == "" {
+	if sonarr.Name != "sonarr" || sonarr.Summary == "" || sonarr.DocsURL == "" {
 		t.Fatalf("sonarr catalog %+v", sonarr)
+	}
+	if sonarr.Namespace != "play" || sonarr.Project != "play" {
+		t.Fatalf("sonarr namespace/project %+v", sonarr)
 	}
 	if ctrl.RepoURL != "https://github.com/ianunruh/kmc" {
 		t.Fatalf("controller repo %q", ctrl.RepoURL)
@@ -146,8 +153,8 @@ func TestListAndGet(t *testing.T) {
 	if st.RepoURL != "https://github.com/ianunruh/kmc" || st.ProjectURL != "https://trello.com/b/rPALXxJF/kcloud" {
 		t.Fatalf("status links %+v", st)
 	}
-	if st.Group != "platform" || st.Summary == "" {
-		t.Fatalf("status catalog group=%q summary=%q", st.Group, st.Summary)
+	if st.Project != "sandbox" || st.Summary == "" {
+		t.Fatalf("status catalog project=%q summary=%q", st.Project, st.Summary)
 	}
 	if len(st.Stages) != 2 || st.Stages[0].LogsURL == "" || st.Stages[1].LogsURL != "" {
 		t.Fatalf("status observability %+v", st.Stages)
@@ -507,6 +514,9 @@ func TestUpdates(t *testing.T) {
 			found = true
 			if u.Auto != "24h" || u.Newest == nil || u.Newest.Tag != "4.0.16.2945-ls286" {
 				t.Fatalf("sonarr %+v", u)
+			}
+			if u.Namespace != "play" || u.Project != "play" {
+				t.Fatalf("sonarr namespace/project %+v", u)
 			}
 		}
 	}

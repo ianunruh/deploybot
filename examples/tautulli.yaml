@@ -7,7 +7,6 @@ metadata:
   name: tautulli
 spec:
   namespace: play
-  group: play
   summary: Plex watch statistics
   links:
     repoURL: https://github.com/linuxserver/docker-tautulli

@@ -1,11 +1,10 @@
 import {
   ActionIcon,
   Anchor,
-  Avatar,
   Badge,
   Box,
+  Grid,
   Group,
-  SimpleGrid,
   Stack,
   Text,
   Tooltip,
@@ -19,23 +18,11 @@ import { ConsolePaper } from "~/ui/console-paper";
 import { DeployableLinkIcons, ObservabilityClusterMenus } from "~/ui/external-links";
 import { RelativeTime } from "~/ui/relative-time";
 import { ReleaseFlowInline } from "~/ui/release-flow";
+import { updatesNameHref } from "~/ui/resource-filter";
 import { ResourceTable, Table } from "~/ui/resource-table";
 import { UpdateBadge } from "~/ui/status-badge";
 
 export type CatalogViewMode = "cards" | "table";
-
-const GROUP_ORDER = ["play", "platform"];
-
-const AVATAR_COLORS = [
-  "accent",
-  "teal",
-  "violet",
-  "cyan",
-  "grape",
-  "indigo",
-  "orange",
-  "pink",
-] as const;
 
 export function CatalogViewToggle({
   value,
@@ -75,14 +62,16 @@ export function CatalogViewToggle({
 export function CatalogView({
   deployables,
   view,
+  emptyMessage = "No deployable specs found.",
 }: {
   deployables: DeployableSummary[];
   view: CatalogViewMode;
+  emptyMessage?: string;
 }) {
   if (deployables.length === 0) {
     return (
       <Text c="dimmed" size="sm" py="xl" ta="center">
-        No deployable specs found.
+        {emptyMessage}
       </Text>
     );
   }
@@ -91,16 +80,18 @@ export function CatalogView({
   }
   return (
     <Stack gap="xl">
-      {groupDeployables(deployables).map((section) => (
-        <Stack key={section.group} gap="sm">
+      {groupByNamespace(deployables).map((section) => (
+        <Stack key={section.namespace} gap="sm">
           <Text size="sm" tt="uppercase" c="dimmed" fw={600}>
-            {groupLabel(section.group)} · {section.items.length}
+            {section.namespace} · {section.items.length}
           </Text>
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+          <Grid gap="md" align="start">
             {section.items.map((d) => (
-              <CatalogCard key={d.name} deployable={d} />
+              <Grid.Col key={d.name} span={{ base: 12, sm: 6, lg: 4 }}>
+                <CatalogCard deployable={d} />
+              </Grid.Col>
             ))}
-          </SimpleGrid>
+          </Grid>
         </Stack>
       ))}
     </Stack>
@@ -110,7 +101,7 @@ export function CatalogView({
 function CatalogTable({ deployables }: { deployables: DeployableSummary[] }) {
   return (
     <ResourceTable
-      headers={["Name", "Group", "Namespace", "Flow", "Last deploy", "Links"]}
+      headers={["Name", "Project", "Namespace", "Flow", "Last deploy", "Links"]}
       isEmpty={false}
     >
       {deployables.map((d) => (
@@ -126,7 +117,9 @@ function CatalogTable({ deployables }: { deployables: DeployableSummary[] }) {
                 >
                   {d.name}
                 </Text>
-                {d.update?.stale ? <UpdateBadge stale /> : null}
+                {d.update?.stale ? (
+                  <UpdateBadge stale to={updatesNameHref(d.name)} />
+                ) : null}
               </Group>
               {d.summary ? (
                 <Text size="xs" c="dimmed">
@@ -136,9 +129,9 @@ function CatalogTable({ deployables }: { deployables: DeployableSummary[] }) {
             </Stack>
           </Table.Td>
           <Table.Td>
-            {d.group ? (
+            {d.project ? (
               <Badge variant="light" size="sm" tt="uppercase" radius="sm">
-                {d.group}
+                {d.project}
               </Badge>
             ) : (
               <Text size="sm" c="dimmed">
@@ -206,62 +199,40 @@ function CatalogCard({ deployable: d }: { deployable: DeployableSummary }) {
       onKeyDown={onKeyDown}
     >
       <Stack gap="xs">
-        <Group align="flex-start" wrap="nowrap" gap="sm">
-          <CatalogAvatar name={d.name} icon={d.icon} />
+        <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm">
           <Stack gap={4} style={{ minWidth: 0, flex: 1 }}>
-            <Group gap="xs" wrap="nowrap" justify="space-between">
-              <Text fw={600} truncate>
-                {d.name}
-              </Text>
-              {d.update?.stale ? <UpdateBadge stale /> : null}
-            </Group>
+            <Text fw={600} truncate>
+              {d.name}
+            </Text>
             <Text size="sm" c="dimmed" lineClamp={2}>
               {d.summary || d.namespace}
             </Text>
           </Stack>
+          {open ? (
+            <Tooltip label={open.hostname} withArrow>
+              <Anchor
+                href={open.href}
+                target="_blank"
+                rel="noreferrer"
+                size="sm"
+                c="var(--db-link)"
+                display="inline-flex"
+                style={{ alignItems: "center", gap: 6, flexShrink: 0 }}
+                onClick={(event) => event.stopPropagation()}
+              >
+                Open
+                <IconExternalLink size={12} />
+              </Anchor>
+            </Tooltip>
+          ) : null}
         </Group>
         <Group justify="space-between" align="center" wrap="nowrap" gap="sm">
           <StageDots stages={d.stages ?? []} />
           <RelativeTime value={d.deployedAt} size="xs" />
         </Group>
-        {open ? (
-          <Tooltip label={open.hostname} withArrow>
-            <Anchor
-              href={open.href}
-              target="_blank"
-              rel="noreferrer"
-              size="sm"
-              c="var(--db-link)"
-              display="inline-flex"
-              w="fit-content"
-              style={{ alignItems: "center", gap: 6 }}
-              onClick={(event) => event.stopPropagation()}
-            >
-              Open
-              <IconExternalLink size={12} />
-            </Anchor>
-          </Tooltip>
-        ) : (
-          <Box h="1.5rem" />
-        )}
+        {d.update?.stale ? <UpdateBadge stale to={updatesNameHref(d.name)} /> : null}
       </Stack>
     </ConsolePaper>
-  );
-}
-
-function CatalogAvatar({ name, icon }: { name: string; icon?: string }) {
-  const letter = name.charAt(0).toUpperCase() || "?";
-  return (
-    <Avatar
-      src={icon || undefined}
-      alt=""
-      size={40}
-      radius="sm"
-      color={colorFor(name)}
-      variant="light"
-    >
-      {letter}
-    </Avatar>
   );
 }
 
@@ -297,41 +268,19 @@ function openHref(stages: StageStatus[]): { href: string; hostname: string } | n
   return { href, hostname: st.hostname };
 }
 
-function groupDeployables(
+function groupByNamespace(
   items: DeployableSummary[],
-): { group: string; items: DeployableSummary[] }[] {
+): { namespace: string; items: DeployableSummary[] }[] {
   const buckets = new Map<string, DeployableSummary[]>();
   for (const item of items) {
-    const group = item.group?.trim() || "other";
-    const list = buckets.get(group) ?? [];
+    const namespace = item.namespace?.trim() || "other";
+    const list = buckets.get(namespace) ?? [];
     list.push(item);
-    buckets.set(group, list);
+    buckets.set(namespace, list);
   }
-  const sections: { group: string; items: DeployableSummary[] }[] = [];
-  for (const group of GROUP_ORDER) {
-    const grouped = buckets.get(group);
-    if (grouped) {
-      sections.push({ group, items: grouped });
-      buckets.delete(group);
-    }
-  }
-  for (const group of [...buckets.keys()].sort()) {
-    sections.push({ group, items: buckets.get(group) ?? [] });
-  }
-  return sections;
-}
-
-function groupLabel(group: string): string {
-  if (!group) return "Other";
-  return group.charAt(0).toUpperCase() + group.slice(1);
-}
-
-function colorFor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) {
-    h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  }
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+  return [...buckets.keys()]
+    .sort((a, b) => a.localeCompare(b))
+    .map((namespace) => ({ namespace, items: buckets.get(namespace) ?? [] }));
 }
 
 function healthDotColor(status?: string): string {

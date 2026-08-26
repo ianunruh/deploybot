@@ -243,7 +243,6 @@ a {
 
 .db-catalog-card {
   cursor: pointer;
-  height: 100%;
   transition: border-color 120ms ease;
 }
 

@@ -9,7 +9,6 @@ metadata:
   name: plex
 spec:
   namespace: play
-  group: play
   summary: Media server
   links:
     repoURL: https://github.com/linuxserver/docker-plex

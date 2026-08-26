@@ -7,7 +7,6 @@ metadata:
   name: sonarr
 spec:
   namespace: play
-  group: play
   summary: TV library manager
   links:
     repoURL: https://github.com/linuxserver/docker-sonarr

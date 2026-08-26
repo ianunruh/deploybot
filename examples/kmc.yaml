@@ -8,7 +8,6 @@ metadata:
   name: kmc
 spec:
   namespace: kmc-system
-  group: platform
   summary: KCloud management console
   links:
     repoURL: https://github.com/ianunruh/kmc

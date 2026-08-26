@@ -8,7 +8,6 @@ metadata:
   name: kmc-controller
 spec:
   namespace: kmc-system
-  group: platform
   summary: Cluster controller for kmc
   links:
     repoURL: https://github.com/ianunruh/kmc

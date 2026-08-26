@@ -9,7 +9,6 @@ metadata:
   name: humpty
 spec:
   namespace: deploybot-system
-  group: platform
   summary: Crash-test dummy for deploybot
   links:
     repoURL: https://github.com/ianunruh/humpty

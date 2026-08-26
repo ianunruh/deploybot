@@ -7,7 +7,6 @@ metadata:
   name: ombi
 spec:
   namespace: play
-  group: play
   summary: Media request portal
   links:
     repoURL: https://github.com/linuxserver/docker-ombi

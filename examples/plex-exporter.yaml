@@ -8,7 +8,6 @@ metadata:
   name: plex-exporter
 spec:
   namespace: play
-  group: play
   summary: Plex Prometheus metrics
   links:
     repoURL: https://github.com/axsuul/plex-media-server-exporter

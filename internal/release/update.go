@@ -36,6 +36,8 @@ type UpdateNewest struct {
 
 type UpdateStatus struct {
 	Name       string        `json:"name"`
+	Namespace  string        `json:"namespace"`
+	Project    string        `json:"project"`
 	Repository string        `json:"repository"`
 	Stage      string        `json:"stage"`
 	Current    UpdatePin     `json:"current"`
@@ -192,6 +194,8 @@ func (s *Service) snapshotUpdate(ctx context.Context, d *spec.Deployable, mode f
 func (s *Service) updateFromTree(d *spec.Deployable, tree render.Tree) UpdateStatus {
 	st := UpdateStatus{
 		Name:       d.Metadata.Name,
+		Namespace:  d.Spec.Namespace,
+		Project:    d.Spec.Argo.Project,
 		Repository: d.Spec.Image.Repository,
 		Stage:      d.BaseStage().Name,
 		Auto:       formatAuto(d.AutoUpdate()),

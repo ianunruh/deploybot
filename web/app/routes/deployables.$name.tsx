@@ -51,6 +51,7 @@ import {
 } from "~/ui/mutation-controls";
 import { PageHeader } from "~/ui/page-header";
 import { PromoteChangelog } from "~/ui/promote-changelog";
+import { updatesNameHref } from "~/ui/resource-filter";
 import { UpdateBadge } from "~/ui/status-badge";
 
 export type DeployableContext = {
@@ -156,7 +157,10 @@ function RegistryUpdateHint({ update }: { update: RegistryUpdate }) {
   }
   return (
     <Group gap="xs" wrap="nowrap">
-      <UpdateBadge stale={update.stale} />
+      <UpdateBadge
+        stale={update.stale}
+        to={update.stale ? updatesNameHref(update.name) : undefined}
+      />
       <Text size="sm" c="dimmed">
         {body}
       </Text>
@@ -365,9 +369,9 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
           <Stack gap={6}>
             {status.summary ? <Text size="sm">{status.summary}</Text> : null}
             <Group gap="xs" wrap="wrap">
-              {status.group ? (
+              {status.project ? (
                 <Badge variant="light" size="sm" tt="uppercase" radius="sm">
-                  {status.group}
+                  {status.project}
                 </Badge>
               ) : null}
               <Text size="sm" c="dimmed">

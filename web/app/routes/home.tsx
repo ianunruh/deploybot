@@ -5,6 +5,12 @@ import type { Route } from "./+types/home";
 import { listDeployables } from "~/lib/api.server";
 import { CatalogView, CatalogViewToggle, type CatalogViewMode } from "~/ui/catalog-view";
 import { PageHeader } from "~/ui/page-header";
+import {
+  matchesResourceFilters,
+  ResourceFilterBar,
+  uniqueSorted,
+  useResourceFilters,
+} from "~/ui/resource-filter";
 
 export function meta(_args: Route.MetaArgs) {
   return [{ title: "Catalog · deploybot" }];
@@ -29,6 +35,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     defaultValue: "cards",
     deserialize: (value) => (value === "table" ? "table" : "cards"),
   });
+  const [filters, setFilters] = useResourceFilters();
+  const filtered = deployables.filter((d) => matchesResourceFilters(d, filters));
 
   return (
     <Stack gap="lg">
@@ -42,7 +50,23 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           {error}. Start the Go API with `just serve`.
         </Alert>
       )}
-      <CatalogView deployables={deployables} view={view} />
+      {deployables.length > 0 ? (
+        <ResourceFilterBar
+          value={filters}
+          onChange={setFilters}
+          namespaces={uniqueSorted(deployables.map((d) => d.namespace))}
+          projects={uniqueSorted(deployables.map((d) => d.project))}
+        />
+      ) : null}
+      <CatalogView
+        deployables={filtered}
+        view={view}
+        emptyMessage={
+          deployables.length > 0
+            ? "No deployables match these filters."
+            : "No deployable specs found."
+        }
+      />
     </Stack>
   );
 }

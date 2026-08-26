@@ -31,10 +31,8 @@ type Metadata struct {
 
 type Spec struct {
 	Namespace string `yaml:"namespace"`
-	// Summary is a one-line catalog blurb. Group shelves the app in the
-	// console (play, platform, …). Both are optional and console-only.
+	// Summary is a one-line catalog blurb. Optional and console-only.
 	Summary  string        `yaml:"summary,omitempty"`
-	Group    string        `yaml:"group,omitempty"`
 	Links    Links         `yaml:"links,omitempty"`
 	Git      Git           `yaml:"git"`
 	Argo     Argo          `yaml:"argo"`
@@ -147,7 +145,6 @@ func Parse(b []byte) (*Deployable, error) {
 
 func (d *Deployable) Default() {
 	d.Spec.Summary = strings.TrimSpace(d.Spec.Summary)
-	d.Spec.Group = strings.TrimSpace(d.Spec.Group)
 	d.Spec.Git.TargetRevision = cmp.Or(d.Spec.Git.TargetRevision, "HEAD")
 	d.Spec.Argo.Name = cmp.Or(d.Spec.Argo.Name, d.Metadata.Name)
 	d.Spec.Argo.DestinationServer = cmp.Or(d.Spec.Argo.DestinationServer, "https://kubernetes.default.svc")

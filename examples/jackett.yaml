@@ -7,7 +7,6 @@ metadata:
   name: jackett
 spec:
   namespace: play
-  group: play
   summary: Torrent indexer proxy
   links:
     repoURL: https://github.com/linuxserver/docker-jackett

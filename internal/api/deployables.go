@@ -12,7 +12,7 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	type item struct {
 		Name       string                 `json:"name"`
 		Namespace  string                 `json:"namespace"`
-		Group      string                 `json:"group,omitempty"`
+		Project    string                 `json:"project"`
 		Summary    string                 `json:"summary,omitempty"`
 		Icon       string                 `json:"icon,omitempty"`
 		DocsURL    string                 `json:"docsURL,omitempty"`
@@ -51,7 +51,7 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 		items = append(items, item{
 			Name:       d.Metadata.Name,
 			Namespace:  d.Spec.Namespace,
-			Group:      d.Spec.Group,
+			Project:    d.Spec.Argo.Project,
 			Summary:    d.Spec.Summary,
 			Icon:       d.Spec.Links.Icon,
 			DocsURL:    d.Spec.Links.DocsURL,

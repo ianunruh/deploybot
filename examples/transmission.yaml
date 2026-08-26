@@ -9,7 +9,6 @@ metadata:
   name: transmission
 spec:
   namespace: play
-  group: play
   summary: BitTorrent client with OpenVPN
   links:
     repoURL: https://github.com/haugene/docker-transmission-openvpn

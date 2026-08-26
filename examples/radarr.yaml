@@ -7,7 +7,6 @@ metadata:
   name: radarr
 spec:
   namespace: play
-  group: play
   summary: Movie library manager
   links:
     repoURL: https://github.com/linuxserver/docker-radarr

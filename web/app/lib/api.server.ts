@@ -118,6 +118,8 @@ export type UpdateNewest = {
 
 export type UpdateStatus = {
   name: string;
+  namespace: string;
+  project: string;
   repository: string;
   stage: string;
   current: UpdatePin;
@@ -138,7 +140,7 @@ export type UpdateList = {
 export type DeployableSummary = {
   name: string;
   namespace: string;
-  group?: string;
+  project: string;
   summary?: string;
   icon?: string;
   docsURL?: string;
@@ -174,7 +176,7 @@ export type Workflows = {
 export type DeployableStatus = {
   name: string;
   namespace: string;
-  group?: string;
+  project: string;
   summary?: string;
   icon?: string;
   docsURL?: string;

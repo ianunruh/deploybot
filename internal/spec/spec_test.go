@@ -207,7 +207,6 @@ func TestParseSourceLinks(t *testing.T) {
 func TestParseCatalogMetadata(t *testing.T) {
 	t.Parallel()
 	body := kmcYAML + `
-  group: platform
   summary: Kubernetes multi-cluster console
   links:
     repoURL: https://github.com/ianunruh/kmc
@@ -217,9 +216,6 @@ func TestParseCatalogMetadata(t *testing.T) {
 	d, err := Parse([]byte(body))
 	if err != nil {
 		t.Fatal(err)
-	}
-	if d.Spec.Group != "platform" {
-		t.Fatalf("group %q", d.Spec.Group)
 	}
 	if d.Spec.Summary != "Kubernetes multi-cluster console" {
 		t.Fatalf("summary %q", d.Spec.Summary)
@@ -235,9 +231,6 @@ func TestParseCatalogMetadata(t *testing.T) {
 func TestParseCatalogRejects(t *testing.T) {
 	t.Parallel()
 	cases := []string{
-		kmcYAML + "\n  group: Platform\n",
-		kmcYAML + "\n  group: play_media\n",
-		kmcYAML + "\n  group: \"-play\"\n",
 		kmcYAML + "\n  summary: " + strings.Repeat("x", MaxSummaryLen+1) + "\n",
 		kmcYAML + "\n  links:\n    docsURL: javascript:alert(1)\n",
 		kmcYAML + "\n  links:\n    icon: \"git@github.com:ianunruh/kmc.git\"\n",
