@@ -201,9 +201,14 @@ function CatalogCard({ deployable: d }: { deployable: DeployableSummary }) {
       <Stack gap="xs">
         <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm">
           <Stack gap={4} style={{ minWidth: 0, flex: 1 }}>
-            <Text fw={600} truncate>
-              {d.name}
-            </Text>
+            <Group gap="xs" wrap="nowrap">
+              <Text fw={600} truncate>
+                {d.name}
+              </Text>
+              {d.update?.stale ? (
+                <UpdateBadge stale to={updatesNameHref(d.name)} />
+              ) : null}
+            </Group>
             <Text size="sm" c="dimmed" lineClamp={2}>
               {d.summary || d.namespace}
             </Text>
@@ -230,7 +235,6 @@ function CatalogCard({ deployable: d }: { deployable: DeployableSummary }) {
           <StageDots stages={d.stages ?? []} />
           <RelativeTime value={d.deployedAt} size="xs" />
         </Group>
-        {d.update?.stale ? <UpdateBadge stale to={updatesNameHref(d.name)} /> : null}
       </Stack>
     </ConsolePaper>
   );
