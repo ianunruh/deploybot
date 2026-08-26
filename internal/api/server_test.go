@@ -229,6 +229,7 @@ func TestListAndGetDeployedAt(t *testing.T) {
 			Argo:    listRouter{"homelab": homelab, "prod": prod},
 		},
 	}
+	s.Release.RefreshLive(t.Context())
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
 

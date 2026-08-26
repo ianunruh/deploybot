@@ -69,8 +69,8 @@ func (s *Service) Status(ctx context.Context, name string) (Status, error) {
 	return s.status(ctx, name, false)
 }
 
-// LiveStatus is Status plus source commit lookup. Argo/workload live state
-// comes from the WatchLive snapshot (or pull-through when the watcher is off).
+// LiveStatus is Status plus source commit lookup. Argo live state comes
+// from the WatchLive snapshot; missing snapshots stay "waiting".
 func (s *Service) LiveStatus(ctx context.Context, name string) (Status, error) {
 	return s.status(ctx, name, true)
 }
@@ -147,7 +147,6 @@ func (s *Service) buildStatus(ctx context.Context, d *spec.Deployable, tree rend
 	if err != nil {
 		events = nil
 	}
-	var wg sync.WaitGroup
 	for i, st := range d.Spec.Stages {
 		ss := StageStatus{
 			Name:     st.Name,
@@ -165,16 +164,11 @@ func (s *Service) buildStatus(ctx context.Context, d *spec.Deployable, tree rend
 		if s.Argo != nil {
 			if c := s.Argo.ForStage(st.Name); c != nil {
 				ss.ArgoURL = argo.AppURL(c, d.Spec.Argo.Name)
-				out.Stages[i] = ss
-				wg.Go(func() {
-					s.fillStageArgo(ctx, st.Name, d.Spec.Argo.Name, &out.Stages[i])
-				})
-				continue
+				s.fillStageArgo(st.Name, d.Spec.Argo.Name, &ss)
 			}
 		}
 		out.Stages[i] = ss
 	}
-	wg.Wait()
 	snaps := make([]stageSnap, len(d.Spec.Stages))
 	for i, st := range d.Spec.Stages {
 		disconnected := out.Stages[i].Connected != nil && !*out.Stages[i].Connected
@@ -197,63 +191,36 @@ func (s *Service) buildStatus(ctx context.Context, d *spec.Deployable, tree rend
 	return out
 }
 
-func (s *Service) fillStageArgo(ctx context.Context, stage, app string, ss *StageStatus) {
-	if snap, ok := s.liveSnapshot(stage); ok {
-		connected := snap.Connected
-		ss.Connected = &connected
-		if !snap.UpdatedAt.IsZero() {
-			t := snap.UpdatedAt
-			ss.UpdatedAt = &t
-		}
-		if got, ok := snap.Apps[app]; ok {
-			ss.Health = got.Health
-			ss.Sync = got.Sync
-			ss.Revision = got.Revision
-			ss.Message = got.Message
-			ss.DeployedAt = got.DeployedAt
-			if !snap.Connected && snap.Message != "" && ss.Message == "" {
-				ss.Message = snap.Message
-			}
-			return
-		}
-		if snap.Message != "" {
-			ss.Message = snap.Message
-			return
-		}
-		ss.Message = fmt.Sprintf("app %s not found", app)
-		return
-	}
-	if s.liveWatching() {
+func (s *Service) fillStageArgo(stage, app string, ss *StageStatus) {
+	snap, ok := s.liveSnapshot(stage)
+	if !ok {
 		connected := false
 		ss.Connected = &connected
 		ss.Message = "waiting for live snapshot"
 		return
 	}
-	got, err := s.stageArgo(ctx, stage, app)
-	if err != nil {
-		ss.Message = err.Error()
+	connected := snap.Connected
+	ss.Connected = &connected
+	if !snap.UpdatedAt.IsZero() {
+		t := snap.UpdatedAt
+		ss.UpdatedAt = &t
+	}
+	if got, ok := snap.Apps[app]; ok {
+		ss.Health = got.Health
+		ss.Sync = got.Sync
+		ss.Revision = got.Revision
+		ss.Message = got.Message
+		ss.DeployedAt = got.DeployedAt
+		if !snap.Connected && snap.Message != "" && ss.Message == "" {
+			ss.Message = snap.Message
+		}
 		return
 	}
-	ss.Health = got.Health
-	ss.Sync = got.Sync
-	ss.Revision = got.Revision
-	ss.Message = got.Message
-	ss.DeployedAt = got.DeployedAt
-}
-
-func (s *Service) stageArgo(ctx context.Context, stage, app string) (argo.Status, error) {
-	if s == nil || s.Argo == nil {
-		return argo.Status{}, fmt.Errorf("no Argo endpoint for stage %s", stage)
+	if snap.Message != "" {
+		ss.Message = snap.Message
+		return
 	}
-	c := s.Argo.ForStage(stage)
-	if c == nil {
-		return argo.Status{}, fmt.Errorf("no Argo endpoint for stage %s", stage)
-	}
-	gctx, cancel := context.WithTimeout(ctx, statusArgoTimeout)
-	defer cancel()
-	return s.argoApps().lookup(gctx, stage, app, func(ctx context.Context) (map[string]argo.Status, error) {
-		return listApps(ctx, c)
-	})
+	ss.Message = fmt.Sprintf("app %s not found", app)
 }
 
 func newestDeployedAt(stages []StageStatus) *time.Time {

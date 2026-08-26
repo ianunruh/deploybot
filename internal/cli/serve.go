@@ -100,7 +100,6 @@ func runServe(ctx context.Context, args []string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var wg sync.WaitGroup
-	svc.SetLiveWatching()
 	wg.Go(func() { svc.WatchLive(ctx) })
 	wg.Go(func() { svc.WatchFlows(ctx) })
 	wg.Go(func() { svc.WatchUpdates(ctx) })

@@ -27,10 +27,9 @@ type clusterSnap struct {
 }
 
 type liveStore struct {
-	mu       sync.RWMutex
-	watching bool
-	items    map[string]clusterSnap
-	persist  *valkey.Client
+	mu      sync.RWMutex
+	items   map[string]clusterSnap
+	persist *valkey.Client
 }
 
 func newLiveStore(addr string) *liveStore {
@@ -44,27 +43,6 @@ func newLiveStore(addr string) *liveStore {
 func (s *Service) initLive() *liveStore {
 	s.initCaches()
 	return s.live
-}
-
-func (s *Service) liveWatching() bool {
-	if s == nil || s.live == nil {
-		return false
-	}
-	s.live.mu.RLock()
-	defer s.live.mu.RUnlock()
-	return s.live.watching
-}
-
-// SetLiveWatching makes request-path Argo/workload reads use the snapshot
-// (or "waiting") instead of pulling kube. serve calls this before listen.
-func (s *Service) SetLiveWatching() {
-	live := s.initLive()
-	if live == nil {
-		return
-	}
-	live.mu.Lock()
-	live.watching = true
-	live.mu.Unlock()
 }
 
 func (s *Service) liveSnapshot(cluster string) (clusterSnap, bool) {
@@ -159,6 +137,21 @@ func cloneClusterSnap(in clusterSnap) clusterSnap {
 	out.Workloads = make(map[string]kube.Workload, len(in.Workloads))
 	for k, w := range in.Workloads {
 		out.Workloads[k] = cloneWorkload(w)
+	}
+	return out
+}
+
+func cloneApps(in map[string]argo.Status) map[string]argo.Status {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]argo.Status, len(in))
+	for k, st := range in {
+		if st.DeployedAt != nil {
+			t := st.DeployedAt.UTC()
+			st.DeployedAt = &t
+		}
+		out[k] = st
 	}
 	return out
 }

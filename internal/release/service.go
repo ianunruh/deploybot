@@ -38,8 +38,6 @@ type Service struct {
 	Lock      *sync.Mutex
 	overlays  *overlayCache
 	update    *updateState
-	apps      *appsCache
-	appsTTL   time.Duration
 	live      *liveStore
 	cacheOnce *sync.Once
 }
@@ -89,6 +87,36 @@ func (s *Service) cachesOnce() *sync.Once {
 		s.cacheOnce = new(sync.Once)
 	}
 	return s.cacheOnce
+}
+
+func (s *Service) initCaches() {
+	if s == nil {
+		return
+	}
+	s.cachesOnce().Do(func() {
+		if s.update == nil {
+			s.update = &updateState{
+				ttl:      defaultListingTTL,
+				listings: map[string]cachedListing{},
+				lastAuto: map[string]time.Time{},
+			}
+		}
+		if s.update.listings == nil {
+			s.update.listings = map[string]cachedListing{}
+		}
+		if s.update.lastAuto == nil {
+			s.update.lastAuto = map[string]time.Time{}
+		}
+		if s.update.ttl <= 0 {
+			s.update.ttl = defaultListingTTL
+		}
+		if s.overlays == nil {
+			s.overlays = &overlayCache{events: map[string][]Event{}}
+		}
+		if s.live == nil {
+			s.live = newLiveStore(s.Valkey)
+		}
+	})
 }
 
 func (s *Service) author() gitwrite.Author {

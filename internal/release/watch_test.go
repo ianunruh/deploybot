@@ -69,6 +69,7 @@ func TestReconcileFlowsAutoPromote(t *testing.T) {
 	if _, err := svc.Pin(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc@sha256:abc"); err != nil {
 		t.Fatal(err)
 	}
+	svc.RefreshLive(t.Context())
 	svc.ReconcileFlows(t.Context())
 	tree := mustOpenTree(t, dir)
 	d := mustKMC(t, svc)
@@ -122,6 +123,7 @@ spec:
 	if _, err := svc.Pin(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc@sha256:abc"); err != nil {
 		t.Fatal(err)
 	}
+	svc.RefreshLive(t.Context())
 	svc.ReconcileFlows(t.Context())
 	tree := mustOpenTree(t, dir)
 	d := mustKMC(t, svc)

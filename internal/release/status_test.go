@@ -31,6 +31,7 @@ func TestStatusLinksAndArgoURL(t *testing.T) {
 		Clusters: testClusters(),
 		Sync:     true,
 	}
+	svc.RefreshLive(t.Context())
 	st, err := svc.Status(t.Context(), "kmc")
 	if err != nil {
 		t.Fatal(err)
@@ -117,6 +118,7 @@ func TestLatestWaitingApproval(t *testing.T) {
 	if _, err := svc.Pin(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc@sha256:abc"); err != nil {
 		t.Fatal(err)
 	}
+	svc.RefreshLive(t.Context())
 	latest := svc.Latest(t.Context())
 	kmc := latest["kmc"]
 	if len(kmc.Flow.Hops) != 1 || kmc.Flow.Hops[0].State != HopWaitingApproval {
@@ -137,8 +139,8 @@ func TestLatestListsOncePerStage(t *testing.T) {
 	svc := &Service{
 		Catalog: loadExamples(t),
 		Argo:    stageRouter{"homelab": homelab, "prod": prod},
-		appsTTL: time.Minute,
 	}
+	svc.RefreshLive(t.Context())
 	latest := svc.Latest(t.Context())
 	if latest["kmc"].Stages[0].Health != "Healthy" {
 		t.Fatalf("kmc %+v", latest["kmc"])
@@ -155,38 +157,8 @@ func TestLatestListsOncePerStage(t *testing.T) {
 		t.Fatalf("lists homelab %d prod %d", hList, pList)
 	}
 	_ = svc.Latest(t.Context())
-	_, hList = homelab.Calls()
-	_, pList = prod.Calls()
-	if hList != 1 || pList != 1 {
-		t.Fatalf("ttl should skip list: homelab %d prod %d", hList, pList)
-	}
-	svc.dropArgo("homelab")
-	_ = svc.Latest(t.Context())
-	_, hList = homelab.Calls()
-	_, pList = prod.Calls()
-	if hList != 2 || pList != 1 {
-		t.Fatalf("drop homelab: homelab %d prod %d", hList, pList)
-	}
-}
-
-func TestLiveStatusDoesNotRelist(t *testing.T) {
-	t.Parallel()
-	homelab := argo.NewFake()
-	homelab.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
-	prod := argo.NewFake()
-	prod.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
-	svc := &Service{
-		Catalog: loadExamples(t),
-		Argo:    stageRouter{"homelab": homelab, "prod": prod},
-		appsTTL: time.Minute,
-	}
 	if _, err := svc.Status(t.Context(), "kmc"); err != nil {
 		t.Fatal(err)
-	}
-	_, hList := homelab.Calls()
-	_, pList := prod.Calls()
-	if hList != 1 || pList != 1 {
-		t.Fatalf("first status lists homelab %d prod %d", hList, pList)
 	}
 	if _, err := svc.LiveStatus(t.Context(), "kmc"); err != nil {
 		t.Fatal(err)
@@ -194,7 +166,7 @@ func TestLiveStatusDoesNotRelist(t *testing.T) {
 	_, hList = homelab.Calls()
 	_, pList = prod.Calls()
 	if hList != 1 || pList != 1 {
-		t.Fatalf("live status should use cache: homelab %d prod %d", hList, pList)
+		t.Fatalf("reads should use snapshot: homelab %d prod %d", hList, pList)
 	}
 }
 
@@ -293,8 +265,12 @@ func TestStatusLiveWorkload(t *testing.T) {
 	rest := &kube.REST{BaseURL: srv.URL, HTTP: srv.Client(), Auth: kube.Bearer("t")}
 	client := &argo.KubeClient{REST: rest, Namespace: "argocd", UIBaseURL: "https://argocd.example"}
 	svc := &Service{
-		Catalog: loadExamples(t),
+		Catalog: catalogYAML(t, miniKMC),
 		Argo:    stageRouter{"homelab": client, "prod": client},
+	}
+	svc.RefreshLive(t.Context())
+	if podLists.Load() != 2 {
+		t.Fatalf("refresh pod lists %d", podLists.Load())
 	}
 	st, err := svc.Status(t.Context(), "kmc")
 	if err != nil {
@@ -311,7 +287,7 @@ func TestStatusLiveWorkload(t *testing.T) {
 			t.Fatalf("status should skip pods %+v", stage.Workload)
 		}
 	}
-	if podLists.Load() != 0 {
+	if podLists.Load() != 2 {
 		t.Fatalf("status listed pods")
 	}
 

@@ -2,15 +2,10 @@ package release
 
 import (
 	"context"
-	"sync"
-	"time"
 
-	"github.com/ianunruh/deploybot/internal/argo"
 	"github.com/ianunruh/deploybot/internal/kube"
 	"github.com/ianunruh/deploybot/internal/spec"
 )
-
-const statusKubeTimeout = 4 * time.Second
 
 // StageWorkload is live Deployment/StatefulSet state for one stage.
 type StageWorkload struct {
@@ -23,8 +18,9 @@ type LiveWorkloads struct {
 	Stages []StageWorkload `json:"stages"`
 }
 
-// LiveWorkloads reads Deployment/StatefulSet replica counts and pods.
-// Status, Latest, and WatchFlows skip this; only the detail overview fetches it.
+// LiveWorkloads is Deployment/StatefulSet replica counts and pods from the
+// WatchLive snapshot. Status, Latest, and WatchFlows skip this; only the
+// detail overview fetches it.
 func (s *Service) LiveWorkloads(ctx context.Context, name string) (LiveWorkloads, error) {
 	d, err := s.Catalog.Get(name)
 	if err != nil {
@@ -34,7 +30,7 @@ func (s *Service) LiveWorkloads(ctx context.Context, name string) (LiveWorkloads
 	for i, st := range d.Spec.Stages {
 		stages[i] = StageStatus{Name: st.Name}
 	}
-	s.attachLive(ctx, d, stages)
+	s.attachLive(d, stages)
 	out := LiveWorkloads{Stages: make([]StageWorkload, len(stages))}
 	for i, st := range stages {
 		out.Stages[i] = StageWorkload{Name: st.Name, Workload: st.Workload}
@@ -42,12 +38,12 @@ func (s *Service) LiveWorkloads(ctx context.Context, name string) (LiveWorkloads
 	return out, nil
 }
 
-// attachLive fills per-stage Deployment/StatefulSet replica counts and pods.
-func (s *Service) attachLive(ctx context.Context, d *spec.Deployable, stages []StageStatus) {
+// attachLive fills per-stage Deployment/StatefulSet replica counts and pods
+// from the WatchLive snapshot.
+func (s *Service) attachLive(d *spec.Deployable, stages []StageStatus) {
 	if s == nil || d == nil || len(stages) == 0 {
 		return
 	}
-	var wg sync.WaitGroup
 	for i, st := range d.Spec.Stages {
 		if i >= len(stages) {
 			break
@@ -58,27 +54,10 @@ func (s *Service) attachLive(ctx context.Context, d *spec.Deployable, stages []S
 			stages[i].Workload = &wl
 			continue
 		}
-		if s.liveWatching() {
-			stages[i].Workload = &kube.Workload{
-				Kind:    d.Spec.Workload.Kind,
-				Name:    d.Metadata.Name,
-				Message: "waiting for live snapshot",
-			}
-			continue
+		stages[i].Workload = &kube.Workload{
+			Kind:    d.Spec.Workload.Kind,
+			Name:    d.Metadata.Name,
+			Message: "waiting for live snapshot",
 		}
-		if s.Argo == nil {
-			continue
-		}
-		rest := argo.REST(s.Argo.ForStage(st.Name))
-		if rest == nil {
-			continue
-		}
-		wg.Go(func() {
-			gctx, cancel := context.WithTimeout(ctx, statusKubeTimeout)
-			defer cancel()
-			live := kube.ReadWorkload(gctx, rest, d.Spec.Namespace, d.Spec.Workload.Kind, d.Metadata.Name)
-			stages[i].Workload = &live
-		})
 	}
-	wg.Wait()
 }

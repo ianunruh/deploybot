@@ -60,7 +60,7 @@ func TestRefreshLiveFeedsStatus(t *testing.T) {
 	}
 }
 
-func TestWatchingSkipsPullThrough(t *testing.T) {
+func TestStatusDoesNotPullThrough(t *testing.T) {
 	t.Parallel()
 	homelab := argo.NewFake()
 	homelab.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
@@ -68,7 +68,6 @@ func TestWatchingSkipsPullThrough(t *testing.T) {
 		Catalog: loadExamples(t),
 		Argo:    stageRouter{"homelab": homelab},
 	}
-	svc.SetLiveWatching()
 	st, err := svc.Status(t.Context(), "kmc")
 	if err != nil {
 		t.Fatal(err)
@@ -79,9 +78,23 @@ func TestWatchingSkipsPullThrough(t *testing.T) {
 	if st.Stages[0].Message != "waiting for live snapshot" {
 		t.Fatalf("message %q", st.Stages[0].Message)
 	}
+	if st.Stages[0].Connected == nil || *st.Stages[0].Connected {
+		t.Fatalf("connected %+v", st.Stages[0].Connected)
+	}
 	_, hList := homelab.Calls()
 	if hList != 0 {
-		t.Fatalf("watching listed %d", hList)
+		t.Fatalf("status listed %d", hList)
+	}
+	wl, err := svc.LiveWorkloads(t.Context(), "kmc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wl.Stages) == 0 || wl.Stages[0].Workload == nil || wl.Stages[0].Workload.Message != "waiting for live snapshot" {
+		t.Fatalf("workloads %+v", wl)
+	}
+	_, hList = homelab.Calls()
+	if hList != 0 {
+		t.Fatalf("workloads listed %d", hList)
 	}
 }
 

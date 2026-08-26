@@ -11,7 +11,10 @@ import (
 	"github.com/ianunruh/deploybot/internal/kube"
 )
 
-const defaultLiveEvery = 5 * time.Second
+const (
+	defaultLiveEvery  = 5 * time.Second
+	statusKubeTimeout = 4 * time.Second
+)
 
 // WatchLive polls each configured cluster independently and writes Argo
 // apps + workloads into the live snapshot. API reads use that snapshot
@@ -20,7 +23,7 @@ func (s *Service) WatchLive(ctx context.Context) {
 	if s == nil {
 		return
 	}
-	s.SetLiveWatching()
+	s.initLive()
 	names := s.liveClusterNames()
 	if s.live != nil {
 		s.live.hydrate(ctx, names)
@@ -167,4 +170,19 @@ func (s *Service) liveClusterNames() []string {
 	}
 	slices.Sort(out)
 	return out
+}
+
+func listApps(ctx context.Context, c argo.Client) (map[string]argo.Status, error) {
+	items, err := c.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]argo.Status, len(items))
+	for _, st := range items {
+		if st.Name == "" {
+			continue
+		}
+		out[st.Name] = st
+	}
+	return out, nil
 }
