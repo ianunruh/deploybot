@@ -39,6 +39,12 @@ type Result struct {
 // Write materializes tree into repoDir and creates a local commit. It never
 // pushes; call Push when the caller wants the remote updated.
 func Write(repoDir string, tree render.Tree, message string, author Author) (Result, error) {
+	return WriteCommit(repoDir, tree, message, author, Author{})
+}
+
+// WriteCommit is Write with a distinct committer. An empty committer uses
+// author for both signatures.
+func WriteCommit(repoDir string, tree render.Tree, message string, author, committer Author) (Result, error) {
 	repo, err := git.PlainOpen(repoDir)
 	if err != nil {
 		return Result{}, fmt.Errorf("open repo %s: %w", repoDir, err)
@@ -74,13 +80,22 @@ func Write(repoDir string, tree render.Tree, message string, author Author) (Res
 		return Result{Commit: head.Hash().String(), Files: written}, nil
 	}
 
-	hash, err := wt.Commit(message, &git.CommitOptions{
+	now := time.Now()
+	opts := &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  author.Name,
 			Email: author.Email,
-			When:  time.Now(),
+			When:  now,
 		},
-	})
+	}
+	if committer.Name != "" {
+		opts.Committer = &object.Signature{
+			Name:  committer.Name,
+			Email: committer.Email,
+			When:  now,
+		}
+	}
+	hash, err := wt.Commit(message, opts)
 	if err != nil {
 		return Result{}, fmt.Errorf("commit: %w", err)
 	}

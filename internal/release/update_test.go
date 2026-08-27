@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -282,6 +283,13 @@ func TestReconcileUpdatesPinsEnrolled(t *testing.T) {
 	}
 	if _, err := render.CurrentImage(tree, d, "prod"); err == nil {
 		t.Fatal("must not pin prod")
+	}
+	c := gitCommit(t, dir, repoHeadHash(t, dir))
+	if c.Author.Name != "auto-pin" {
+		t.Fatalf("auto-pin author %q", c.Author.Name)
+	}
+	if !strings.Contains(c.Message, "Deploybot-Actor: auto-pin") {
+		t.Fatalf("auto-pin trailer %q", c.Message)
 	}
 }
 

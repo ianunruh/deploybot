@@ -5,6 +5,7 @@ import { Link, useFetcher, useRevalidator } from "react-router";
 
 import type { Route } from "./+types/updates";
 import {
+  actorHeaders,
   listUpdates,
   pinDeployable,
   type MutationResult,
@@ -69,7 +70,11 @@ export async function action({ request }: Route.ActionArgs) {
         String(form.get("name") ?? ""),
         String(form.get("stage") ?? ""),
         String(form.get("image") ?? ""),
-        { sync: formFlag(form, "sync"), wait: formFlag(form, "wait") },
+        {
+          sync: formFlag(form, "sync"),
+          wait: formFlag(form, "wait"),
+          headers: actorHeaders(request),
+        },
       ),
     } satisfies ActionData;
   } catch (err) {

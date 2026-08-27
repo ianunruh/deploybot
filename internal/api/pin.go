@@ -18,7 +18,7 @@ func (s *Server) pin(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	mut, err := s.mutator(req.Sync, req.Wait).Pin(r.Context(), r.PathValue("name"), req.Stage, req.Image)
+	mut, err := s.mutateWith(r, req.Sync, req.Wait).Pin(r.Context(), r.PathValue("name"), req.Stage, req.Image)
 	if err != nil {
 		writeError(w, err)
 		return

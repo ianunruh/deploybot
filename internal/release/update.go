@@ -352,7 +352,7 @@ func (s *Service) ReconcileUpdates(ctx context.Context) {
 			continue
 		}
 		slog.Info("auto-pin", "deployable", d.Metadata.Name, "stage", st.Stage, "image", st.Newest.Ref)
-		if _, err := s.Pin(ctx, d.Metadata.Name, st.Stage, st.Newest.Ref); err != nil {
+		if _, err := s.WithActor(ActorAutoPin()).Pin(ctx, d.Metadata.Name, st.Stage, st.Newest.Ref); err != nil {
 			slog.Warn("auto-pin", "deployable", d.Metadata.Name, "err", err)
 		}
 	}

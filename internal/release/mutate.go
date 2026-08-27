@@ -42,7 +42,13 @@ func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string
 	for _, p := range mut.Files {
 		toWrite[p] = after[p]
 	}
-	res, err := gitwrite.Write(s.OpsRepo, toWrite, message, s.author())
+	msg := s.Actor.AppendTrailers(message)
+	author := s.commitAuthor()
+	committer := gitwrite.Author{}
+	if s.Actor.Kind != "" {
+		committer = s.author()
+	}
+	res, err := gitwrite.WriteCommit(s.OpsRepo, toWrite, msg, author, committer)
 	if err != nil {
 		return Mutation{}, err
 	}

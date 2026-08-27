@@ -5,6 +5,7 @@ import { Link, useFetcher, useRevalidator } from "react-router";
 
 import type { Route } from "./+types/deployables.$name.reconcile.$stage";
 import {
+  actorHeaders,
   getDeployable,
   previewReconcile,
   reconcileDeployable,
@@ -66,6 +67,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       result: await reconcileDeployable(name, stage, {
         sync: formFlag(form, "sync"),
         wait: formFlag(form, "wait"),
+        headers: actorHeaders(request),
       }),
     } satisfies ActionData;
   } catch (err) {

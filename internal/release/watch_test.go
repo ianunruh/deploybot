@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -79,6 +80,13 @@ func TestReconcileFlowsAutoPromote(t *testing.T) {
 	}
 	if img.Digest != "sha256:abc" {
 		t.Fatalf("prod %+v", img)
+	}
+	c := gitCommit(t, dir, repoHeadHash(t, dir))
+	if c.Author.Name != "auto-promote" {
+		t.Fatalf("auto-promote author %q", c.Author.Name)
+	}
+	if !strings.Contains(c.Message, "Deploybot-Actor: auto-promote") {
+		t.Fatalf("auto-promote trailer %q", c.Message)
 	}
 }
 

@@ -35,7 +35,7 @@ func (s *Server) reconcile(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "stage is required"})
 		return
 	}
-	mut, err := s.mutator(req.Sync, req.Wait).Reconcile(r.Context(), r.PathValue("name"), []string{req.Stage})
+	mut, err := s.mutateWith(r, req.Sync, req.Wait).Reconcile(r.Context(), r.PathValue("name"), []string{req.Stage})
 	if err != nil {
 		writeError(w, err)
 		return

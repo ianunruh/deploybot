@@ -1,5 +1,33 @@
 const apiBase = () => process.env.DEPLOYBOT_API_URL ?? "http://127.0.0.1:8080";
 
+// Dex Authorization, or the IdToken cookie when Envoy only forwarded the cookie.
+export function actorHeaders(request: Request): Record<string, string> {
+  const auth = request.headers.get("authorization");
+  if (auth) {
+    return { Authorization: auth };
+  }
+  const token = cookieValue(request.headers.get("cookie") ?? "", "IdToken");
+  if (token) {
+    return { Authorization: `Bearer ${token}` };
+  }
+  return {};
+}
+
+function cookieValue(header: string, name: string): string {
+  const prefix = `${name}=`;
+  for (const part of header.split(";")) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(prefix)) {
+      try {
+        return decodeURIComponent(trimmed.slice(prefix.length));
+      } catch {
+        return trimmed.slice(prefix.length);
+      }
+    }
+  }
+  return "";
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const url = new URL(path, apiBase());
   const res = await fetch(url, {
@@ -340,10 +368,11 @@ export function pinDeployable(
   name: string,
   stage: string,
   image: string,
-  opts?: { sync?: boolean; wait?: boolean },
+  opts?: { sync?: boolean; wait?: boolean; headers?: HeadersInit },
 ) {
   return apiFetch<MutationResult>(`/api/v1/deployables/${encodeURIComponent(name)}/pin`, {
     method: "POST",
+    headers: opts?.headers,
     body: JSON.stringify({
       stage,
       image,
@@ -357,12 +386,13 @@ export function rollbackDeployable(
   name: string,
   stage: string,
   image: string,
-  opts?: { sync?: boolean; wait?: boolean },
+  opts?: { sync?: boolean; wait?: boolean; headers?: HeadersInit },
 ) {
   return apiFetch<MutationResult>(
     `/api/v1/deployables/${encodeURIComponent(name)}/rollback`,
     {
       method: "POST",
+      headers: opts?.headers,
       body: JSON.stringify({
         stage,
         image,
@@ -377,12 +407,13 @@ export function promoteDeployable(
   name: string,
   from: string,
   to: string,
-  opts?: { sync?: boolean; wait?: boolean; image?: string },
+  opts?: { sync?: boolean; wait?: boolean; image?: string; headers?: HeadersInit },
 ) {
   return apiFetch<MutationResult>(
     `/api/v1/deployables/${encodeURIComponent(name)}/promote`,
     {
       method: "POST",
+      headers: opts?.headers,
       body: JSON.stringify({
         from,
         to,
@@ -404,12 +435,13 @@ export function previewReconcile(name: string, stage: string) {
 export function reconcileDeployable(
   name: string,
   stage: string,
-  opts?: { sync?: boolean; wait?: boolean },
+  opts?: { sync?: boolean; wait?: boolean; headers?: HeadersInit },
 ) {
   return apiFetch<MutationResult>(
     `/api/v1/deployables/${encodeURIComponent(name)}/reconcile`,
     {
       method: "POST",
+      headers: opts?.headers,
       body: JSON.stringify({
         stage,
         ...(opts?.sync != null ? { sync: opts.sync } : {}),

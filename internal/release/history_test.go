@@ -8,6 +8,20 @@ import (
 	"github.com/ianunruh/deploybot/internal/gitwrite"
 )
 
+func TestEventKindIgnoresTrailers(t *testing.T) {
+	t.Parallel()
+	msg := "pin kmc homelab to ghcr.io/ianunruh/kmc@sha256:abc\n\nDeploybot-Actor: auto-pin"
+	if got := eventKind(msg); got != EventPin {
+		t.Fatalf("%q", got)
+	}
+	if got := eventKind("promote kmc homelab -> prod (img)\n\nDeploybot-Actor: user\nDeploybot-Actor-ID: ianunruh"); got != EventPromote {
+		t.Fatalf("%q", got)
+	}
+	if got := eventKind("rollback kmc homelab to img\n\nDeploybot-Actor: github-actions"); got != EventRollback {
+		t.Fatalf("%q", got)
+	}
+}
+
 func TestHistoryPinThenPromote(t *testing.T) {
 	t.Parallel()
 	dir := initOpsRepo(t)

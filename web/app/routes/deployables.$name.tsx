@@ -25,6 +25,7 @@ import type { ImagesLoaderData } from "./deployables.$name.images";
 import type { WorkloadsLoaderData } from "./deployables.$name.workloads";
 import {
   getDeployable,
+  actorHeaders,
   pinDeployable,
   promoteDeployable,
   rollbackDeployable,
@@ -101,7 +102,11 @@ export async function action({ request, params }: Route.ActionArgs) {
             name,
             String(form.get("stage") ?? ""),
             String(form.get("image") ?? ""),
-            { sync: formFlag(form, "sync"), wait: formFlag(form, "wait") },
+            {
+              sync: formFlag(form, "sync"),
+              wait: formFlag(form, "wait"),
+              headers: actorHeaders(request),
+            },
           ),
         } satisfies ActionData;
       case "promote":
@@ -116,6 +121,7 @@ export async function action({ request, params }: Route.ActionArgs) {
               sync: formFlag(form, "sync"),
               wait: formFlag(form, "wait"),
               image: String(form.get("image") ?? "") || undefined,
+              headers: actorHeaders(request),
             },
           ),
         } satisfies ActionData;
@@ -127,7 +133,11 @@ export async function action({ request, params }: Route.ActionArgs) {
             name,
             String(form.get("stage") ?? ""),
             String(form.get("image") ?? ""),
-            { sync: formFlag(form, "sync"), wait: formFlag(form, "wait") },
+            {
+              sync: formFlag(form, "sync"),
+              wait: formFlag(form, "wait"),
+              headers: actorHeaders(request),
+            },
           ),
         } satisfies ActionData;
       default:

@@ -13,13 +13,16 @@ import (
 )
 
 type Service struct {
-	Catalog     *catalog.Catalog
-	OpsRepo     string
-	Apply       bool
-	Push        bool
-	Sync        bool
-	AutoPin     bool
-	Author      gitwrite.Author
+	Catalog *catalog.Catalog
+	OpsRepo string
+	Apply   bool
+	Push    bool
+	Sync    bool
+	AutoPin bool
+	Author  gitwrite.Author
+	// Actor is the initiator of a single mutation (auto-pin, GitHub Actions,
+	// console user). Empty means the process Author / DefaultAuthor.
+	Actor       Actor
 	Argo        argo.Router
 	Clusters    map[string]config.Cluster
 	Wait        time.Duration
@@ -126,6 +129,13 @@ func (s *Service) author() gitwrite.Author {
 		return s.Author
 	}
 	return gitwrite.DefaultAuthor()
+}
+
+func (s *Service) commitAuthor() gitwrite.Author {
+	if a := s.Actor.GitAuthor(); a.Name != "" {
+		return a
+	}
+	return s.author()
 }
 
 // Cluster returns process-config options for a promotion stage. Stage names

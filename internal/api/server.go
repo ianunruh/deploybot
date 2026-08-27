@@ -38,12 +38,19 @@ func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) mutator(sync, wait *bool) *release.Service {
+	return s.mutateWith(nil, sync, wait)
+}
+
+func (s *Server) mutateWith(r *http.Request, sync, wait *bool) *release.Service {
 	svc := s.Release
 	if sync != nil {
 		svc = svc.WithSync(*sync)
 	}
 	if wait != nil {
 		svc = svc.WithWait(*wait)
+	}
+	if a := actorFromRequest(r); a.Kind != "" {
+		return svc.WithActor(a)
 	}
 	return svc
 }
