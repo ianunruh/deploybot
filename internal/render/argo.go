@@ -20,7 +20,7 @@ func writeArgo(out Tree, d *spec.Deployable) error {
 
 func applicationObj(d *spec.Deployable, st spec.Stage) application {
 	ann := map[string]string{
-		"argocd.argoproj.io/manifest-generate-paths": "/" + strings.TrimPrefix(d.Spec.Git.WorkloadPath, "/"),
+		"argocd.argoproj.io/manifest-generate-paths": manifestGeneratePaths(d),
 	}
 	app := application{
 		APIVersion: "argoproj.io/v1alpha1",
@@ -47,4 +47,21 @@ func applicationObj(d *spec.Deployable, st spec.Stage) application {
 		app.Spec.SyncPolicy = &syncPolicy{SyncOptions: []string{"CreateNamespace=true"}}
 	}
 	return app
+}
+
+func manifestGeneratePaths(d *spec.Deployable) string {
+	paths := []string{"/" + strings.TrimPrefix(d.Spec.Git.WorkloadPath, "/")}
+	seen := map[string]struct{}{paths[0]: {}}
+	for _, p := range d.Spec.Argo.GeneratePaths {
+		p = "/" + strings.TrimPrefix(strings.TrimSpace(p), "/")
+		if p == "/" {
+			continue
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		paths = append(paths, p)
+	}
+	return strings.Join(paths, ";")
 }

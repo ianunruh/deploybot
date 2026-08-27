@@ -70,10 +70,12 @@ API is ClusterIP in-cluster (console talks to it directly; Service, SA, Argo
 RBAC, git clone of kcloud-ops, and kubeconfig are overlay-owned). Prod
 exposes the API at `deploy-api.k8s.kcloud.io` on Gateway `external` / `https`
 with a GitHub Actions OIDC SecurityPolicy (allow `ianunruh/deploybot`,
-`ianunruh/kmc`, and `ianunruh/humpty` on `refs/heads/main`). Console is routed at `deploy.k8s.kcloud.zone` /
-`deploy.k8s.kcloud.io` on Gateway `internal` / `https`. Specs are baked into
-the API image. GitHub Actions builds both images and pins homelab through
-the prod API; promote to prod is a console action.
+`ianunruh/kmc`, and `ianunruh/humpty` on `refs/heads/main`). Console is routed
+at `deploy.k8s.kcloud.zone` (Gateway `internal` / `https`) and
+`deploy.k8s.kcloud.io` (Gateway `external` / `https`) with edge-sso (Dex
+`gateway-sso` OIDC). Specs are baked into the API image. GitHub Actions
+builds both images and pins homelab through the prod API; promote to prod
+is a console action.
 
 GitHub Actions keeps building; deploybot consumes the image. Do not move
 Kaniko or rewrite the image build in `docker-build.yml` for this.

@@ -69,6 +69,10 @@ type Argo struct {
 	Name              string `yaml:"name,omitempty"`
 	DestinationServer string `yaml:"destinationServer,omitempty"`
 	CreateNamespace   bool   `yaml:"createNamespace,omitempty"`
+	// GeneratePaths are extra git paths on the Argo Application
+	// argocd.argoproj.io/manifest-generate-paths annotation, joined with
+	// the workload path. Use for nested helm charts (edge-sso).
+	GeneratePaths []string `yaml:"generatePaths,omitempty"`
 }
 
 type Image struct {

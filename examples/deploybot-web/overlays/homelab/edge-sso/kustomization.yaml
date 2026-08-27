@@ -1,0 +1,17 @@
+# Nested kustomization so helmGlobals.chartHome does not pull remote
+# charts into k8s/edge-sso's parent.
+#
+# Register each hostname's /oauth2/callback on the Dex gateway-sso client
+# when adding policies below.
+helmGlobals:
+  chartHome: ../../../../
+
+helmCharts:
+  - name: edge-sso
+    releaseName: edge-sso
+    namespace: deploybot-system
+    valuesFile: ../../../../edge-sso/values-homelab.yaml
+    valuesInline:
+      policies:
+        - route: deploybot-web
+          hostname: deploy.k8s.kcloud.zone

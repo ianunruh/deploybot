@@ -169,7 +169,7 @@ Homelab and prod run the same specs in `deploybot-system` (`kcloud-ops`).
 
 | Surface | Homelab | Prod |
 |---------|---------|------|
-| Console | `https://deploy.k8s.kcloud.zone` (internal Envoy) | `https://deploy.k8s.kcloud.io` (internal Envoy) |
+| Console | `https://deploy.k8s.kcloud.zone` (internal Envoy, edge-sso) | `https://deploy.k8s.kcloud.io` (external Envoy, edge-sso) |
 | API | ClusterIP (`http://deploybot:8080`) | `https://deploy-api.k8s.kcloud.io` (external Envoy, GitHub OIDC) |
 
 The console talks to the API in-cluster. GitHub Actions pins homelab through
