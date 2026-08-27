@@ -13,6 +13,29 @@ import (
 )
 
 func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string, before render.Tree, edit func(render.Tree) error, syncStages []string) (Mutation, error) {
+	mut, err := s.commitEdit(ctx, message, before, edit)
+	if err != nil {
+		return mut, err
+	}
+	if !s.Apply || !s.Sync {
+		return mut, nil
+	}
+	for _, st := range syncStages {
+		if err := s.syncStage(ctx, d, st); err != nil {
+			return mut, err
+		}
+		// CLI waits until healthy. The console sets NoWait and watches live status.
+		if !s.NoWait {
+			if err := s.waitStage(ctx, d, st); err != nil {
+				return mut, err
+			}
+		}
+	}
+	mut.Synced = len(syncStages) > 0
+	return mut, nil
+}
+
+func (s *Service) commitEdit(ctx context.Context, message string, before render.Tree, edit func(render.Tree) error) (Mutation, error) {
 	if s != nil && s.Lock != nil {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
@@ -60,20 +83,6 @@ func (s *Service) mutate(ctx context.Context, d *spec.Deployable, message string
 		}
 		mut.Pushed = true
 		mut.Ref = pushed.Ref()
-	}
-	if s.Sync {
-		for _, st := range syncStages {
-			if err := s.syncStage(ctx, d, st); err != nil {
-				return mut, err
-			}
-			// CLI waits until healthy. The console sets NoWait and watches live status.
-			if !s.NoWait {
-				if err := s.waitStage(ctx, d, st); err != nil {
-					return mut, err
-				}
-			}
-		}
-		mut.Synced = len(syncStages) > 0
 	}
 	return mut, nil
 }

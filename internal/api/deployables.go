@@ -66,7 +66,13 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	if items == nil {
 		items = []item{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"deployables": items})
+	out := map[string]any{"deployables": items}
+	if s.Release != nil {
+		if pause := s.Release.CurrentPause(); !pause.Empty() {
+			out["pause"] = pause
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) updates(w http.ResponseWriter, r *http.Request) {

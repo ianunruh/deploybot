@@ -29,12 +29,14 @@ import {
   pinDeployable,
   promoteDeployable,
   rollbackDeployable,
+  submitPauseForm,
   type DeployableStatus,
   type ImageVersion,
   type MutationResult,
   type StageStatus,
   type UpdateStatus as RegistryUpdate,
 } from "~/lib/api.server";
+
 import { notifyActionError, notifyActionSuccess } from "~/lib/action-feedback";
 import { formatAbsolute } from "~/lib/time";
 import { useFetcherResult } from "~/lib/use-fetcher-result";
@@ -51,6 +53,7 @@ import {
   mutationNote,
 } from "~/ui/mutation-controls";
 import { PageHeader } from "~/ui/page-header";
+import { PauseBanners, PauseButton } from "~/ui/pause-panel";
 import { PromoteChangelog } from "~/ui/promote-changelog";
 import { updatesNameHref } from "~/ui/resource-filter";
 import { UpdateBadge } from "~/ui/status-badge";
@@ -91,6 +94,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { ok: false, error: "missing name" } satisfies ActionData;
   }
   const form = await request.formData();
+  const pause = await submitPauseForm(form, actorHeaders(request));
+  if (pause) return pause;
   const intent = String(form.get("intent") ?? "");
   try {
     switch (intent) {
@@ -406,6 +411,11 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
         }
         actions={
           <Group gap="sm">
+            <PauseButton
+              app={status.name}
+              stages={stages.map((st) => st.name)}
+              action={actionPath}
+            />
             <Button
               variant="default"
               onClick={() => {
@@ -430,6 +440,13 @@ export default function DeployableDetail({ loaderData }: Route.ComponentProps) {
       />
 
       <MutationModeAlert apply={status.apply} push={status.push} />
+
+      <PauseBanners
+        pause={status.pause}
+        app={status.name}
+        stages={stages.map((st) => st.name)}
+        action={actionPath}
+      />
 
       {stages
         .filter(

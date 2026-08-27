@@ -18,6 +18,7 @@ const (
 	HopWaitingApproval = "waiting_approval"
 	HopReady           = "ready"
 	HopBehind          = "behind"
+	HopPaused          = "paused"
 )
 
 type Flow struct {
@@ -47,6 +48,7 @@ type stageSnap struct {
 	policy       *spec.PromotePolicy
 	hasArgo      bool
 	disconnected bool
+	paused       bool
 }
 
 func buildFlow(snaps []stageSnap, now time.Time) Flow {
@@ -76,6 +78,10 @@ func hopBetween(src, dest stageSnap, now time.Time) Hop {
 	}
 	if dest.pinnedAt != nil && src.pinnedAt != nil && dest.pinnedAt.After(*src.pinnedAt) && !dest.ref.IsZero() {
 		h.State = HopDestAhead
+		return h
+	}
+	if dest.paused {
+		h.State = HopPaused
 		return h
 	}
 	p := dest.policy

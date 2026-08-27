@@ -44,6 +44,9 @@ func (s *Service) Promote(ctx context.Context, name, from, to, imageRef string) 
 		}
 	}
 	return s.mutate(ctx, d, fmt.Sprintf("promote %s %s -> %s (%s)", name, from, to, img.LogName()), tree, func(tree render.Tree) error {
+		if err := s.denyIfPaused(name, to); err != nil {
+			return err
+		}
 		return render.Pin(tree, d, to, img)
 	}, []string{to})
 }

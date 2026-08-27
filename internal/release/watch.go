@@ -2,6 +2,7 @@ package release
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 )
@@ -53,6 +54,10 @@ func (s *Service) ReconcileFlows(ctx context.Context) {
 			}
 			slog.Info("auto-promote", "deployable", d.Metadata.Name, "from", hop.From, "to", hop.To, "image", hop.SourceImage)
 			if _, err := s.WithActor(ActorAutoPromote()).Promote(ctx, d.Metadata.Name, hop.From, hop.To, hop.SourceImage); err != nil {
+				if errors.Is(err, ErrPaused) {
+					slog.Info("auto-promote skipped", "deployable", d.Metadata.Name, "from", hop.From, "to", hop.To, "err", err)
+					continue
+				}
 				slog.Warn("auto-promote", "deployable", d.Metadata.Name, "from", hop.From, "to", hop.To, "err", err)
 			}
 		}

@@ -81,6 +81,33 @@ func TestHopSourceStaleBlocksAutoPromote(t *testing.T) {
 	}
 }
 
+func TestHopPaused(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	src := stageSnap{
+		name:    "homelab",
+		ref:     image.MustParse("ghcr.io/ianunruh/kmc@sha256:abc"),
+		health:  "Healthy",
+		hasArgo: true,
+	}
+	dest := stageSnap{
+		name: "prod",
+		ref:  image.MustParse("ghcr.io/ianunruh/kmc@sha256:old"),
+		policy: &spec.PromotePolicy{
+			After: []string{spec.AfterHealthy},
+		},
+		paused: true,
+	}
+	hop := hopBetween(src, dest, now)
+	if hop.State != HopPaused {
+		t.Fatalf("%+v", hop)
+	}
+	caught := hopBetween(src, stageSnap{name: "prod", ref: src.ref, paused: true}, now)
+	if caught.State != HopCaughtUp {
+		t.Fatalf("caught up stays %q", caught.State)
+	}
+}
+
 func TestHopReadyAutoPromote(t *testing.T) {
 	t.Parallel()
 	now := time.Now().UTC()

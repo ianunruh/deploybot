@@ -33,6 +33,19 @@ func TestActorGitAuthor(t *testing.T) {
 	}
 }
 
+func TestActorAutomated(t *testing.T) {
+	t.Parallel()
+	if (Actor{}).Automated() || (Actor{Kind: ActorKindUser, ID: "ian"}).Automated() {
+		t.Fatal("console/CLI must not be automated")
+	}
+	if !ActorAutoPin().Automated() || !ActorAutoPromote().Automated() {
+		t.Fatal("auto writers must be automated")
+	}
+	if !(Actor{Kind: ActorKindGitHubActions}).Automated() {
+		t.Fatal("github actions must be automated")
+	}
+}
+
 func TestActorTrailers(t *testing.T) {
 	t.Parallel()
 	if got := (Actor{}).AppendTrailers("pin kmc homelab to img"); got != "pin kmc homelab to img" {

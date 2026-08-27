@@ -167,6 +167,22 @@ export type UpdateList = {
   sync: boolean;
 };
 
+export type PauseEntry = {
+  at?: string;
+  by?: string;
+  reason?: string;
+};
+
+export type AppPause = PauseEntry & {
+  stages?: Record<string, PauseEntry>;
+};
+
+export type PauseFile = {
+  all?: PauseEntry;
+  stages?: Record<string, PauseEntry>;
+  apps?: Record<string, AppPause>;
+};
+
 export type DeployableSummary = {
   name: string;
   namespace: string;
@@ -220,6 +236,7 @@ export type DeployableStatus = {
   push: boolean;
   sync: boolean;
   update?: UpdateStatus;
+  pause?: PauseFile;
 };
 
 export type StageWorkload = {
@@ -294,7 +311,9 @@ export type MutationResult = {
 };
 
 export function listDeployables() {
-  return apiFetch<{ deployables: DeployableSummary[] }>("/api/v1/deployables");
+  return apiFetch<{ deployables: DeployableSummary[]; pause?: PauseFile }>(
+    "/api/v1/deployables",
+  );
 }
 
 export function listUpdates() {
@@ -441,6 +460,70 @@ export function previewReconcile(name: string, stage: string) {
   return apiFetch<MutationResult>(
     `/api/v1/deployables/${encodeURIComponent(name)}/reconcile?${q}`,
   );
+}
+
+export function pauseDeployments(opts: {
+  name?: string;
+  stage?: string;
+  reason?: string;
+  headers?: HeadersInit;
+}) {
+  return apiFetch<MutationResult>("/api/v1/pause", {
+    method: "POST",
+    headers: opts.headers,
+    body: JSON.stringify({
+      ...(opts.name ? { name: opts.name } : {}),
+      ...(opts.stage ? { stage: opts.stage } : {}),
+      ...(opts.reason ? { reason: opts.reason } : {}),
+    }),
+  });
+}
+
+export function unpauseDeployments(opts: {
+  name?: string;
+  stage?: string;
+  headers?: HeadersInit;
+}) {
+  return apiFetch<MutationResult>("/api/v1/unpause", {
+    method: "POST",
+    headers: opts.headers,
+    body: JSON.stringify({
+      ...(opts.name ? { name: opts.name } : {}),
+      ...(opts.stage ? { stage: opts.stage } : {}),
+    }),
+  });
+}
+
+export type PauseActionData =
+  { ok: true; intent: string; result?: MutationResult } | { ok: false; error: string };
+
+export async function submitPauseForm(
+  form: FormData,
+  headers: HeadersInit,
+): Promise<PauseActionData | null> {
+  const intent = String(form.get("intent") ?? "");
+  if (intent !== "pause" && intent !== "unpause") return null;
+  const name = String(form.get("name") ?? "").trim();
+  const stage = String(form.get("stage") ?? "").trim();
+  const reason = String(form.get("reason") ?? "").trim();
+  try {
+    const result =
+      intent === "pause"
+        ? await pauseDeployments({
+            name: name || undefined,
+            stage: stage || undefined,
+            reason: reason || undefined,
+            headers,
+          })
+        : await unpauseDeployments({
+            name: name || undefined,
+            stage: stage || undefined,
+            headers,
+          });
+    return { ok: true, intent, result };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export function reconcileDeployable(

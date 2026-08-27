@@ -29,6 +29,9 @@ func (s *Service) Pin(ctx context.Context, name, stage, imageRef string) (Mutati
 		return Mutation{}, err
 	}
 	return s.mutate(ctx, d, fmt.Sprintf("pin %s %s to %s", name, stage, ref.LogName()), tree, func(tree render.Tree) error {
+		if err := s.denyIfPaused(name, stage); err != nil {
+			return err
+		}
 		return render.Pin(tree, d, stage, ref)
 	}, []string{stage})
 }

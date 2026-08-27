@@ -13,7 +13,8 @@ import { IconExternalLink, IconLayoutGrid, IconTable } from "@tabler/icons-react
 import type { KeyboardEvent } from "react";
 import { Link, useNavigate } from "react-router";
 
-import type { DeployableSummary, StageStatus } from "~/lib/api.server";
+import type { DeployableSummary, PauseFile, StageStatus } from "~/lib/api.server";
+import { visiblePauses } from "~/lib/pause";
 import { formatRelative } from "~/lib/time";
 import { ConsolePaper } from "~/ui/console-paper";
 import { DeployableLinkIcons, ObservabilityClusterMenus } from "~/ui/external-links";
@@ -21,7 +22,7 @@ import { RelativeTime } from "~/ui/relative-time";
 import { ReleaseFlowInline } from "~/ui/release-flow";
 import { updatesNameHref } from "~/ui/resource-filter";
 import { ResourceTable, Table } from "~/ui/resource-table";
-import { UpdateBadge } from "~/ui/status-badge";
+import { PauseBadge, UpdateBadge } from "~/ui/status-badge";
 
 export type CatalogViewMode = "cards" | "table";
 
@@ -63,10 +64,12 @@ export function CatalogViewToggle({
 export function CatalogView({
   deployables,
   view,
+  pause,
   emptyMessage = "No deployable specs found.",
 }: {
   deployables: DeployableSummary[];
   view: CatalogViewMode;
+  pause?: PauseFile;
   emptyMessage?: string;
 }) {
   if (deployables.length === 0) {
@@ -77,7 +80,7 @@ export function CatalogView({
     );
   }
   if (view === "table") {
-    return <CatalogTable deployables={deployables} />;
+    return <CatalogTable deployables={deployables} pause={pause} />;
   }
   return (
     <Stack gap="xl">
@@ -89,7 +92,7 @@ export function CatalogView({
           <Grid gap="md" align="start">
             {section.items.map((d) => (
               <Grid.Col key={d.name} span={{ base: 12, sm: 6, lg: 4 }}>
-                <CatalogCard deployable={d} />
+                <CatalogCard deployable={d} pause={pause} />
               </Grid.Col>
             ))}
           </Grid>
@@ -99,7 +102,13 @@ export function CatalogView({
   );
 }
 
-function CatalogTable({ deployables }: { deployables: DeployableSummary[] }) {
+function CatalogTable({
+  deployables,
+  pause,
+}: {
+  deployables: DeployableSummary[];
+  pause?: PauseFile;
+}) {
   return (
     <ResourceTable
       headers={["Name", "Project", "Namespace", "Flow", "Last deploy", "Links"]}
@@ -118,6 +127,7 @@ function CatalogTable({ deployables }: { deployables: DeployableSummary[] }) {
                 >
                   {d.name}
                 </Text>
+                {catalogPaused(pause, d) ? <PauseBadge /> : null}
                 {d.update?.stale ? (
                   <UpdateBadge stale to={updatesNameHref(d.name)} />
                 ) : null}
@@ -174,7 +184,13 @@ function CatalogTable({ deployables }: { deployables: DeployableSummary[] }) {
   );
 }
 
-function CatalogCard({ deployable: d }: { deployable: DeployableSummary }) {
+function CatalogCard({
+  deployable: d,
+  pause,
+}: {
+  deployable: DeployableSummary;
+  pause?: PauseFile;
+}) {
   const navigate = useNavigate();
   const href = `/deployables/${d.name}`;
   const open = openHref(d.stages ?? []);
@@ -206,6 +222,7 @@ function CatalogCard({ deployable: d }: { deployable: DeployableSummary }) {
               <Text fw={600} truncate>
                 {d.name}
               </Text>
+              {catalogPaused(pause, d) ? <PauseBadge /> : null}
               {d.update?.stale ? (
                 <UpdateBadge stale to={updatesNameHref(d.name)} />
               ) : null}
@@ -302,6 +319,16 @@ function stageDotLabel(st: StageStatus): string {
     return `${st.name}: ${health} (unreachable${seen})`;
   }
   return `${st.name}: ${health}`;
+}
+
+function catalogPaused(pause: PauseFile | undefined, d: DeployableSummary): boolean {
+  return (
+    visiblePauses(
+      pause,
+      d.name,
+      (d.stages ?? []).map((st) => st.name),
+    ).length > 0
+  );
 }
 
 function healthDotColor(status?: string): string {

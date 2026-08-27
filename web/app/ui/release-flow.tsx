@@ -17,6 +17,7 @@ const HOP_LABEL: Record<string, string> = {
   waiting_approval: "waiting for approval",
   ready: "ready to promote",
   behind: "behind",
+  paused: "paused",
 };
 
 const HOP_COLOR: Record<string, string> = {
@@ -28,6 +29,7 @@ const HOP_COLOR: Record<string, string> = {
   waiting_approval: "accent",
   ready: "teal",
   behind: "gray",
+  paused: "orange",
 };
 
 function hopLabel(hop: FlowHop): string {

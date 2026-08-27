@@ -90,6 +90,35 @@ func TestReconcileFlowsAutoPromote(t *testing.T) {
 	}
 }
 
+func TestReconcileFlowsPauseDoesNotPromote(t *testing.T) {
+	t.Parallel()
+	dir := initOpsRepo(t)
+	fake := argo.NewFake()
+	fake.Set("kmc", argo.Status{Health: "Healthy", Sync: "Synced"})
+	svc := &Service{
+		Catalog: catalogYAML(t, miniKMC),
+		OpsRepo: dir,
+		Apply:   true,
+		Sync:    true,
+		Argo:    argo.StaticRouter{Client: fake},
+		Wait:    time.Second,
+		Author:  gitwrite.Author{Name: "t", Email: "t@t"},
+	}
+	if _, err := svc.Pin(t.Context(), "kmc", "homelab", "ghcr.io/ianunruh/kmc@sha256:abc"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.SetPause(t.Context(), "", "prod", "freeze"); err != nil {
+		t.Fatal(err)
+	}
+	svc.RefreshLive(t.Context())
+	svc.ReconcileFlows(t.Context())
+	tree := mustOpenTree(t, dir)
+	d := mustKMC(t, svc)
+	if _, err := render.CurrentImage(tree, d, "prod"); err == nil {
+		t.Fatal("paused prod must not auto-promote")
+	}
+}
+
 func TestReconcileFlowsApprovalDoesNotPromote(t *testing.T) {
 	t.Parallel()
 	body := `

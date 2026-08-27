@@ -2,9 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/ianunruh/deploybot/internal/release"
 )
 
 func withJSON(next http.Handler) http.Handler {
@@ -31,6 +34,8 @@ func writeError(w http.ResponseWriter, err error) {
 	status := http.StatusBadRequest
 	if isNotFound(err) {
 		status = http.StatusNotFound
+	} else if errors.Is(err, release.ErrPaused) {
+		status = http.StatusConflict
 	}
 	writeJSON(w, status, map[string]string{"error": err.Error()})
 }

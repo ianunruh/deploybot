@@ -30,6 +30,17 @@ type Actor struct {
 func ActorAutoPin() Actor     { return Actor{Kind: ActorKindAutoPin} }
 func ActorAutoPromote() Actor { return Actor{Kind: ActorKindAutoPromote} }
 
+// Automated is true for CI and scheduled writers. Pause blocks those, not
+// console or CLI pins and promotes.
+func (a Actor) Automated() bool {
+	switch a.Kind {
+	case ActorKindAutoPin, ActorKindAutoPromote, ActorKindGitHubActions:
+		return true
+	default:
+		return false
+	}
+}
+
 // GitAuthor is the commit author for this actor. Zero if Kind is empty so
 // the process default author is used.
 func (a Actor) GitAuthor() gitwrite.Author {

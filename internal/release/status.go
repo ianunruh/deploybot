@@ -55,6 +55,7 @@ type Status struct {
 	Push       bool          `json:"push"`
 	Sync       bool          `json:"sync"`
 	Update     *UpdateStatus `json:"update,omitempty"`
+	Pause      *PauseFile    `json:"pause,omitempty"`
 }
 
 // Live is a catalog-list snapshot: newest Argo deployedAt, stage health, and
@@ -180,6 +181,12 @@ func (s *Service) buildStatus(ctx context.Context, d *spec.Deployable, tree rend
 			policy:       st.Promote,
 			hasArgo:      s.Argo != nil && s.Argo.ForStage(st.Name) != nil,
 			disconnected: disconnected,
+		}
+	}
+	if pause := s.CurrentPause(); !pause.Empty() {
+		out.Pause = &pause
+		for i, st := range d.Spec.Stages {
+			snaps[i].paused = pause.Hit(d.Metadata.Name, st.Name) != nil
 		}
 	}
 	out.Flow = buildFlow(snaps, time.Now().UTC())

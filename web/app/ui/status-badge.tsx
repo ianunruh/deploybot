@@ -78,6 +78,34 @@ export function EventKindBadge({ kind }: { kind: string }) {
   );
 }
 
+export function PauseBadge() {
+  return (
+    <Badge
+      color="orange"
+      variant="light"
+      size="sm"
+      radius="sm"
+      tt="uppercase"
+      styles={{
+        root: {
+          fontFamily: "inherit",
+          letterSpacing: "0.04em",
+          maxWidth: "none",
+          overflow: "visible",
+          flexShrink: 0,
+        },
+        label: {
+          overflow: "visible",
+          textOverflow: "unset",
+          whiteSpace: "nowrap",
+        },
+      }}
+    >
+      paused
+    </Badge>
+  );
+}
+
 export function UpdateBadge({
   stale,
   error,
