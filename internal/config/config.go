@@ -24,8 +24,8 @@ type File struct {
 	Clusters   map[string]Cluster `yaml:"clusters,omitempty"`
 }
 
-// Valkey is the local live-state cache. Addr is host:port. Empty means the
-// API process keeps snapshots in memory only.
+// Valkey is the local live-state and overlay-history cache. Addr is
+// host:port. Empty means the API process keeps snapshots in memory only.
 type Valkey struct {
 	Addr string `yaml:"addr,omitempty"`
 }

@@ -47,11 +47,28 @@ func HeadHash(repoDir string) (string, error) {
 // Walks first-parent history from HEAD and compares overlay blobs. It does
 // not use go-git PathFilter, which diffs every commit in the repo.
 func LogPaths(ctx context.Context, repoDir string, paths []string, limit int) ([]Rev, error) {
+	revs, _, err := logPaths(ctx, repoDir, paths, limit, "")
+	return revs, err
+}
+
+// LogPathsAfter returns matching commits newer than sinceHash (exclusive,
+// newest first). found is true if sinceHash was reached so the result is a
+// complete prefix of history since that commit. A missing sinceHash means
+// the caller should rewalk from HEAD.
+func LogPathsAfter(ctx context.Context, repoDir string, paths []string, sinceHash string, limit int) ([]Rev, bool, error) {
+	if sinceHash == "" {
+		revs, err := LogPaths(ctx, repoDir, paths, limit)
+		return revs, true, err
+	}
+	return logPaths(ctx, repoDir, paths, limit, sinceHash)
+}
+
+func logPaths(ctx context.Context, repoDir string, paths []string, limit int, sinceHash string) ([]Rev, bool, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if repoDir == "" || len(paths) == 0 {
-		return nil, nil
+		return nil, sinceHash == "", nil
 	}
 	want := make(map[string]struct{}, len(paths))
 	for _, p := range paths {
@@ -60,30 +77,35 @@ func LogPaths(ctx context.Context, repoDir string, paths []string, limit int) ([
 		}
 	}
 	if len(want) == 0 {
-		return nil, nil
+		return nil, sinceHash == "", nil
 	}
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	repo, err := git.PlainOpen(repoDir)
 	if err != nil {
-		return nil, fmt.Errorf("open repo %s: %w", repoDir, err)
+		return nil, false, fmt.Errorf("open repo %s: %w", repoDir, err)
 	}
 	head, err := repo.Head()
 	if err != nil {
-		return nil, nil
+		return nil, sinceHash == "", nil
 	}
 	iter, err := repo.Log(&git.LogOptions{From: head.Hash()})
 	if err != nil {
-		return nil, fmt.Errorf("log: %w", err)
+		return nil, false, fmt.Errorf("log: %w", err)
 	}
 	defer iter.Close()
 
 	var out []Rev
 	walked := 0
+	found := sinceHash == ""
 	err = iter.ForEach(func(c *object.Commit) error {
 		if err := ctx.Err(); err != nil {
 			return err
+		}
+		if sinceHash != "" && c.Hash.String() == sinceHash {
+			found = true
+			return storer.ErrStop
 		}
 		if limit > 0 && len(out) >= limit {
 			return storer.ErrStop
@@ -121,9 +143,12 @@ func LogPaths(ctx context.Context, repoDir string, paths []string, limit int) ([
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return out, nil
+	if sinceHash != "" && !found {
+		return nil, false, nil
+	}
+	return out, true, nil
 }
 
 func pathsChanged(want map[string]struct{}, files, prev map[string][]byte) bool {

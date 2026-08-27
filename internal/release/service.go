@@ -34,8 +34,11 @@ type Service struct {
 	Commits     image.CommitLookup
 	Compares    image.CompareLookup
 	Actions     image.WorkflowLookup
-	// Valkey is host:port for the local live snapshot. Empty means memory only.
+	// Valkey is host:port for the local live snapshot and overlay commit
+	// log. Empty means memory only.
 	Valkey string
+	// OverlayEvery is how often WatchOverlays refreshes the git commit log.
+	OverlayEvery time.Duration
 
 	// Lock serializes git mutations (HTTP pin, auto-promote, auto-pin).
 	Lock      *sync.Mutex
@@ -43,14 +46,6 @@ type Service struct {
 	update    *updateState
 	live      *liveStore
 	cacheOnce *sync.Once
-}
-
-type overlayCache struct {
-	mu          sync.Mutex
-	head        string
-	events      map[string][]Event
-	global      []Event
-	globalLimit int
 }
 
 type Mutation struct {
@@ -116,7 +111,7 @@ func (s *Service) initCaches() {
 			s.update.ttl = defaultListingTTL
 		}
 		if s.overlays == nil {
-			s.overlays = &overlayCache{events: map[string][]Event{}}
+			s.overlays = newOverlayCache(s.Valkey)
 		}
 		if s.live == nil {
 			s.live = newLiveStore(s.Valkey)

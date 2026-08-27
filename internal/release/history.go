@@ -133,18 +133,20 @@ func (s *Service) overlayChanges(ctx context.Context, d *spec.Deployable, limit 
 		return s.computeOverlayChanges(ctx, d, limit)
 	}
 	s.initCaches()
-	c := s.overlays
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	resetOverlayCache(c, head)
-	if ev, ok := c.events[d.Metadata.Name]; ok {
+	if s.overlays != nil {
+		s.overlays.hydrate(ctx)
+	}
+	if ev, ok := s.cachedOverlayEvents(head, d.Metadata.Name, limit); ok {
+		return ev, nil
+	}
+	if ev, ok := s.deriveOverlayEvents(head, d); ok {
 		return clipEvents(ev, limit), nil
 	}
 	ev, err := s.computeOverlayChanges(ctx, d, defaultHistoryLimit)
 	if err != nil {
 		return nil, err
 	}
-	c.events[d.Metadata.Name] = ev
+	s.storeOverlayEvents(head, d.Metadata.Name, ev)
 	return clipEvents(ev, limit), nil
 }
 
@@ -158,33 +160,21 @@ func (s *Service) allOverlayChanges(ctx context.Context, limit int) ([]Event, er
 		return s.computeAllOverlayChanges(ctx, limit)
 	}
 	s.initCaches()
-	c := s.overlays
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	resetOverlayCache(c, head)
-	if c.global != nil && (len(c.global) >= limit || c.globalLimit >= limit) {
-		return clipEvents(c.global, limit), nil
+	if s.overlays != nil {
+		s.overlays.hydrate(ctx)
+	}
+	if ev, ok := s.cachedGlobalEvents(head, limit); ok {
+		return ev, nil
+	}
+	if ev, ok := s.deriveGlobalEvents(head); ok {
+		return clipEvents(ev, limit), nil
 	}
 	ev, err := s.computeAllOverlayChanges(ctx, limit)
 	if err != nil {
 		return nil, err
 	}
-	if ev == nil {
-		ev = []Event{}
-	}
-	c.global = ev
-	c.globalLimit = limit
+	s.storeGlobalEvents(head, ev, limit)
 	return clipEvents(ev, limit), nil
-}
-
-func resetOverlayCache(c *overlayCache, head string) {
-	if c == nil || c.head == head {
-		return
-	}
-	c.head = head
-	c.events = map[string][]Event{}
-	c.global = nil
-	c.globalLimit = 0
 }
 
 func clipEvents(events []Event, limit int) []Event {
@@ -253,6 +243,10 @@ func (s *Service) overlayEvents(ctx context.Context, paths []string, byPath map[
 	if err != nil {
 		return nil, err
 	}
+	return eventsFromRevs(revs, paths, byPath, eventLimit), nil
+}
+
+func eventsFromRevs(revs []gitwrite.Rev, paths []string, byPath map[string]overlayHit, eventLimit int) []Event {
 	var events []Event
 	for _, rev := range revs {
 		kind := eventKind(rev.Message)
@@ -270,11 +264,11 @@ func (s *Service) overlayEvents(ctx context.Context, paths []string, byPath map[
 			}
 			events = append(events, ev)
 			if eventLimit > 0 && len(events) >= eventLimit {
-				return events, nil
+				return events
 			}
 		}
 	}
-	return events, nil
+	return events
 }
 
 func overlayChange(hit overlayHit, path, kind string, rev gitwrite.Rev) (Event, bool) {

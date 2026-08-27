@@ -3,6 +3,7 @@ package gitwrite
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,5 +79,69 @@ func TestLogPathsEmpty(t *testing.T) {
 	got, err := LogPaths(t.Context(), "", []string{"a"}, 10)
 	if err != nil || got != nil {
 		t.Fatalf("%v %+v", err, got)
+	}
+}
+
+func TestLogPathsAfter(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	repo, err := git.PlainInit(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt, err := repo.Worktree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	write := func(rel, body, msg string) {
+		t.Helper()
+		fp := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(fp), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(fp, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := wt.Add(rel); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := wt.Commit(msg, &git.CommitOptions{
+			Author: &object.Signature{Name: "t", Email: "t@t", When: time.Now()},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	overlay := "k8s/kmc/overlays/homelab/kustomization.yaml"
+	write("README", "ops\n", "init")
+	write(overlay, "resources:\n  - ../../base\n", "add overlay")
+	since, err := HeadHash(dir)
+	if err != nil || since == "" {
+		t.Fatalf("since %q %v", since, err)
+	}
+	write(overlay, "resources:\n  - ../../base\nimages:\n  - name: ghcr.io/ianunruh/kmc\n    digest: sha256:abc\n", "pin abc")
+	write(overlay, "resources:\n  - ../../base\nimages:\n  - name: ghcr.io/ianunruh/kmc\n    digest: sha256:def\n", "pin def")
+
+	newer, found, err := LogPathsAfter(t.Context(), dir, []string{overlay}, since, 0)
+	if err != nil || !found {
+		t.Fatalf("after %v found=%v", err, found)
+	}
+	if len(newer) != 2 {
+		t.Fatalf("newer %d", len(newer))
+	}
+	if !strings.HasPrefix(newer[0].Message, "pin def") {
+		t.Fatalf("newest %q", newer[0].Message)
+	}
+
+	head, err := HeadHash(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	empty, found, err := LogPathsAfter(t.Context(), dir, []string{overlay}, head, 0)
+	if err != nil || !found || len(empty) != 0 {
+		t.Fatalf("at head %+v found=%v %v", empty, found, err)
+	}
+	missing, found, err := LogPathsAfter(t.Context(), dir, []string{overlay}, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)
+	if err != nil || found || missing != nil {
+		t.Fatalf("missing %+v found=%v %v", missing, found, err)
 	}
 }

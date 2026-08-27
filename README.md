@@ -123,11 +123,14 @@ drilldown (homelab only today).
 
 `serve` polls Argo Applications and workloads on each cluster in the
 background and serves catalog/detail/workload reads from that snapshot.
-User requests never wait on kube. `valkey.addr` hydrates and persists the
-snapshot across API restarts (`DEPLOYBOT_VALKEY` overrides). Each cluster runs
-its own Valkey (`deploybot-valkey`). When a cluster is unreachable the API
-keeps last-known health and the console marks the stage stale. Auto-promote
-does not fire off a disconnected source.
+User requests never wait on kube. Overlay git history is walked the same
+way: a background loop fills a commit log that the global and per-app
+history pages both read. `valkey.addr` hydrates and persists the live
+snapshot and that overlay log across API restarts (`DEPLOYBOT_VALKEY`
+overrides). Each cluster runs its own Valkey (`deploybot-valkey`). When a
+cluster is unreachable the API keeps last-known health and the console
+marks the stage stale. Auto-promote does not fire off a disconnected
+source.
 
 ### Registry and git auth
 

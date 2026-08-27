@@ -101,6 +101,7 @@ func runServe(ctx context.Context, args []string) error {
 	defer cancel()
 	var wg sync.WaitGroup
 	wg.Go(func() { svc.WatchLive(ctx) })
+	wg.Go(func() { svc.WatchOverlays(ctx) })
 	wg.Go(func() { svc.WatchFlows(ctx) })
 	wg.Go(func() { svc.WatchUpdates(ctx) })
 	wg.Go(func() {
