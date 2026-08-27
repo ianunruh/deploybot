@@ -1,5 +1,7 @@
 import { CloseButton, Group, Select, TextInput } from "@mantine/core";
+import { useDebouncedCallback } from "@mantine/hooks";
 import { IconSearch } from "@tabler/icons-react";
+import { useState } from "react";
 import { useSearchParams } from "react-router";
 
 export type ResourceFilters = {
@@ -9,16 +11,18 @@ export type ResourceFilters = {
 };
 
 const PARAMS = ["name", "namespace", "project"] as const;
+const NAME_DEBOUNCE_MS = 300;
 
 export function useResourceFilters(): [ResourceFilters, (next: ResourceFilters) => void] {
   const [searchParams, setSearchParams] = useSearchParams();
-  const filters: ResourceFilters = {
+  const urlFilters: ResourceFilters = {
     name: searchParams.get("name") ?? "",
     namespace: searchParams.get("namespace") ?? "",
     project: searchParams.get("project") ?? "",
   };
+  const [name, setName] = useState(urlFilters.name);
 
-  function setFilters(next: ResourceFilters) {
+  function writeParams(next: ResourceFilters) {
     setSearchParams(
       (prev) => {
         const params = new URLSearchParams(prev);
@@ -33,7 +37,28 @@ export function useResourceFilters(): [ResourceFilters, (next: ResourceFilters) 
     );
   }
 
-  return [filters, setFilters];
+  const commitName = useDebouncedCallback((nextName: string) => {
+    if (nextName === urlFilters.name) return;
+    writeParams({ ...urlFilters, name: nextName });
+  }, NAME_DEBOUNCE_MS);
+
+  if (!commitName.isPending() && name !== urlFilters.name) {
+    setName(urlFilters.name);
+  }
+
+  function setFilters(next: ResourceFilters) {
+    setName(next.name);
+    const nameOnly =
+      next.namespace === urlFilters.namespace && next.project === urlFilters.project;
+    if (nameOnly && next.name.trim()) {
+      commitName(next.name);
+      return;
+    }
+    commitName.cancel();
+    writeParams(next);
+  }
+
+  return [{ ...urlFilters, name }, setFilters];
 }
 
 export function matchesResourceFilters(
@@ -58,6 +83,32 @@ export function uniqueSorted(values: Array<string | undefined | null>): string[]
 
 export function updatesNameHref(name: string): string {
   return `/updates?${new URLSearchParams({ name })}`;
+}
+
+export function shouldRevalidateResourceFilters({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}: {
+  currentUrl: URL;
+  nextUrl: URL;
+  formMethod?: string;
+  defaultShouldRevalidate: boolean;
+}): boolean {
+  if (formMethod === "POST") return true;
+  if (currentUrl.pathname !== nextUrl.pathname) return defaultShouldRevalidate;
+  if (currentUrl.search === nextUrl.search) return defaultShouldRevalidate;
+  const current = new URLSearchParams(currentUrl.search);
+  const next = new URLSearchParams(nextUrl.search);
+  for (const key of PARAMS) {
+    current.delete(key);
+    next.delete(key);
+  }
+  current.sort();
+  next.sort();
+  if (current.toString() === next.toString()) return false;
+  return defaultShouldRevalidate;
 }
 
 export function ResourceFilterBar({

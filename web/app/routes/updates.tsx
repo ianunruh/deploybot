@@ -28,6 +28,7 @@ import { RelativeTime } from "~/ui/relative-time";
 import {
   matchesResourceFilters,
   ResourceFilterBar,
+  shouldRevalidateResourceFilters,
   uniqueSorted,
   useResourceFilters,
 } from "~/ui/resource-filter";
@@ -37,6 +38,8 @@ import { UpdateBadge } from "~/ui/status-badge";
 export function meta(_args: Route.MetaArgs) {
   return [{ title: "Updates · deploybot" }];
 }
+
+export const shouldRevalidate = shouldRevalidateResourceFilters;
 
 export async function loader(_args: Route.LoaderArgs) {
   try {

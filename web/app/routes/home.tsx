@@ -8,6 +8,7 @@ import { PageHeader } from "~/ui/page-header";
 import {
   matchesResourceFilters,
   ResourceFilterBar,
+  shouldRevalidateResourceFilters,
   uniqueSorted,
   useResourceFilters,
 } from "~/ui/resource-filter";
@@ -15,6 +16,8 @@ import {
 export function meta(_args: Route.MetaArgs) {
   return [{ title: "Catalog · deploybot" }];
 }
+
+export const shouldRevalidate = shouldRevalidateResourceFilters;
 
 export async function loader(_args: Route.LoaderArgs) {
   try {
