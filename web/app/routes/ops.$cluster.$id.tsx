@@ -96,7 +96,11 @@ export default function OpsExecution({ loaderData, params }: Route.ComponentProp
         </ConsolePaper>
       ) : null}
       <ConsolePaper>
-        <OpsLog key={`${cluster}:${id}`} src={`/ops/${cluster}/${id}/logs`} active={live} />
+        <OpsLog
+          key={`${cluster}:${id}`}
+          src={`/ops/${cluster}/${id}/logs`}
+          active={live}
+        />
       </ConsolePaper>
     </Stack>
   );

@@ -134,7 +134,10 @@ function OpsFieldControl({
   );
 }
 
-export function requiredParamsFilled(fields: OpsField[], values: OpsParamValues): boolean {
+export function requiredParamsFilled(
+  fields: OpsField[],
+  values: OpsParamValues,
+): boolean {
   for (const field of fields) {
     if (!field.required) continue;
     const v = values[field.name];
