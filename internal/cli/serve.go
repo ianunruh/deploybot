@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/ianunruh/deploybot/internal/gitwrite"
 	"github.com/ianunruh/deploybot/internal/image"
 	"github.com/ianunruh/deploybot/internal/release"
+	"github.com/ianunruh/deploybot/internal/valkey"
 )
 
 func runServe(ctx context.Context, args []string) error {
@@ -75,6 +77,9 @@ func runServe(ctx context.Context, args []string) error {
 	token, tokenSrc := image.ResolveToken()
 	httpClient := &http.Client{Timeout: 20 * time.Second}
 	gh := &image.GitHub{Token: token, HTTPClient: httpClient}
+	if a := strings.TrimSpace(s.valkey); a != "" {
+		gh.Persist = &valkey.Client{Addr: a}
+	}
 	hub := image.NewDockerHub()
 	hub.HTTPClient = httpClient
 	svc := &release.Service{

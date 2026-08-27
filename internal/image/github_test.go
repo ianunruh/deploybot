@@ -3,11 +3,14 @@ package image
 import (
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ianunruh/deploybot/internal/valkey"
 )
 
 func TestGitHubListPackagesNewestFirst(t *testing.T) {
@@ -161,6 +164,54 @@ func TestGitHubLookupCommit(t *testing.T) {
 	}
 	if _, err := g.LookupCommit(t.Context(), "https://gitlab.com/ianunruh/kmc", "b8e5098"); err == nil {
 		t.Fatal("expected gitlab error")
+	}
+}
+
+func TestGitHubLookupCommitValkeyRoundTrip(t *testing.T) {
+	t.Parallel()
+	var hits int
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/ianunruh/kmc/commits/b8e5098", func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		writeJSON(t, w, map[string]any{
+			"sha":      "b8e509806517abcdef",
+			"html_url": "https://github.com/ianunruh/kmc/commit/b8e509806517abcdef",
+			"commit": map[string]any{
+				"message": "Fix the thing\n\nMore detail.",
+				"author":  map[string]any{"name": "Ian Unruh"},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	go (&valkey.Memory{}).Listen(ln)
+	persist := &valkey.Client{Addr: ln.Addr().String()}
+
+	warm := &GitHub{APIBase: srv.URL, HTTPClient: srv.Client(), Persist: persist}
+	got, err := warm.LookupCommit(t.Context(), "https://github.com/ianunruh/kmc", "b8e5098")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SHA != "b8e509806517abcdef" || got.Message != "Fix the thing" {
+		t.Fatalf("%+v", got)
+	}
+
+	cold := &GitHub{APIBase: srv.URL, HTTPClient: srv.Client(), Persist: persist}
+	again, err := cold.LookupCommit(t.Context(), "https://github.com/ianunruh/kmc", "b8e5098")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again != got {
+		t.Fatalf("hydrate %+v", again)
+	}
+	if hits != 1 {
+		t.Fatalf("hits %d", hits)
 	}
 }
 
@@ -432,7 +483,7 @@ func TestWorkflowStatus(t *testing.T) {
 	}
 }
 
-func TestGitHubLookupCommitNotFoundCached(t *testing.T) {
+func TestGitHubLookupCommitNotFoundNotCached(t *testing.T) {
 	t.Parallel()
 	var hits int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -440,15 +491,29 @@ func TestGitHubLookupCommitNotFoundCached(t *testing.T) {
 		http.Error(w, `{"message":"Not Found"}`, http.StatusNotFound)
 	}))
 	t.Cleanup(srv.Close)
-	g := &GitHub{APIBase: srv.URL, HTTPClient: srv.Client()}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	go (&valkey.Memory{}).Listen(ln)
+	persist := &valkey.Client{Addr: ln.Addr().String()}
+	g := &GitHub{APIBase: srv.URL, HTTPClient: srv.Client(), Persist: persist}
 	if _, err := g.LookupCommit(t.Context(), "https://github.com/ianunruh/kmc", "deadbee"); err == nil {
 		t.Fatal("expected error")
 	}
 	if _, err := g.LookupCommit(t.Context(), "https://github.com/ianunruh/kmc", "deadbee"); err == nil {
-		t.Fatal("expected cached error")
+		t.Fatal("expected error")
 	}
-	if hits != 1 {
+	if hits != 2 {
 		t.Fatalf("hits %d", hits)
+	}
+	cold := &GitHub{APIBase: srv.URL, HTTPClient: srv.Client(), Persist: persist}
+	if _, err := cold.LookupCommit(t.Context(), "https://github.com/ianunruh/kmc", "deadbee"); err == nil {
+		t.Fatal("expected error")
+	}
+	if hits != 3 {
+		t.Fatalf("valkey must not store misses, hits %d", hits)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,14 +19,17 @@ import (
 	"time"
 
 	"github.com/ianunruh/deploybot/internal/logx"
+	"github.com/ianunruh/deploybot/internal/valkey"
 )
 
 const (
-	githubAPIVersion    = "2022-11-28"
-	maxPackagePages     = 2
-	defaultWorkflowRuns = 10
-	maxWorkflowRuns     = 30
-	workflowRunsTTL     = 15 * time.Second
+	githubAPIVersion     = "2022-11-28"
+	maxPackagePages      = 2
+	defaultWorkflowRuns  = 10
+	maxWorkflowRuns      = 30
+	workflowRunsTTL      = 15 * time.Second
+	commitKeyPrefix      = "deploybot:commit:"
+	commitPersistGetWait = 300 * time.Millisecond
 )
 
 // GitHub lists GHCR images through the GitHub Packages API and looks up
@@ -34,16 +38,14 @@ type GitHub struct {
 	Token      string
 	APIBase    string
 	HTTPClient *http.Client
+	// Persist stores successful commit lookups with no TTL. Empty means
+	// process memory only. 404s and other errors are not written.
+	Persist *valkey.Client
 
 	mu       sync.Mutex
-	commits  map[string]cachedCommit
+	commits  map[string]Commit
 	compares map[string]cachedCompare
 	runs     map[string]cachedRuns
-}
-
-type cachedCommit struct {
-	commit Commit
-	found  bool
 }
 
 type cachedCompare struct {
@@ -194,8 +196,9 @@ func (g *GitHub) commitVersions(ctx context.Context, owner, pkg, repository, def
 	return out, nil
 }
 
-// LookupCommit fetches a commit from a github.com repoURL. Results are cached
-// for the process lifetime; 404s are cached, other errors are not.
+// LookupCommit fetches a commit from a github.com repoURL. Successful
+// results are cached in memory and, when Persist is set, Valkey with no
+// TTL. Misses and errors are not cached.
 func (g *GitHub) LookupCommit(ctx context.Context, repoURL, sha string) (Commit, error) {
 	owner, repo, ok := ParseGitHubRepo(repoURL)
 	if !ok {
@@ -207,24 +210,22 @@ func (g *GitHub) LookupCommit(ctx context.Context, repoURL, sha string) (Commit,
 	}
 	key := commitCacheKey(owner, repo, sha)
 	if cached, hit := g.cachedCommit(key); hit {
-		if !cached.found {
-			return Commit{}, fmt.Errorf("github commit not found")
-		}
-		return cached.commit, nil
+		return cached, nil
+	}
+	if got, ok := g.loadPersistedCommit(ctx, key); ok {
+		g.rememberCommit(owner, repo, sha, got)
+		return got, nil
 	}
 	path := fmt.Sprintf("/repos/%s/%s/commits/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(sha))
 	var raw gitCommit
 	if _, err := g.getJSON(ctx, path, &raw); err != nil {
-		var apiErr *apiError
-		if errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound {
-			g.storeCommit(key, cachedCommit{})
-		}
 		return Commit{}, err
 	}
 	got := commitFromAPI(raw, repoURL, sha)
-	g.storeCommit(key, cachedCommit{commit: got, found: true})
+	g.rememberCommit(owner, repo, sha, got)
+	g.persistCommit(key, got)
 	if raw.SHA != "" && !strings.EqualFold(raw.SHA, sha) {
-		g.storeCommit(commitCacheKey(owner, repo, raw.SHA), cachedCommit{commit: got, found: true})
+		g.persistCommit(commitCacheKey(owner, repo, raw.SHA), got)
 	}
 	return got, nil
 }
@@ -414,23 +415,71 @@ func commitCacheKey(owner, repo, sha string) string {
 	return strings.ToLower(owner + "/" + repo + "@" + sha)
 }
 
-func (g *GitHub) cachedCommit(key string) (cachedCommit, bool) {
+func (g *GitHub) rememberCommit(owner, repo, sha string, got Commit) {
+	g.storeCommit(commitCacheKey(owner, repo, sha), got)
+	if got.SHA != "" && !strings.EqualFold(got.SHA, sha) {
+		g.storeCommit(commitCacheKey(owner, repo, got.SHA), got)
+	}
+}
+
+func (g *GitHub) cachedCommit(key string) (Commit, bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.commits == nil {
-		return cachedCommit{}, false
+		return Commit{}, false
 	}
 	c, ok := g.commits[key]
 	return c, ok
 }
 
-func (g *GitHub) storeCommit(key string, c cachedCommit) {
+func (g *GitHub) storeCommit(key string, c Commit) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.commits == nil {
-		g.commits = map[string]cachedCommit{}
+		g.commits = map[string]Commit{}
 	}
 	g.commits[key] = c
+}
+
+func (g *GitHub) loadPersistedCommit(ctx context.Context, key string) (Commit, bool) {
+	if g == nil || g.Persist == nil {
+		return Commit{}, false
+	}
+	cctx, cancel := context.WithTimeout(ctx, commitPersistGetWait)
+	defer cancel()
+	raw, err := g.Persist.Get(cctx, commitKeyPrefix+key)
+	if err != nil {
+		slog.Warn("commit hydrate", "key", key, "err", err)
+		return Commit{}, false
+	}
+	if len(raw) == 0 {
+		return Commit{}, false
+	}
+	var got Commit
+	if err := json.Unmarshal(raw, &got); err != nil {
+		slog.Warn("commit hydrate decode", "key", key, "err", err)
+		return Commit{}, false
+	}
+	if got.SHA == "" && got.Message == "" {
+		return Commit{}, false
+	}
+	return got, true
+}
+
+func (g *GitHub) persistCommit(key string, got Commit) {
+	if g == nil || g.Persist == nil {
+		return
+	}
+	raw, err := json.Marshal(got)
+	if err != nil {
+		slog.Warn("commit persist marshal", "key", key, "err", err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := g.Persist.Set(ctx, commitKeyPrefix+key, raw); err != nil {
+		slog.Warn("commit persist", "key", key, "err", err)
+	}
 }
 
 func compareCacheKey(owner, repo, base, head string) string {

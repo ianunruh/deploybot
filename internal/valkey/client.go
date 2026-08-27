@@ -1,6 +1,7 @@
 // Package valkey is a tiny RESP GET/SET client. No connection pool: each
 // call dials, runs one command, and closes. Enough for off-request-path
-// hydrate and persist of cluster live snapshots and overlay git history.
+// hydrate and persist of cluster live snapshots, overlay git history, and
+// successful GitHub commit lookups.
 package valkey
 
 import (
