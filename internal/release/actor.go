@@ -20,11 +20,11 @@ const (
 // Actor is who initiated a git mutation. Kind is the stable identifier
 // written as a commit trailer; git author is the display form.
 type Actor struct {
-	Kind  string
-	ID    string
-	Repo  string
-	Email string
-	Name  string
+	Kind  string `json:"kind,omitempty"`
+	ID    string `json:"id,omitempty"`
+	Repo  string `json:"repo,omitempty"`
+	Email string `json:"email,omitempty"`
+	Name  string `json:"name,omitempty"`
 }
 
 func ActorAutoPin() Actor     { return Actor{Kind: ActorKindAutoPin} }
@@ -97,6 +97,40 @@ func (a Actor) AppendTrailers(message string) string {
 		b.WriteString(repo)
 	}
 	return b.String()
+}
+
+// ParseActorTrailers reads Deploybot-Actor trailers from a commit message.
+func ParseActorTrailers(message string) Actor {
+	var a Actor
+	for _, line := range strings.Split(message, "\n") {
+		key, val, ok := cutTrailer(line)
+		if !ok {
+			continue
+		}
+		switch key {
+		case trailerActor:
+			a.Kind = val
+		case trailerID:
+			a.ID = val
+		case trailerRepo:
+			a.Repo = val
+		}
+	}
+	return a
+}
+
+func cutTrailer(line string) (key, val string, ok bool) {
+	line = strings.TrimSpace(line)
+	i := strings.IndexByte(line, ':')
+	if i <= 0 {
+		return "", "", false
+	}
+	key = strings.TrimSpace(line[:i])
+	val = cleanIdent(line[i+1:])
+	if key == "" || val == "" {
+		return "", "", false
+	}
+	return key, val, true
 }
 
 func firstIdent(vals ...string) string {

@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import type { Route } from "./+types/history";
 import { listHistory, type HistoryEvent } from "~/lib/api.server";
 import { CompactImage } from "~/ui/compact-image";
+import { HistoryActor } from "~/ui/history-actor";
 import { PageHeader } from "~/ui/page-header";
 import { RelativeTime } from "~/ui/relative-time";
 import {
@@ -65,7 +66,7 @@ export default function History({ loaderData }: Route.ComponentProps) {
         />
       ) : null}
       <ResourceTable
-        headers={["When", "App", "Kind", "Stage", "Image", "Author", "Commit"]}
+        headers={["When", "App", "Kind", "Stage", "Image", "Actor", "Commit"]}
         isEmpty={filtered.length === 0 && error == null}
         emptyMessage={
           events.length === 0
@@ -105,9 +106,7 @@ export default function History({ loaderData }: Route.ComponentProps) {
               <CompactImage value={event.image} empty="—" />
             </Table.Td>
             <Table.Td className="db-cell-clip">
-              <Text size="sm" c="dimmed">
-                {event.author || "—"}
-              </Text>
+              <HistoryActor actor={event.actor} author={event.author} />
             </Table.Td>
             <Table.Td className="db-cell-fit">
               <HistoryCommit hash={event.commit} url={event.commitURL} />

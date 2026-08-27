@@ -54,6 +54,13 @@ func TestActorTrailers(t *testing.T) {
 	if eventKind(got) != EventPin {
 		t.Fatalf("eventKind %q", eventKind(got))
 	}
+	parsed := ParseActorTrailers(got)
+	if parsed.Kind != ActorKindGitHubActions || parsed.ID != "ianunruh" || parsed.Repo != "ianunruh/kmc" {
+		t.Fatalf("parsed %+v", parsed)
+	}
+	if ParseActorTrailers("pin kmc homelab to img").Kind != "" {
+		t.Fatal("subject-only message should have no actor")
+	}
 }
 
 func TestWithActorPinsAuthorAndTrailer(t *testing.T) {
@@ -98,6 +105,15 @@ func TestWithActorPinsAuthorAndTrailer(t *testing.T) {
 	}
 	if len(h.Events) == 0 || h.Events[0].Author != "auto-pin" {
 		t.Fatalf("history author %+v", h.Events)
+	}
+	if h.Events[0].Actor.Kind != ActorKindAutoPin {
+		t.Fatalf("history actor %+v", h.Events[0].Actor)
+	}
+	if len(h.Releases) == 0 {
+		t.Fatal("missing release")
+	}
+	if homelab := h.Releases[0].Stages["homelab"]; homelab.Actor.Kind != ActorKindAutoPin || homelab.Author != "auto-pin" {
+		t.Fatalf("release stage %+v", homelab)
 	}
 }
 

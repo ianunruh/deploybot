@@ -2,6 +2,7 @@ import { Anchor, Badge, Button, Group, Stack, Text } from "@mantine/core";
 
 import type { Release, ReleaseStageHit } from "~/lib/api.server";
 import { CompactImage, releaseImageRef, releaseMatchesImage } from "~/ui/compact-image";
+import { HistoryActor } from "~/ui/history-actor";
 import { RelativeTime } from "~/ui/relative-time";
 import { ResourceTable, Table } from "~/ui/resource-table";
 import { SourceCommitMeta } from "~/ui/source-commit";
@@ -109,6 +110,7 @@ function ReleaseStageCell({
         </Group>
         <RelativeTime value={hit.at} size="xs" />
       </Stack>
+      <HistoryActor actor={hit.actor} author={hit.author} size="xs" />
       {canRollback ? (
         <Button variant="default" size="compact-xs" onClick={onRollback}>
           Rollback

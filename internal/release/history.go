@@ -38,6 +38,7 @@ type Event struct {
 	Commit     string    `json:"commit"`
 	CommitURL  string    `json:"commitURL,omitempty"`
 	Author     string    `json:"author,omitempty"`
+	Actor      Actor     `json:"actor,omitempty"`
 }
 
 type GlobalHistory struct {
@@ -49,6 +50,8 @@ type ReleaseStage struct {
 	Kind      string    `json:"kind"`
 	Commit    string    `json:"commit,omitempty"`
 	CommitURL string    `json:"commitURL,omitempty"`
+	Author    string    `json:"author,omitempty"`
+	Actor     Actor     `json:"actor,omitempty"`
 }
 
 type SourceCommit struct {
@@ -298,6 +301,7 @@ func overlayChange(hit overlayHit, path, kind string, rev gitwrite.Rev) (Event, 
 		Commit:     rev.Hash,
 		CommitURL:  gitCommitURL(hit.d.Spec.Git.RepoURL, rev.Hash),
 		Author:     rev.Author,
+		Actor:      ParseActorTrailers(rev.Message),
 	}, true
 }
 
@@ -379,6 +383,8 @@ func groupReleases(events []Event, current image.Ref) []Release {
 			Kind:      e.Kind,
 			Commit:    e.Commit,
 			CommitURL: e.CommitURL,
+			Author:    e.Author,
+			Actor:     e.Actor,
 		}
 	}
 	out := make([]Release, 0, len(order))

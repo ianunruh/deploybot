@@ -231,11 +231,21 @@ export type LiveWorkloads = {
   stages: StageWorkload[];
 };
 
+export type Actor = {
+  kind?: string;
+  id?: string;
+  repo?: string;
+  name?: string;
+  email?: string;
+};
+
 export type ReleaseStageHit = {
   at: string;
   kind: string;
   commit?: string;
   commitURL?: string;
+  author?: string;
+  actor?: Actor;
 };
 
 export type Release = {
@@ -260,6 +270,7 @@ export type HistoryEvent = {
   commit: string;
   commitURL?: string;
   author?: string;
+  actor?: Actor;
 };
 
 export type DeployableHistory = {
