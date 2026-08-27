@@ -5,6 +5,9 @@ export default [
   route("healthz", "routes/healthz.ts"),
   route("history", "routes/history.tsx"),
   route("updates", "routes/updates.tsx"),
+  route("ops", "routes/ops.tsx"),
+  route("ops/:cluster/:id", "routes/ops.$cluster.$id.tsx"),
+  route("ops/:cluster/:id/logs", "routes/ops.$cluster.$id.logs.ts"),
   route("deployables/:name", "routes/deployables.$name.tsx", [
     index("routes/deployables.$name._index.tsx"),
     route("history", "routes/deployables.$name.history.tsx"),

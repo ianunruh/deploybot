@@ -526,6 +526,93 @@ export async function submitPauseForm(
   }
 }
 
+export type OpsField = {
+  name: string;
+  type: string;
+  title?: string;
+  description?: string;
+  required?: boolean;
+  options?: string[];
+  suggestions?: string[];
+  keys?: string[];
+};
+
+export type OpsKind = {
+  name: string;
+  title: string;
+  workDir?: string;
+  fields: OpsField[];
+};
+
+export type OpsCatalog = {
+  kinds: OpsKind[];
+  clusters: string[];
+  defaultRef?: string;
+  imageSet: boolean;
+};
+
+export type OpsExecution = {
+  id: string;
+  kind: string;
+  cluster: string;
+  phase: string;
+  dryRun: boolean;
+  ref?: string;
+  summary?: string;
+  command?: string[];
+  params?: unknown;
+  actor?: Actor;
+  podName?: string;
+  message?: string;
+  createdAt?: string;
+};
+
+export function getOpsCatalog() {
+  return apiFetch<OpsCatalog>("/api/v1/ops/catalog");
+}
+
+export function listOpsExecutions(opts?: { kind?: string; cluster?: string }) {
+  const q = new URLSearchParams();
+  if (opts?.kind) q.set("kind", opts.kind);
+  if (opts?.cluster) q.set("cluster", opts.cluster);
+  const suffix = q.size > 0 ? `?${q}` : "";
+  return apiFetch<{ executions: OpsExecution[] }>(`/api/v1/ops/executions${suffix}`);
+}
+
+export function getOpsExecution(cluster: string, id: string) {
+  const q = new URLSearchParams({ cluster });
+  return apiFetch<OpsExecution>(`/api/v1/ops/executions/${encodeURIComponent(id)}?${q}`);
+}
+
+export function startOpsExecution(
+  body: {
+    kind: string;
+    cluster: string;
+    dryRun?: boolean;
+    ref?: string;
+    params?: unknown;
+  },
+  opts?: { headers?: HeadersInit },
+) {
+  return apiFetch<OpsExecution>("/api/v1/ops/executions", {
+    method: "POST",
+    headers: opts?.headers,
+    body: JSON.stringify(body),
+  });
+}
+
+export function opsLogsPath(cluster: string, id: string, follow = true): string {
+  const q = new URLSearchParams({
+    cluster,
+    follow: follow ? "1" : "0",
+  });
+  return `/api/v1/ops/executions/${encodeURIComponent(id)}/logs?${q}`;
+}
+
+export function apiURL(path: string): string {
+  return new URL(path, apiBase()).toString();
+}
+
 export function reconcileDeployable(
   name: string,
   stage: string,

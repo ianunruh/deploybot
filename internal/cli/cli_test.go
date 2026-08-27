@@ -30,6 +30,32 @@ func TestRunVersion(t *testing.T) {
 	}
 }
 
+func TestRunOpsCatalog(t *testing.T) {
+	isolateEnv(t)
+	if err := Run(t.Context(), []string{"ops", "catalog"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMergeParams(t *testing.T) {
+	t.Parallel()
+	raw, err := mergeParams("", paramList{"roles=common,k8s", "limit=k8s_nodes", "data.k8s_package_set=kubeadm"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != `{"data":{"k8s_package_set":"kubeadm"},"limit":"k8s_nodes","roles":["common","k8s"]}` {
+		t.Fatalf("%s", raw)
+	}
+}
+
+func TestRunOpsRunRequiresFlags(t *testing.T) {
+	isolateEnv(t)
+	err := Run(t.Context(), []string{"ops", "run"})
+	if err == nil || err.Error() != "ops run requires --kind and --cluster" {
+		t.Fatalf("got %v", err)
+	}
+}
+
 func TestRunUnknown(t *testing.T) {
 	t.Parallel()
 	if err := Run(t.Context(), []string{"nope"}); err == nil {

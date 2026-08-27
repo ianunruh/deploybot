@@ -32,6 +32,9 @@ your app.
   pin / promote / rollback with diffs, release history, and links out to
   Argo, Headlamp, and Grafana. The CLI is the same loop; dry-run unless
   `--apply`, nothing is pushed unless `--push`, and it never force-pushes.
+- **Ops Jobs.** Allowlisted kcloud-ops commands (pyinfra first) run as
+  Kubernetes Jobs on the target cluster. History is the Job list;
+  the console streams pod logs. Dry-run unless `--apply`.
 - **GitOps, not a second source of truth.** Deploybot writes git and
   talks to Application CRs. Argo applies the cluster.
 
@@ -76,6 +79,10 @@ just build
   --image ghcr.io/ianunruh/kmc@sha256:… --repo /path/to/kcloud-ops --apply --push
 ./build/deploybot reconcile --spec examples/kmc.yaml --stage homelab \
   --repo /path/to/kcloud-ops --apply --push
+./build/deploybot ops catalog
+./build/deploybot ops run --kind pyinfra --cluster homelab \
+  --param roles=common --param limit=exporter_nodes
+./build/deploybot ops logs --cluster homelab --follow ops-xxxx
 ```
 
 `--apply` commits locally. `--push` (requires `--apply`) pushes the current

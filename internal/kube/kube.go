@@ -246,6 +246,38 @@ func (c *REST) Patch(ctx context.Context, path, contentType string, body any) er
 	return c.Do(ctx, http.MethodPatch, path, contentType, body, nil)
 }
 
+// Post JSON-encodes body as a POST of an absolute API path.
+func (c *REST) Post(ctx context.Context, path string, body, out any) error {
+	return c.Do(ctx, http.MethodPost, path, "", body, out)
+}
+
+// Stream sends a request and returns the response body on 2xx. The caller
+// must Close the body. Unlike Do, the HTTP client timeout is cleared so
+// follow/watch calls can run for as long as ctx allows. Accept is */*
+// (pod logs are text/plain). 401 retries once after Invalidate.
+func (c *REST) Stream(ctx context.Context, method, path string) (io.ReadCloser, error) {
+	if c == nil || c.BaseURL == "" {
+		return nil, fmt.Errorf("kube client: no server")
+	}
+	if !strings.HasPrefix(path, "/") {
+		return nil, fmt.Errorf("kube path %q must start with /", path)
+	}
+	var last error
+	for attempt := 0; attempt < 2; attempt++ {
+		rc, err := c.streamOnce(ctx, method, path)
+		if err == nil {
+			return rc, nil
+		}
+		last = err
+		var se *StatusError
+		if !errors.As(err, &se) || se.Code != http.StatusUnauthorized || c.Auth == nil {
+			return nil, err
+		}
+		c.Auth.Invalidate()
+	}
+	return nil, last
+}
+
 // Do sends a JSON request. path must start with /.
 func (c *REST) Do(ctx context.Context, method, path, contentType string, body, out any) error {
 	if c == nil || c.BaseURL == "" {
@@ -322,6 +354,46 @@ func (c *REST) doOnce(ctx context.Context, method, path, contentType string, bod
 		return fmt.Errorf("kube decode %s %s: %w", method, path, err)
 	}
 	return nil
+}
+
+func (c *REST) streamOnce(ctx context.Context, method, path string) (io.ReadCloser, error) {
+	req, err := http.NewRequestWithContext(ctx, method, c.BaseURL+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "*/*")
+	if c.Auth != nil {
+		tok, err := c.Auth.Token(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if tok != "" {
+			req.Header.Set("Authorization", "Bearer "+tok)
+		}
+	}
+	resp, err := logx.Do("kube", c.streamClient(), req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrBody+1))
+		_ = resp.Body.Close()
+		return nil, &StatusError{Method: method, Path: path, Code: resp.StatusCode, Status: resp.Status, Body: truncate(raw)}
+	}
+	return resp.Body, nil
+}
+
+func (c *REST) streamClient() *http.Client {
+	base := c.HTTP
+	if base == nil {
+		return &http.Client{}
+	}
+	if base.Timeout == 0 {
+		return base
+	}
+	clone := *base
+	clone.Timeout = 0
+	return &clone
 }
 
 // StatusError is a non-2xx Kubernetes API response.

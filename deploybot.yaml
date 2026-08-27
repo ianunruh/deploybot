@@ -4,6 +4,11 @@
 # kubeContext defaults to the cluster name.
 valkey:
   addr: 127.0.0.1:6379
+ops:
+  namespace: ops-ci
+  image: ghcr.io/ianunruh/kcloud-ops:main-8597ede@sha256:4441d4ddaec70b7d1582abca3b9bc375722dd7e4a3be25627b7c20b806d95f8d
+  repoURL: https://github.com/ianunruh/kcloud-ops
+  ref: main
 clusters:
   homelab:
     argo:

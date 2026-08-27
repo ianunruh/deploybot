@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ianunruh/deploybot/internal/ops"
 	"github.com/ianunruh/deploybot/internal/release"
 )
 
@@ -34,8 +35,10 @@ func writeError(w http.ResponseWriter, err error) {
 	status := http.StatusBadRequest
 	if isNotFound(err) {
 		status = http.StatusNotFound
-	} else if errors.Is(err, release.ErrPaused) {
+	} else if errors.Is(err, release.ErrPaused) || errors.Is(err, ops.ErrBusy) {
 		status = http.StatusConflict
+	} else if errors.Is(err, ops.ErrNoImage) || errors.Is(err, ops.ErrClusterOffline) {
+		status = http.StatusServiceUnavailable
 	}
 	writeJSON(w, status, map[string]string{"error": err.Error()})
 }
@@ -45,5 +48,5 @@ func isNotFound(err error) bool {
 		return false
 	}
 	msg := err.Error()
-	return strings.Contains(msg, "unknown deployable") || strings.Contains(msg, "unknown stage")
+	return strings.Contains(msg, "unknown deployable") || strings.Contains(msg, "unknown stage") || errors.Is(err, ops.ErrNotFound)
 }

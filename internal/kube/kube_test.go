@@ -237,6 +237,115 @@ func TestExecAuthNoToken(t *testing.T) {
 	}
 }
 
+func TestRESTPost(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /apis/batch/v1/namespaces/ops-ci/jobs", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("content-type %q", r.Header.Get("Content-Type"))
+		}
+		body, _ := io.ReadAll(r.Body)
+		var got map[string]any
+		if err := json.Unmarshal(body, &got); err != nil {
+			t.Fatal(err)
+		}
+		if got["kind"] != "Job" {
+			t.Errorf("kind %v", got["kind"])
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"kind": "Job",
+			"metadata": map[string]any{
+				"name":      "ops-abc",
+				"namespace": "ops-ci",
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	c := &REST{BaseURL: srv.URL, HTTP: srv.Client(), Auth: Bearer("t")}
+	var out map[string]any
+	if err := c.Post(t.Context(), "/apis/batch/v1/namespaces/ops-ci/jobs", map[string]any{
+		"kind": "Job",
+	}, &out); err != nil {
+		t.Fatal(err)
+	}
+	meta, _ := out["metadata"].(map[string]any)
+	if meta["name"] != "ops-abc" {
+		t.Fatalf("%v", out)
+	}
+}
+
+func TestRESTStreamFollowAnd401Retry(t *testing.T) {
+	var hits atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/namespaces/ns/pods/p/log", func(w http.ResponseWriter, r *http.Request) {
+		n := hits.Add(1)
+		if r.Header.Get("Authorization") != "Bearer tok" {
+			t.Errorf("auth %q", r.Header.Get("Authorization"))
+		}
+		if r.Header.Get("Accept") != "*/*" {
+			t.Errorf("accept %q", r.Header.Get("Accept"))
+		}
+		if r.URL.Query().Get("follow") != "true" {
+			t.Errorf("query %s", r.URL.RawQuery)
+		}
+		if n == 1 {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"reason":"Unauthorized"}`))
+			return
+		}
+		fl, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatal("not flushable")
+		}
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("line1\n"))
+		fl.Flush()
+		_, _ = w.Write([]byte("line2\n"))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	c := &REST{
+		BaseURL: srv.URL,
+		HTTP:    &http.Client{Timeout: time.Second, Transport: srv.Client().Transport},
+		Auth:    Bearer("tok"),
+	}
+	rc, err := c.Stream(t.Context(), http.MethodGet, "/api/v1/namespaces/ns/pods/p/log?follow=true")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rc.Close() }()
+	got, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "line1\nline2\n" {
+		t.Fatalf("body %q", got)
+	}
+	if hits.Load() != 2 {
+		t.Fatalf("hits %d", hits.Load())
+	}
+}
+
+func TestRESTStreamStatusError(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/namespaces/ns/pods/p/log", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("container is waiting"))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	c := &REST{BaseURL: srv.URL, HTTP: srv.Client()}
+	_, err := c.Stream(t.Context(), http.MethodGet, "/api/v1/namespaces/ns/pods/p/log")
+	var se *StatusError
+	if !errors.As(err, &se) || se.Code != 400 {
+		t.Fatalf("got %v", err)
+	}
+}
+
 func TestDoRejectsRelativePath(t *testing.T) {
 	c := &REST{BaseURL: "http://127.0.0.1"}
 	if err := c.Get(t.Context(), "pods", nil); err == nil {

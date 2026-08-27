@@ -4,12 +4,14 @@ import (
 	"net/http"
 
 	"github.com/ianunruh/deploybot/internal/catalog"
+	"github.com/ianunruh/deploybot/internal/ops"
 	"github.com/ianunruh/deploybot/internal/release"
 )
 
 type Server struct {
 	Release *release.Service
 	Catalog *catalog.Catalog
+	Ops     *ops.Service
 }
 
 func (s *Server) Handler() http.Handler {
@@ -33,6 +35,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/deployables/{name}/promote", s.promote)
 	mux.HandleFunc("POST /api/v1/deployables/{name}/rollback", s.rollback)
 	mux.HandleFunc("POST /api/v1/deployables/{name}/reconcile", s.reconcile)
+	mux.HandleFunc("GET /api/v1/ops/catalog", s.opsCatalog)
+	mux.HandleFunc("GET /api/v1/ops/executions", s.listOps)
+	mux.HandleFunc("POST /api/v1/ops/executions", s.startOps)
+	mux.HandleFunc("GET /api/v1/ops/executions/{id}", s.getOps)
+	mux.HandleFunc("GET /api/v1/ops/executions/{id}/logs", s.opsLogs)
 	return withJSON(mux)
 }
 

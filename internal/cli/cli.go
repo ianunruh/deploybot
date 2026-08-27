@@ -16,6 +16,10 @@ Usage:
   deploybot reconcile --spec <file> [--stage name]... [--config file] [--repo dir] [--apply] [--push] [--sync]
   deploybot update [--spec file] [--specs dir] [--config file] [--repo dir] [--apply] [--push] [--sync]
   deploybot serve [--config file] [--addr host:port] [--specs dir] [--repo dir] [--apply] [--push] [--sync] [--auto-pin]
+  deploybot ops catalog [--config file]
+  deploybot ops ls [--config file] [--kind name] [--cluster name]
+  deploybot ops run --kind <name> --cluster <name> [--param k=v]... [--params json] [--ref name] [--apply] [--config file]
+  deploybot ops logs --cluster <name> [--follow] <id>
   deploybot version
 `
 
@@ -45,6 +49,8 @@ func Run(ctx context.Context, args []string) error {
 		return runUpdate(ctx, args[1:])
 	case "serve":
 		return runServe(ctx, args[1:])
+	case "ops":
+		return runOps(ctx, args[1:])
 	default:
 		_, _ = fmt.Fprint(os.Stderr, usage)
 		return fmt.Errorf("unknown command %q", args[0])

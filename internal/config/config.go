@@ -22,6 +22,18 @@ type File struct {
 	AutoPin    *bool              `yaml:"autoPin,omitempty"`
 	Valkey     Valkey             `yaml:"valkey,omitempty"`
 	Clusters   map[string]Cluster `yaml:"clusters,omitempty"`
+	Ops        Ops                `yaml:"ops,omitempty"`
+}
+
+// Ops is how serve creates cluster Jobs for allowlisted kcloud-ops commands.
+// Image should be a digest-pinned toolkit image. Empty image disables create.
+type Ops struct {
+	Namespace      string `yaml:"namespace,omitempty"`
+	Image          string `yaml:"image,omitempty"`
+	RepoURL        string `yaml:"repoURL,omitempty"`
+	Ref            string `yaml:"ref,omitempty"`
+	ServiceAccount string `yaml:"serviceAccount,omitempty"`
+	SecretName     string `yaml:"secretName,omitempty"`
 }
 
 // Valkey is the local live-state, overlay-history, and GitHub commit cache.

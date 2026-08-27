@@ -16,6 +16,7 @@ import {
   IconMoon,
   IconRefresh,
   IconSun,
+  IconTerminal2,
 } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigation } from "react-router";
@@ -92,6 +93,13 @@ export function AppChrome({ children }: { children: ReactNode }) {
           active={
             location.pathname === "/updates" || location.pathname.startsWith("/updates")
           }
+        />
+        <NavLink
+          component={Link}
+          to="/ops"
+          label="Ops"
+          leftSection={<IconTerminal2 size={16} />}
+          active={location.pathname === "/ops" || location.pathname.startsWith("/ops")}
         />
       </AppShell.Navbar>
       <AppShell.Main className="db-shell-main">

@@ -19,6 +19,7 @@ import (
 	"github.com/ianunruh/deploybot/internal/config"
 	"github.com/ianunruh/deploybot/internal/gitwrite"
 	"github.com/ianunruh/deploybot/internal/image"
+	"github.com/ianunruh/deploybot/internal/ops"
 	"github.com/ianunruh/deploybot/internal/release"
 	"github.com/ianunruh/deploybot/internal/valkey"
 )
@@ -100,7 +101,15 @@ func runServe(ctx context.Context, args []string) error {
 		Valkey:   s.valkey,
 		Lock:     new(sync.Mutex),
 	}
-	h := (&api.Server{Release: svc, Catalog: cat}).Handler()
+	h := (&api.Server{
+		Release: svc,
+		Catalog: cat,
+		Ops: &ops.Service{
+			Config: ops.ConfigFromFile(file),
+			Kube:   kubeClients(eps),
+			Names:  clusterNameList(file),
+		},
+	}).Handler()
 	srv := &http.Server{Addr: s.addr, Handler: h}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

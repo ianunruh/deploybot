@@ -76,6 +76,29 @@ func TestLoadValkey(t *testing.T) {
 	}
 }
 
+func TestLoadOps(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "deploybot.yaml")
+	body := []byte(`
+ops:
+  namespace: ops-ci
+  image: ghcr.io/ianunruh/kcloud-ops@sha256:abc
+  repoURL: https://github.com/ianunruh/kcloud-ops
+  ref: main
+`)
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Ops.Namespace != "ops-ci" || f.Ops.Image == "" || f.Ops.Ref != "main" {
+		t.Fatalf("ops %+v", f.Ops)
+	}
+}
+
 func TestLoadAutoPin(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
